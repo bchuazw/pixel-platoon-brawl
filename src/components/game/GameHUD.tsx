@@ -475,6 +475,18 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
               <Play className="w-3.5 h-3.5" /> PLAY
             </button>
           )}
+          {/* Exit button */}
+          {onMainMenu && !isGameOver && (
+            <>
+              <div className="h-5 w-px bg-border/15" />
+              <button onClick={onMainMenu}
+                className="text-xs px-2 sm:px-3 py-1.5 bg-muted/40 hover:bg-muted/70 text-muted-foreground rounded-md transition-all tracking-wider font-bold font-display flex items-center gap-1.5 border border-border/20"
+                title="Exit to menu">
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">EXIT</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 

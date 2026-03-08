@@ -354,7 +354,19 @@ export function useGameStore() {
       // If queue is empty, advance to next team
       if (unitQueueRef.current.length === 0) {
         const nextTeam = getNextTeam(newState.currentTeam, newState.units);
-        if (!nextTeam) return newState;
+        if (!nextTeam) {
+          // No more teams - force game over
+          stopBgMusic();
+          const alive = getAliveTeams(newState.units);
+          return {
+            ...newState,
+            log: [...newState.log, `🏆 ${alive[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
+            phase: 'game_over' as const, selectedUnitId: null,
+            movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+            combatEvents: [...prev.combatEvents, ...allEvents], activeAbility: null,
+            autoPlay: false,
+          };
+        }
 
         const teamOrder = ['blue', 'red', 'green', 'yellow'] as const;
         const firstAliveTeam = teamOrder.find(t => newState.units.some(u => u.team === t && u.isAlive));

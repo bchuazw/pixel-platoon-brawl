@@ -565,7 +565,7 @@ function PropObject({ tile }: { tile: TileData }) {
           {/* Main wall section */}
           <mesh position={[0, 0.25, 0]} castShadow>
             <boxGeometry args={[0.7, 0.5, 0.12]} />
-            <meshStandardMaterial color="#8a7a6a" roughness={0.92} />
+            <meshStandardMaterial color={wallColor} roughness={0.92} />
           </mesh>
           {/* Jagged top — broken edge */}
           <mesh position={[-0.15, 0.52, 0]} castShadow>

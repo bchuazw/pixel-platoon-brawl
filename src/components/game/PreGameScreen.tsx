@@ -218,7 +218,7 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
   }, []);
 
   return (
-    <div className="absolute inset-0 z-30 pointer-events-auto overflow-y-auto">
+    <div className="absolute inset-0 z-30 pointer-events-auto overflow-y-auto" onClick={handleClick}>
       {/* The 3D board renders behind — we just darken over it */}
       <div className="absolute inset-0 bg-background/75 backdrop-blur-[2px]" />
       <Scanlines />

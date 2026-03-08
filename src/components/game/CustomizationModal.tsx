@@ -452,7 +452,7 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
           <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
             style={{ background: `linear-gradient(180deg, ${teamColor}15, transparent)` }} />
 
-          <Canvas camera={{ position: [0, 0.5, 2.8], fov: 45 }}>
+          <Canvas camera={{ position: [0, 0.6, 3.5], fov: 40 }}>
             <ambientLight intensity={0.5} />
             <directionalLight position={[3, 5, 3]} intensity={1} />
             <directionalLight position={[-2, 3, -1]} intensity={0.3} />

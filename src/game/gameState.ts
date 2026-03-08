@@ -674,6 +674,7 @@ export function createInitialState(): GameState {
     autoPlay: false,
     movePath: null,
     movingUnitId: null,
+    killCam: null,
   };
 }
 

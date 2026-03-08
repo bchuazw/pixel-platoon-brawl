@@ -204,6 +204,202 @@ function Minimap({ state }: { state: GameState }) {
   );
 }
 
+function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onRestart: () => void; onMainMenu?: () => void }) {
+  const [show, setShow] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [particles, setParticles] = useState<{ id: number; x: number; delay: number; color: string; size: number }[]>([]);
+
+  const winnerLine = state.log.find(l => l.includes('WINS'))?.replace('🏆 ', '') || 'BATTLE COMPLETE';
+  const winningTeam = (['blue', 'red', 'green', 'yellow'] as const).find(t =>
+    state.units.some(u => u.team === t && u.isAlive)
+  );
+  const winnerColor = winningTeam ? TEAM_COLORS[winningTeam] : '#ffcc00';
+
+  // MVP - most kills
+  const mvp = [...state.units].sort((a, b) => b.kills - a.kills)[0];
+  const totalKills = state.units.reduce((s, u) => s + u.kills, 0);
+  const survivors = state.units.filter(u => u.isAlive);
+
+  useEffect(() => {
+    playVictoryFanfare();
+    // Stagger reveal
+    setTimeout(() => setShow(true), 200);
+    setTimeout(() => setShowStats(true), 1200);
+
+    // Generate confetti particles
+    const confetti = Array.from({ length: 40 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 2,
+      color: ['#ffcc00', '#ff4444', '#44cc44', '#4488ff', '#ff88ff', '#ff8844'][Math.floor(Math.random() * 6)],
+      size: 4 + Math.random() * 8,
+    }));
+    setParticles(confetti);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 z-40 pointer-events-auto">
+      {/* Dark overlay with fade in */}
+      <div
+        className="absolute inset-0 bg-background/85 backdrop-blur-sm transition-opacity duration-1000"
+        style={{ opacity: show ? 1 : 0 }}
+      />
+
+      {/* Confetti particles */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute top-0 pointer-events-none"
+          style={{
+            left: `${p.x}%`,
+            width: p.size,
+            height: p.size * 1.5,
+            backgroundColor: p.color,
+            borderRadius: '2px',
+            animation: `confetti-fall ${3 + Math.random() * 2}s linear ${p.delay}s infinite`,
+            transform: `rotate(${Math.random() * 360}deg)`,
+            opacity: show ? 0.9 : 0,
+          }}
+        />
+      ))}
+
+      {/* Radial glow behind trophy */}
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full transition-all duration-[2s]"
+        style={{
+          background: `radial-gradient(circle, ${winnerColor}22 0%, transparent 70%)`,
+          opacity: show ? 1 : 0,
+          transform: `translate(-50%, -50%) scale(${show ? 1 : 0.3})`,
+        }}
+      />
+
+      {/* Main content */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-6">
+        {/* Trophy + title */}
+        <div
+          className="text-center transition-all duration-700"
+          style={{
+            opacity: show ? 1 : 0,
+            transform: `translateY(${show ? 0 : 40}px) scale(${show ? 1 : 0.5})`,
+          }}
+        >
+          <div
+            className="text-[60px] mb-2"
+            style={{ animation: show ? 'trophy-bounce 1s ease-out 0.5s both' : 'none' }}
+          >
+            🏆
+          </div>
+          <h1
+            className="text-[28px] font-bold tracking-[0.4em] mb-2"
+            style={{ color: winnerColor, textShadow: `0 0 30px ${winnerColor}88, 0 0 60px ${winnerColor}44` }}
+          >
+            VICTORY
+          </h1>
+          <p className="text-[12px] text-foreground/80 tracking-[0.2em]">{winnerLine}</p>
+        </div>
+
+        {/* Stats cards */}
+        <div
+          className="flex gap-4 transition-all duration-700"
+          style={{
+            opacity: showStats ? 1 : 0,
+            transform: `translateY(${showStats ? 0 : 30}px)`,
+          }}
+        >
+          {/* MVP Card */}
+          {mvp && (
+            <div className="bg-card/90 border border-accent/40 rounded-xl p-4 text-center min-w-[140px]"
+              style={{ boxShadow: `0 0 20px ${winnerColor}22` }}>
+              <div className="text-[7px] text-accent tracking-[0.2em] mb-1">⭐ MVP</div>
+              <div className="text-[12px] font-bold text-foreground">{mvp.name}</div>
+              <div className="text-[8px] uppercase tracking-wider mt-0.5" style={{ color: TEAM_COLORS[mvp.team] }}>
+                {mvp.unitClass} • {mvp.team}
+              </div>
+              <div className="text-[18px] font-bold text-accent mt-1">{mvp.kills}</div>
+              <div className="text-[7px] text-muted-foreground">KILLS</div>
+            </div>
+          )}
+
+          {/* Battle stats */}
+          <div className="bg-card/90 border border-border/40 rounded-xl p-4 text-center min-w-[120px]">
+            <div className="text-[7px] text-muted-foreground tracking-[0.2em] mb-2">BATTLE STATS</div>
+            <div className="space-y-2">
+              <div>
+                <div className="text-[16px] font-bold text-foreground">{state.turn}</div>
+                <div className="text-[7px] text-muted-foreground">TURNS</div>
+              </div>
+              <div>
+                <div className="text-[16px] font-bold text-destructive">{totalKills}</div>
+                <div className="text-[7px] text-muted-foreground">ELIMINATIONS</div>
+              </div>
+              <div>
+                <div className="text-[16px] font-bold text-primary">{survivors.length}</div>
+                <div className="text-[7px] text-muted-foreground">SURVIVORS</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Survivors */}
+          <div className="bg-card/90 border border-border/40 rounded-xl p-4 min-w-[140px]">
+            <div className="text-[7px] text-muted-foreground tracking-[0.2em] mb-2 text-center">SURVIVORS</div>
+            <div className="space-y-1.5">
+              {survivors.map(u => (
+                <div key={u.id} className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: TEAM_COLORS[u.team] }} />
+                  <span className="text-[8px] text-foreground font-bold">{u.name}</span>
+                  <span className="text-[7px] text-muted-foreground ml-auto">{u.hp}HP</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div
+          className="flex gap-3 mt-2 transition-all duration-700"
+          style={{
+            opacity: showStats ? 1 : 0,
+            transform: `translateY(${showStats ? 0 : 20}px)`,
+            transitionDelay: '0.3s',
+          }}
+        >
+          <button
+            onClick={onRestart}
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all text-[11px] tracking-[0.2em] flex items-center gap-2"
+            style={{ boxShadow: `0 0 20px hsl(var(--primary) / 0.3)` }}
+          >
+            <RotateCcw className="w-4 h-4" />
+            PLAY AGAIN
+          </button>
+          {onMainMenu && (
+            <button
+              onClick={onMainMenu}
+              className="px-6 py-3 bg-secondary text-secondary-foreground rounded-lg hover:bg-muted transition-all text-[11px] tracking-[0.2em] flex items-center gap-2 border border-border/40"
+            >
+              <Home className="w-4 h-4" />
+              MAIN MENU
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* CSS animations */}
+      <style>{`
+        @keyframes confetti-fall {
+          0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        @keyframes trophy-bounce {
+          0% { transform: scale(0.3) translateY(40px); opacity: 0; }
+          50% { transform: scale(1.2) translateY(-10px); opacity: 1; }
+          70% { transform: scale(0.95) translateY(2px); }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+
+
 export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect }: GameHUDProps) {
   const logRef = useRef<HTMLDivElement>(null);
 

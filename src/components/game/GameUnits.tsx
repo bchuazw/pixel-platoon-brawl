@@ -754,13 +754,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
         <meshBasicMaterial color={color} />
       </mesh>
 
-      {/* Vision ring */}
-      {unit.isAlive && (
-        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[unit.visionRange - 0.05, unit.visionRange + 0.05, 20]} />
-          <meshBasicMaterial color={color} transparent opacity={0.06} side={THREE.DoubleSide} />
-        </mesh>
-      )}
+      {/* Vision ring - hidden by default, too confusing visually */}
 
       {/* Attack range ring when hunkered */}
       {unit.isHunkered && (

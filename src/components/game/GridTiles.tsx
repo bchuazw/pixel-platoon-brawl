@@ -795,12 +795,13 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
 }
 
 // ── Main GridTiles ──
-export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTiles, shrinkLevel, movePath, onTileClick, onTileHover }: GridTilesProps) {
+export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTiles, shrinkLevel, movePath, onTileClick, onTileHover, weaponRangeTiles }: GridTilesProps) {
   const lootTiles = useMemo(() => grid.flat().filter(t => t.loot !== null), [grid]);
   const movableSet = useMemo(() => new Set(movableTiles.map(t => `${t.x},${t.z}`)), [movableTiles]);
   const attackableSet = useMemo(() => new Set(attackableTiles.map(t => `${t.x},${t.z}`)), [attackableTiles]);
   const abilitySet = useMemo(() => new Set(abilityTargetTiles.map(t => `${t.x},${t.z}`)), [abilityTargetTiles]);
   const pathSet = useMemo(() => new Set(movePath ? movePath.map(p => `${p.x},${p.z}`) : []), [movePath]);
+  const weaponRangeSet = useMemo(() => new Set(weaponRangeTiles ? weaponRangeTiles.map(t => `${t.x},${t.z}`) : []), [weaponRangeTiles]);
 
   return (
     <group>

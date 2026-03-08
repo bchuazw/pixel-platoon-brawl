@@ -10,392 +10,507 @@ interface GameBoard2DProps {
   onMoveComplete?: () => void;
 }
 
-// ── Constants ──
-const TILE_SIZE = 28;
-const BOARD_PX = GRID_SIZE * TILE_SIZE;
+// ── Isometric constants ──
+const TILE_W = 48;  // diamond width
+const TILE_H = 24;  // diamond height
+const ELEV_SCALE = 12; // pixels per elevation unit
+const UNIT_H = 28;  // unit sprite height
 
-// ── Richer terrain palette with multiple tones for natural variation ──
-const TERRAIN_COLORS: Record<string, { base: string; shade: string; highlight: string; detail: string }> = {
-  grass:  { base: '#4a7a3a', shade: '#3a6530', highlight: '#5c8e48', detail: '#3d6e2e' },
-  dirt:   { base: '#8a7050', shade: '#6e5a3e', highlight: '#a0845e', detail: '#7a6444' },
-  stone:  { base: '#787880', shade: '#5a5a62', highlight: '#92929a', detail: '#686870' },
-  water:  { base: '#2860a0', shade: '#1c4878', highlight: '#3878c0', detail: '#205088' },
-  sand:   { base: '#c8aa68', shade: '#a89050', highlight: '#e0c280', detail: '#b89858' },
-  wall:   { base: '#585860', shade: '#404048', highlight: '#6e6e78', detail: '#4e4e56' },
-  trench: { base: '#5a4a38', shade: '#443828', highlight: '#6e5c48', detail: '#4e4030' },
+// ── Isometric transform: grid → screen ──
+function toIso(gx: number, gz: number, elev: number = 0): { sx: number; sy: number } {
+  return {
+    sx: (gx - gz) * (TILE_W / 2),
+    sy: (gx + gz) * (TILE_H / 2) - elev * ELEV_SCALE,
+  };
+}
+
+// ── Reverse: screen → grid (approximate, ignores elevation) ──
+function fromIso(sx: number, sy: number): { gx: number; gz: number } {
+  const gx = (sx / (TILE_W / 2) + sy / (TILE_H / 2)) / 2;
+  const gz = (sy / (TILE_H / 2) - sx / (TILE_W / 2)) / 2;
+  return { gx: Math.floor(gx), gz: Math.floor(gz) };
+}
+
+// ── Tile color palette — rich & warm FFT-inspired ──
+const TILE_PALETTE: Record<string, { top: string; left: string; right: string; detail: string }> = {
+  grass:  { top: '#5a9648', left: '#3a6830', right: '#4a8038', detail: '#6aaa55' },
+  dirt:   { top: '#a08858', left: '#786840', right: '#8a7848', detail: '#b09868' },
+  stone:  { top: '#8a8a92', left: '#606068', right: '#707078', detail: '#9a9aa2' },
+  water:  { top: '#3878b8', left: '#285898', right: '#3068a8', detail: '#4890d0' },
+  sand:   { top: '#d8b868', left: '#b09048', right: '#c0a058', detail: '#e8c878' },
+  wall:   { top: '#686870', left: '#484850', right: '#585860', detail: '#787880' },
+  trench: { top: '#6a5840', left: '#4a3c28', right: '#5a4830', detail: '#7a6850' },
 };
 
-// ── Seeded noise for consistent tile variation ──
+// ── Noise for tile variation ──
 function tileNoise(x: number, z: number, seed: number): number {
   const n = Math.sin(x * 127.1 + z * 311.7 + seed * 43758.5453) * 43758.5453;
   return n - Math.floor(n);
 }
 
-// ── Prop drawing functions (drawn as pixel art shapes, not glyphs) ──
-function drawProp(ctx: CanvasRenderingContext2D, prop: string, px: number, pz: number, ts: number, variant: number) {
-  const cx = px + ts / 2;
-  const cy = pz + ts / 2;
+// ── Draw an isometric diamond tile (top face + side faces for elevation) ──
+function drawIsoTile(
+  ctx: CanvasRenderingContext2D,
+  sx: number, sy: number,
+  colors: { top: string; left: string; right: string; detail: string },
+  elevation: number,
+  outOfZone: boolean,
+  highlight?: string,
+) {
+  const hw = TILE_W / 2;
+  const hh = TILE_H / 2;
+  const sideH = Math.max(elevation * ELEV_SCALE, 4); // minimum side height for depth
 
+  if (outOfZone) {
+    // Dead zone — desaturated red
+    drawDiamond(ctx, sx, sy, hw, hh, '#3a1818');
+    drawLeftFace(ctx, sx, sy, hw, hh, sideH, '#2a1010');
+    drawRightFace(ctx, sx, sy, hw, hh, sideH, '#221010');
+    return;
+  }
+
+  // Side faces (drawn first, behind top)
+  drawLeftFace(ctx, sx, sy, hw, hh, sideH, colors.left);
+  drawRightFace(ctx, sx, sy, hw, hh, sideH, colors.right);
+
+  // Top face (diamond)
+  drawDiamond(ctx, sx, sy, hw, hh, colors.top);
+
+  // Highlight overlay
+  if (highlight) {
+    drawDiamond(ctx, sx, sy, hw, hh, highlight);
+  }
+}
+
+function drawDiamond(ctx: CanvasRenderingContext2D, cx: number, cy: number, hw: number, hh: number, color: string) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - hh);
+  ctx.lineTo(cx + hw, cy);
+  ctx.lineTo(cx, cy + hh);
+  ctx.lineTo(cx - hw, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawLeftFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, hw: number, hh: number, sideH: number, color: string) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx - hw, cy);
+  ctx.lineTo(cx, cy + hh);
+  ctx.lineTo(cx, cy + hh + sideH);
+  ctx.lineTo(cx - hw, cy + sideH);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawRightFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, hw: number, hh: number, sideH: number, color: string) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(cx + hw, cy);
+  ctx.lineTo(cx, cy + hh);
+  ctx.lineTo(cx, cy + hh + sideH);
+  ctx.lineTo(cx + hw, cy + sideH);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ── Draw isometric prop on tile ──
+function drawIsoProp(ctx: CanvasRenderingContext2D, prop: string, sx: number, sy: number) {
   switch (prop) {
-    case 'crate': {
-      // Wooden crate with planks
-      ctx.fillStyle = '#a07838';
-      ctx.fillRect(cx - ts * 0.32, cy - ts * 0.32, ts * 0.64, ts * 0.64);
-      ctx.fillStyle = '#8a6428';
-      ctx.fillRect(cx - ts * 0.32, cy - ts * 0.05, ts * 0.64, ts * 0.1); // horizontal plank
-      ctx.fillRect(cx - ts * 0.05, cy - ts * 0.32, ts * 0.1, ts * 0.64); // vertical plank
-      ctx.fillStyle = '#c09048';
-      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.3, ts * 0.6, 2); // top highlight
-      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.3, 2, ts * 0.6);
-      break;
-    }
-    case 'barrel': {
-      ctx.fillStyle = '#6a4828';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, ts * 0.22, ts * 0.28, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#7a5a38';
-      ctx.fillRect(cx - ts * 0.2, cy - ts * 0.06, ts * 0.4, ts * 0.04); // metal band
-      ctx.fillRect(cx - ts * 0.2, cy + ts * 0.1, ts * 0.4, ts * 0.04);
-      ctx.fillStyle = '#8a6a48';
-      ctx.fillRect(cx - ts * 0.15, cy - ts * 0.26, ts * 0.3, 2); // lid highlight
-      break;
-    }
-    case 'sandbag': {
-      // Stacked sandbag wall
-      ctx.fillStyle = '#a09068';
-      ctx.fillRect(cx - ts * 0.35, cy - ts * 0.1, ts * 0.32, ts * 0.2);
-      ctx.fillRect(cx + ts * 0.03, cy - ts * 0.1, ts * 0.32, ts * 0.2);
-      ctx.fillRect(cx - ts * 0.18, cy - ts * 0.28, ts * 0.36, ts * 0.2);
-      ctx.fillStyle = '#8a7a58';
-      ctx.fillRect(cx - ts * 0.35, cy + ts * 0.08, ts * 0.7, 2);
-      ctx.fillStyle = '#b0a078';
-      ctx.fillRect(cx - ts * 0.35, cy - ts * 0.1, ts * 0.7, 1);
+    case 'tree': {
+      // Trunk
+      ctx.fillStyle = '#5a4020';
+      ctx.fillRect(sx - 2, sy - 18, 4, 18);
+      // Canopy layers
+      ctx.fillStyle = '#2a6a1a';
+      drawTriangle(ctx, sx, sy - 30, 14, 16);
+      ctx.fillStyle = '#3a8a28';
+      drawTriangle(ctx, sx, sy - 22, 12, 12);
+      ctx.fillStyle = '#4a9a38';
+      drawTriangle(ctx, sx, sy - 16, 8, 8);
       break;
     }
     case 'rock': {
       ctx.fillStyle = '#707070';
       ctx.beginPath();
-      ctx.moveTo(cx - ts * 0.25, cy + ts * 0.15);
-      ctx.lineTo(cx - ts * 0.15, cy - ts * 0.2);
-      ctx.lineTo(cx + ts * 0.1, cy - ts * 0.25);
-      ctx.lineTo(cx + ts * 0.28, cy - ts * 0.05);
-      ctx.lineTo(cx + ts * 0.2, cy + ts * 0.2);
+      ctx.moveTo(sx - 8, sy);
+      ctx.lineTo(sx - 5, sy - 10);
+      ctx.lineTo(sx + 3, sy - 12);
+      ctx.lineTo(sx + 9, sy - 4);
+      ctx.lineTo(sx + 6, sy + 2);
       ctx.closePath();
       ctx.fill();
       ctx.fillStyle = '#888';
-      ctx.fillRect(cx - ts * 0.12, cy - ts * 0.18, ts * 0.18, 2); // highlight
-      ctx.fillStyle = '#585858';
-      ctx.fillRect(cx + ts * 0.05, cy + ts * 0.05, ts * 0.12, ts * 0.08); // shadow crack
+      ctx.fillRect(sx - 4, sy - 9, 5, 2);
+      break;
+    }
+    case 'crate': {
+      // 3D box
+      ctx.fillStyle = '#b08030';
+      ctx.fillRect(sx - 7, sy - 14, 14, 14);
+      ctx.fillStyle = '#c89848';
+      ctx.fillRect(sx - 7, sy - 14, 14, 3); // top
+      ctx.fillStyle = '#906820';
+      ctx.fillRect(sx - 1, sy - 14, 2, 14); // plank
+      ctx.fillRect(sx - 7, sy - 7, 14, 2);
+      break;
+    }
+    case 'sandbag': {
+      ctx.fillStyle = '#a89868';
+      ctx.beginPath();
+      ctx.ellipse(sx - 4, sy - 3, 7, 4, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(sx + 4, sy - 3, 7, 4, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#b8a878';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy - 8, 6, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
       break;
     }
     case 'bush': {
-      // Layered foliage
-      ctx.fillStyle = '#2a5520';
-      ctx.beginPath();
-      ctx.arc(cx, cy + ts * 0.05, ts * 0.3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#387028';
-      ctx.beginPath();
-      ctx.arc(cx - ts * 0.08, cy - ts * 0.05, ts * 0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#48883a';
-      ctx.beginPath();
-      ctx.arc(cx + ts * 0.1, cy - ts * 0.08, ts * 0.15, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = '#2a6820';
+      ctx.beginPath(); ctx.arc(sx, sy - 5, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a8830';
+      ctx.beginPath(); ctx.arc(sx - 3, sy - 8, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#4a9840';
+      ctx.beginPath(); ctx.arc(sx + 3, sy - 7, 4, 0, Math.PI * 2); ctx.fill();
       break;
     }
-    case 'tree': {
-      // Tree trunk + layered canopy
-      ctx.fillStyle = '#5a4028';
-      ctx.fillRect(cx - ts * 0.06, cy, ts * 0.12, ts * 0.3); // trunk
-      ctx.fillStyle = '#2a5a1e';
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - ts * 0.35);
-      ctx.lineTo(cx - ts * 0.28, cy + ts * 0.05);
-      ctx.lineTo(cx + ts * 0.28, cy + ts * 0.05);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#38701e';
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - ts * 0.22);
-      ctx.lineTo(cx - ts * 0.22, cy + ts * 0.12);
-      ctx.lineTo(cx + ts * 0.22, cy + ts * 0.12);
-      ctx.closePath();
-      ctx.fill();
+    case 'barrel': {
+      ctx.fillStyle = '#6a4828';
+      ctx.fillRect(sx - 5, sy - 12, 10, 12);
+      ctx.fillStyle = '#8a6040';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 12, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#555';
+      ctx.fillRect(sx - 5, sy - 9, 10, 2);
+      ctx.fillRect(sx - 5, sy - 4, 10, 2);
       break;
     }
     case 'ruins': {
-      // Broken wall segments
-      ctx.fillStyle = '#606060';
-      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.1, ts * 0.18, ts * 0.35);
-      ctx.fillRect(cx + ts * 0.05, cy - ts * 0.25, ts * 0.2, ts * 0.5);
-      ctx.fillRect(cx - ts * 0.15, cy + ts * 0.1, ts * 0.25, ts * 0.15);
-      ctx.fillStyle = '#505050';
-      ctx.fillRect(cx - ts * 0.28, cy + ts * 0.2, ts * 0.14, ts * 0.08);
-      ctx.fillStyle = '#707070';
-      ctx.fillRect(cx + ts * 0.05, cy - ts * 0.25, ts * 0.2, 2);
+      ctx.fillStyle = '#686868';
+      ctx.fillRect(sx - 8, sy - 16, 6, 16);
+      ctx.fillRect(sx + 2, sy - 10, 6, 10);
+      ctx.fillStyle = '#585858';
+      ctx.fillRect(sx - 4, sy - 4, 8, 4);
+      ctx.fillStyle = '#787878';
+      ctx.fillRect(sx - 8, sy - 16, 6, 2);
       break;
     }
     case 'wire': {
-      ctx.strokeStyle = '#999';
+      ctx.strokeStyle = '#aaa';
       ctx.lineWidth = 1;
-      // Zigzag wire
       ctx.beginPath();
-      ctx.moveTo(px + 3, pz + ts * 0.3);
+      ctx.moveTo(sx - 10, sy - 4);
       for (let i = 0; i < 5; i++) {
-        const wx = px + 3 + (i + 0.5) * (ts - 6) / 5;
-        const wy = pz + (i % 2 === 0 ? ts * 0.2 : ts * 0.5);
-        ctx.lineTo(wx, wy);
+        ctx.lineTo(sx - 10 + (i + 0.5) * 4, sy - 4 + (i % 2 === 0 ? -3 : 3));
       }
-      ctx.lineTo(px + ts - 3, pz + ts * 0.4);
+      ctx.lineTo(sx + 10, sy - 3);
       ctx.stroke();
-      // Posts
       ctx.fillStyle = '#777';
-      ctx.fillRect(px + 4, pz + ts * 0.15, 2, ts * 0.45);
-      ctx.fillRect(px + ts - 6, pz + ts * 0.2, 2, ts * 0.4);
+      ctx.fillRect(sx - 9, sy - 8, 2, 8);
+      ctx.fillRect(sx + 8, sy - 7, 2, 7);
       break;
     }
     case 'jersey_barrier': {
-      ctx.fillStyle = '#909090';
-      ctx.fillRect(cx - ts * 0.35, cy - ts * 0.12, ts * 0.7, ts * 0.24);
       ctx.fillStyle = '#a0a0a0';
-      ctx.fillRect(cx - ts * 0.33, cy - ts * 0.12, ts * 0.66, 2);
-      ctx.fillStyle = '#e8a020';
-      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.02, ts * 0.6, ts * 0.04); // warning stripe
+      ctx.fillRect(sx - 10, sy - 6, 20, 6);
+      ctx.fillStyle = '#b0b0b0';
+      ctx.fillRect(sx - 10, sy - 6, 20, 2);
+      ctx.fillStyle = '#e0a020';
+      ctx.fillRect(sx - 8, sy - 3, 16, 2);
       break;
     }
     case 'burnt_vehicle': {
-      ctx.fillStyle = '#383838';
-      ctx.fillRect(cx - ts * 0.35, cy - ts * 0.2, ts * 0.7, ts * 0.4);
+      ctx.fillStyle = '#3a3a3a';
+      ctx.fillRect(sx - 12, sy - 8, 24, 8);
       ctx.fillStyle = '#2a2a2a';
-      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.3, ts * 0.5, ts * 0.15); // cab
-      // Wheels
+      ctx.fillRect(sx - 8, sy - 14, 14, 7);
       ctx.fillStyle = '#222';
-      ctx.beginPath(); ctx.arc(cx - ts * 0.22, cy + ts * 0.2, ts * 0.08, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx + ts * 0.22, cy + ts * 0.2, ts * 0.08, 0, Math.PI * 2); ctx.fill();
-      // Burn marks
-      ctx.fillStyle = '#4a3020';
-      ctx.fillRect(cx - ts * 0.1, cy - ts * 0.28, ts * 0.25, ts * 0.1);
+      ctx.beginPath(); ctx.arc(sx - 8, sy, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx + 8, sy, 3, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'foxhole': {
-      ctx.fillStyle = '#3a3020';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, ts * 0.28, ts * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#504030';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, ts * 0.22, ts * 0.14, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#5a4a38';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, ts * 0.28, ts * 0.2, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.fillStyle = '#4a3828';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a2818';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'hesco': {
-      // Hesco barrier — stacked boxes
-      ctx.fillStyle = '#8a8a68';
-      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.15, ts * 0.28, ts * 0.3);
-      ctx.fillRect(cx + ts * 0.02, cy - ts * 0.15, ts * 0.28, ts * 0.3);
-      ctx.strokeStyle = '#6a6a50';
+      ctx.fillStyle = '#8a8a60';
+      ctx.fillRect(sx - 8, sy - 10, 7, 10);
+      ctx.fillRect(sx + 1, sy - 10, 7, 10);
+      ctx.strokeStyle = '#6a6a48';
       ctx.lineWidth = 0.8;
-      ctx.strokeRect(cx - ts * 0.3, cy - ts * 0.15, ts * 0.28, ts * 0.3);
-      ctx.strokeRect(cx + ts * 0.02, cy - ts * 0.15, ts * 0.28, ts * 0.3);
-      // Mesh lines
-      ctx.strokeStyle = '#7a7a5a';
-      ctx.beginPath();
-      ctx.moveTo(cx - ts * 0.3, cy); ctx.lineTo(cx - ts * 0.02, cy); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx + ts * 0.02, cy); ctx.lineTo(cx + ts * 0.3, cy); ctx.stroke();
+      ctx.strokeRect(sx - 8, sy - 10, 7, 10);
+      ctx.strokeRect(sx + 1, sy - 10, 7, 10);
       break;
     }
     case 'tank_trap': {
-      // Czech hedgehog
-      ctx.strokeStyle = '#606060';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(cx - ts * 0.25, cy + ts * 0.2); ctx.lineTo(cx + ts * 0.25, cy - ts * 0.2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx + ts * 0.25, cy + ts * 0.2); ctx.lineTo(cx - ts * 0.25, cy - ts * 0.2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, cy - ts * 0.28); ctx.lineTo(cx, cy + ts * 0.28); ctx.stroke();
-      ctx.fillStyle = '#555';
-      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill(); // center bolt
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(sx - 8, sy + 2); ctx.lineTo(sx + 8, sy - 10); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx + 8, sy + 2); ctx.lineTo(sx - 8, sy - 10); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx, sy - 14); ctx.lineTo(sx, sy + 4); ctx.stroke();
       break;
     }
   }
 }
 
-// ── Draw natural terrain details on a tile ──
-function drawTerrainDetail(ctx: CanvasRenderingContext2D, type: string, px: number, pz: number, ts: number, variant: number, elevation: number) {
-  const n1 = tileNoise(px, pz, 1);
-  const n2 = tileNoise(px, pz, 2);
-  const n3 = tileNoise(px, pz, 3);
+function drawTriangle(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx - w / 2, cy + h);
+  ctx.lineTo(cx + w / 2, cy + h);
+  ctx.closePath();
+  ctx.fill();
+}
 
-  switch (type) {
-    case 'grass': {
-      // Small grass tufts
-      ctx.fillStyle = '#5a9a45';
-      if (n1 > 0.5) {
-        ctx.fillRect(px + ts * 0.15, pz + ts * 0.7, 2, 3);
-        ctx.fillRect(px + ts * 0.18, pz + ts * 0.68, 2, 4);
-      }
-      if (n2 > 0.4) {
-        ctx.fillRect(px + ts * 0.65, pz + ts * 0.3, 2, 3);
-        ctx.fillRect(px + ts * 0.68, pz + ts * 0.28, 2, 4);
-      }
-      if (n3 > 0.6) {
-        // Small flower / pebble
-        ctx.fillStyle = n1 > 0.7 ? '#c8b848' : '#6aa050';
-        ctx.fillRect(px + ts * 0.4 + n2 * ts * 0.2, pz + ts * 0.5 + n3 * ts * 0.2, 2, 2);
-      }
-      break;
+// ── Draw chunky isometric soldier ──
+function drawUnit(
+  ctx: CanvasRenderingContext2D,
+  sx: number, sy: number,
+  unit: Unit,
+  isSelected: boolean,
+  flash: number,
+  walkCycle: number,
+  isMoving: boolean,
+  deathProgress: number,
+  timestamp: number,
+) {
+  const tc = TEAM_COLORS[unit.team];
+  const s = 1; // scale factor
+
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // Death
+  if (!unit.isAlive) {
+    ctx.globalAlpha = 1 - deathProgress;
+    ctx.translate(0, deathProgress * 6);
+    ctx.scale(1, 1 - deathProgress * 0.4);
+  }
+
+  // Walk bob
+  const bob = isMoving ? Math.sin(walkCycle * 2) * 2.5 : 0;
+  const lean = isMoving ? Math.sin(walkCycle) * 0.04 : 0;
+  ctx.translate(0, bob);
+  ctx.rotate(lean);
+
+  // Leg animation
+  const legL = isMoving ? Math.sin(walkCycle) * 4 : 0;
+  const legR = isMoving ? Math.sin(walkCycle + Math.PI) * 4 : 0;
+  const armSwing = isMoving ? Math.sin(walkCycle + Math.PI) * 3 : 0;
+
+  // ── Selected pulse ring ──
+  if (isSelected) {
+    const pulse = 0.5 + Math.sin(timestamp * 0.006) * 0.3;
+    ctx.strokeStyle = tc;
+    ctx.globalAlpha = (ctx.globalAlpha || 1) * pulse;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 14, 7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = unit.isAlive ? 1 : (1 - deathProgress);
+  }
+
+  // ── Shadow ──
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(0, 4 - bob, 10, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Flash white on hit
+  const bodyColor = flash > 0.3 ? '#ffffff' : flash > 0 ? '#ffaaaa' : tc;
+  const darkColor = flash > 0.3 ? '#dddddd' : flash > 0 ? '#dd8888' : darken(tc, 0.3);
+
+  // ── Boots ──
+  ctx.fillStyle = '#2a2a2a';
+  ctx.fillRect(-6, -2 + legL, 5, 4);
+  ctx.fillRect(1, -2 + legR, 5, 4);
+
+  // ── Legs ──
+  ctx.fillStyle = '#3a3a3a';
+  ctx.fillRect(-5, -6 + legL, 4, 6);
+  ctx.fillRect(1, -6 + legR, 4, 6);
+
+  // ── Body / armor ──
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(-7, -20, 14, 15);
+  // Armor plate highlight
+  ctx.fillStyle = darken(bodyColor, -0.15);
+  ctx.fillRect(-7, -20, 14, 3);
+  // Belt
+  ctx.fillStyle = '#444';
+  ctx.fillRect(-7, -6, 14, 2);
+
+  // ── Arms ──
+  ctx.fillStyle = darkColor;
+  ctx.fillRect(-9, -18 + armSwing * 0.5, 3, 10);
+  ctx.fillRect(6, -18 - armSwing * 0.5, 3, 10);
+
+  // ── Weapon (rifle on right arm) ──
+  ctx.fillStyle = '#555';
+  ctx.fillRect(7, -22 - armSwing * 0.3, 3, 14);
+  ctx.fillStyle = '#777';
+  ctx.fillRect(7, -22 - armSwing * 0.3, 3, 2); // barrel end
+
+  // ── Head ──
+  ctx.fillStyle = '#ddc0a0';
+  ctx.fillRect(-4, -26, 8, 7);
+
+  // ── Helmet ──
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(-5, -29, 10, 5);
+  ctx.fillStyle = darkColor;
+  ctx.fillRect(-5, -25, 10, 2); // brim
+
+  // ── Class badge ──
+  if (unit.unitClass === 'medic') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-3, -16, 6, 2);
+    ctx.fillRect(-1, -18, 2, 6);
+  }
+
+  // ── HP bar ──
+  const barW = 18;
+  const barH = 3;
+  const barY = -33;
+  ctx.fillStyle = '#000000cc';
+  ctx.fillRect(-barW / 2 - 1, barY - 1, barW + 2, barH + 2);
+  const hpPct = unit.hp / unit.maxHp;
+  ctx.fillStyle = hpPct > 0.5 ? '#44dd44' : hpPct > 0.25 ? '#ddaa22' : '#dd3322';
+  ctx.fillRect(-barW / 2, barY, barW * hpPct, barH);
+
+  // ── Name label ──
+  ctx.fillStyle = '#ffffffcc';
+  ctx.font = 'bold 7px "Share Tech Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(unit.name, 0, barY - 3);
+
+  // ── Status icons ──
+  if (unit.isOnOverwatch) {
+    ctx.fillStyle = '#4488ff';
+    ctx.font = 'bold 8px monospace';
+    ctx.fillText('👁', 0, -38);
+  }
+  if (unit.coverType === 'full') {
+    ctx.fillStyle = '#4488ff';
+    ctx.font = '7px monospace';
+    ctx.fillText('🛡', 10, -20);
+  } else if (unit.coverType === 'half') {
+    ctx.fillStyle = '#88aa44';
+    ctx.font = '7px monospace';
+    ctx.fillText('◐', 10, -20);
+  }
+
+  ctx.restore();
+}
+
+function darken(hex: string, amount: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const f = 1 - amount;
+  return `rgb(${Math.max(0, Math.min(255, Math.floor(r * f)))},${Math.max(0, Math.min(255, Math.floor(g * f)))},${Math.max(0, Math.min(255, Math.floor(b * f)))})`;
+}
+
+// ── Terrain detail decorations ──
+function drawTileDecor(ctx: CanvasRenderingContext2D, type: string, sx: number, sy: number, variant: number) {
+  const n = tileNoise(sx, sy, 42);
+  if (type === 'grass') {
+    ctx.fillStyle = '#6aaa55';
+    if (n > 0.5) { ctx.fillRect(sx - 8, sy - 3, 2, 3); ctx.fillRect(sx - 6, sy - 4, 2, 4); }
+    if (n > 0.7) { ctx.fillRect(sx + 5, sy - 2, 2, 3); }
+    if (n < 0.3) {
+      ctx.fillStyle = '#c8b040';
+      ctx.fillRect(sx + 3 + n * 4, sy - 2, 2, 2); // flower
     }
-    case 'dirt': {
-      // Pebbles and tracks
-      ctx.fillStyle = '#665538';
-      if (n1 > 0.3) ctx.fillRect(px + n2 * ts * 0.6 + 2, pz + n3 * ts * 0.6 + 2, 3, 2);
-      if (n2 > 0.5) ctx.fillRect(px + n1 * ts * 0.5 + 4, pz + n3 * ts * 0.4 + 6, 2, 2);
-      // Subtle tire track
-      if (n3 > 0.7) {
-        ctx.fillStyle = '#5a4a35';
-        ctx.fillRect(px + ts * 0.3, pz, 2, ts);
-        ctx.fillRect(px + ts * 0.65, pz, 2, ts);
-      }
-      break;
-    }
-    case 'stone': {
-      // Cracks and chips
-      ctx.strokeStyle = '#50505a';
-      ctx.lineWidth = 0.8;
-      if (n1 > 0.5) {
-        ctx.beginPath();
-        ctx.moveTo(px + ts * 0.2, pz + ts * n2);
-        ctx.lineTo(px + ts * 0.5, pz + ts * n3 * 0.8);
-        ctx.stroke();
-      }
-      if (n2 > 0.6) {
-        ctx.fillStyle = '#62626a';
-        ctx.fillRect(px + ts * 0.6, pz + ts * 0.4, 3, 3);
-      }
-      break;
-    }
-    case 'water': {
-      // Animated ripple highlights (using variant as pseudo-time)
-      const shimmer = Math.sin(variant * 0.5 + px * 0.1 + pz * 0.15) * 0.5 + 0.5;
-      ctx.fillStyle = `rgba(100,180,255,${shimmer * 0.12})`;
-      ctx.fillRect(px + ts * n1 * 0.5, pz + ts * n2 * 0.5, ts * 0.4, 1);
-      ctx.fillRect(px + ts * n3 * 0.3 + 2, pz + ts * n1 * 0.6 + 4, ts * 0.3, 1);
-      break;
-    }
-    case 'sand': {
-      // Wind ripple lines
-      ctx.strokeStyle = '#b8985a';
-      ctx.lineWidth = 0.6;
-      const yOff = ts * 0.2 + n1 * ts * 0.6;
-      ctx.beginPath();
-      ctx.moveTo(px + 2, pz + yOff);
-      ctx.quadraticCurveTo(px + ts / 2, pz + yOff - 2, px + ts - 2, pz + yOff + 1);
-      ctx.stroke();
-      if (n2 > 0.4) {
-        const yOff2 = ts * 0.5 + n3 * ts * 0.3;
-        ctx.beginPath();
-        ctx.moveTo(px + 3, pz + yOff2);
-        ctx.quadraticCurveTo(px + ts / 2, pz + yOff2 + 2, px + ts - 3, pz + yOff2 - 1);
-        ctx.stroke();
-      }
-      break;
-    }
-    case 'trench': {
-      // Plank lines
-      ctx.fillStyle = '#4a3a28';
-      ctx.fillRect(px + 2, pz + ts * 0.2, ts - 4, 2);
-      ctx.fillRect(px + 2, pz + ts * 0.6, ts - 4, 2);
-      break;
-    }
+  } else if (type === 'dirt') {
+    ctx.fillStyle = '#786040';
+    if (n > 0.4) ctx.fillRect(sx - 4, sy - 1, 3, 2);
+    if (n > 0.6) ctx.fillRect(sx + 3, sy + 1, 2, 2);
+  } else if (type === 'water') {
+    const shimmer = Math.sin(variant * 0.01 + sx * 0.1) * 0.5 + 0.5;
+    ctx.fillStyle = `rgba(120,200,255,${shimmer * 0.2})`;
+    ctx.fillRect(sx - 6, sy - 1, 8, 1);
+    ctx.fillRect(sx + 2, sy + 1, 6, 1);
   }
 }
 
-// ── Unit Animation State ──
+// ── Unit animation state ──
 interface UnitAnim {
-  x: number;
-  z: number;
-  flash: number; // 0-1, red flash for hit
-  floatText: string | null;
-  floatY: number;
-  floatOpacity: number;
-  scale: number;
-  deathProgress: number; // 0 = alive, 1 = fully dead
-  walkCycle: number; // 0-2π, drives leg alternation + bob
+  x: number; z: number;
+  flash: number;
+  walkCycle: number;
   isMoving: boolean;
-  prevX: number;
-  prevZ: number;
+  deathProgress: number;
+}
+
+// ── Floating text ──
+interface FloatText {
+  id: string;
+  gx: number; gz: number;
+  text: string; color: string;
+  age: number;
+  isCrit: boolean;
+}
+
+// ── Screen shake state ──
+interface ShakeState {
+  intensity: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 // ── Dust particle ──
 interface DustParticle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
+  x: number; y: number;
+  vx: number; vy: number;
+  life: number; maxLife: number;
   size: number;
-}
-
-// ── Floating damage number ──
-interface FloatingText {
-  id: string;
-  x: number;
-  z: number;
-  text: string;
-  color: string;
-  age: number;
 }
 
 export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete }: GameBoard2DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Camera state
-  const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1 });
+  const [camera, setCamera] = useState({ x: 0, y: 0, zoom: 1.2 });
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, camX: 0, camY: 0 });
 
-  // Animation state
   const unitAnims = useRef<Record<string, UnitAnim>>({});
+  const floatTexts = useRef<FloatText[]>([]);
   const dustParticles = useRef<DustParticle[]>([]);
-  const floatingTexts = useRef<FloatingText[]>([]);
+  const shake = useRef<ShakeState>({ intensity: 0, offsetX: 0, offsetY: 0 });
   const lastEventCount = useRef(0);
   const animFrameId = useRef(0);
   const lastTime = useRef(0);
+  const freezeFrame = useRef(0); // impact freeze in ms
 
-  // Moving unit path animation
-  const movePathIndex = useRef(0);
-  const moveProgress = useRef(0);
-  const lastMovePath = useRef<Position[] | null>(null);
-
-  // Sets for O(1) lookups
   const movableSet = useMemo(() => new Set(state.movableTiles.map(t => `${t.x},${t.z}`)), [state.movableTiles]);
   const attackableSet = useMemo(() => new Set(state.attackableTiles.map(t => `${t.x},${t.z}`)), [state.attackableTiles]);
   const abilitySet = useMemo(() => new Set(state.abilityTargetTiles.map(t => `${t.x},${t.z}`)), [state.abilityTargetTiles]);
 
-  // Initialize unit anims
+  // Init unit anims
   useEffect(() => {
     for (const unit of state.units) {
       if (!unitAnims.current[unit.id]) {
         unitAnims.current[unit.id] = {
           x: unit.position.x, z: unit.position.z,
-          flash: 0, floatText: null, floatY: 0, floatOpacity: 0,
-          scale: 1, deathProgress: unit.isAlive ? 0 : 1,
-          walkCycle: 0, isMoving: false,
-          prevX: unit.position.x, prevZ: unit.position.z,
+          flash: 0, walkCycle: 0, isMoving: false,
+          deathProgress: unit.isAlive ? 0 : 1,
         };
       }
     }
   }, [state.units]);
 
-  // Process combat events for floating text
+  // Process combat events
   useEffect(() => {
     if (state.combatEvents.length <= lastEventCount.current) return;
     const newEvents = state.combatEvents.slice(lastEventCount.current);
@@ -404,57 +519,48 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
     for (const evt of newEvents) {
       if (Date.now() - evt.timestamp > 1000) continue;
 
-      // Flash the target
-      const targetUnit = state.units.find(u =>
+      // Flash target
+      const target = state.units.find(u =>
         u.position.x === evt.targetPos.x && u.position.z === evt.targetPos.z
       );
-      if (targetUnit && unitAnims.current[targetUnit.id]) {
-        unitAnims.current[targetUnit.id].flash = 1;
+      if (target && unitAnims.current[target.id]) {
+        unitAnims.current[target.id].flash = 1;
       }
 
-      // Floating text
-      let text = '';
-      let color = '#fff';
+      // Screen shake
+      if (evt.type === 'kill') {
+        shake.current.intensity = Math.max(shake.current.intensity, 8);
+        freezeFrame.current = 120; // 120ms freeze
+      } else if (evt.type === 'crit') {
+        shake.current.intensity = Math.max(shake.current.intensity, 5);
+        freezeFrame.current = 60;
+      } else if (evt.type === 'damage') {
+        shake.current.intensity = Math.max(shake.current.intensity, 2);
+      }
+
+      // Float text
+      let text = '', color = '#fff';
+      const isCrit = evt.type === 'crit';
       if (evt.type === 'damage') { text = `-${evt.value}`; color = '#ff4444'; }
-      else if (evt.type === 'crit') { text = `CRIT -${evt.value}`; color = '#ff8800'; }
+      else if (evt.type === 'crit') { text = `CRIT! -${evt.value}`; color = '#ff8800'; }
       else if (evt.type === 'miss') { text = 'MISS'; color = '#888'; }
-      else if (evt.type === 'kill') { text = 'ELIMINATED'; color = '#ff2222'; }
-      else if (evt.type === 'heal') { text = `+${evt.value}`; color = '#44cc44'; }
-      else if (evt.type === 'loot') { text = '📦'; color = '#ffcc44'; }
+      else if (evt.type === 'kill') { text = '☠ KILL'; color = '#ff2222'; }
+      else if (evt.type === 'heal') { text = `+${evt.value}`; color = '#44dd44'; }
+      else if (evt.type === 'loot') { text = evt.message.slice(0, 20); color = '#ffcc44'; }
 
       if (text) {
-        floatingTexts.current.push({
-          id: evt.id,
-          x: evt.targetPos.x,
-          z: evt.targetPos.z,
-          text, color, age: 0,
+        floatTexts.current.push({
+          id: evt.id, gx: evt.targetPos.x, gz: evt.targetPos.z,
+          text, color, age: 0, isCrit,
         });
       }
     }
   }, [state.combatEvents, state.units]);
 
-  // Handle move path animation
+  // Center camera
   useEffect(() => {
-    if (state.movePath && state.movePath !== lastMovePath.current) {
-      movePathIndex.current = 0;
-      moveProgress.current = 0;
-      lastMovePath.current = state.movePath;
-    }
-    if (!state.movePath) {
-      lastMovePath.current = null;
-    }
-  }, [state.movePath]);
-
-  // Center camera on initial load
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    setCamera({
-      x: BOARD_PX / 2 - rect.width / 2,
-      y: BOARD_PX / 2 - rect.height / 2,
-      zoom: Math.min(rect.width / BOARD_PX, rect.height / BOARD_PX) * 0.95,
-    });
+    const center = toIso(GRID_SIZE / 2, GRID_SIZE / 2, 0);
+    setCamera(prev => ({ ...prev, x: center.sx, y: center.sy - 100 }));
   }, []);
 
   // Auto-follow active unit
@@ -462,17 +568,15 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
     if (!state.autoPlay || !state.selectedUnitId) return;
     const unit = state.units.find(u => u.id === state.selectedUnitId);
     if (!unit) return;
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const targetX = unit.position.x * TILE_SIZE + TILE_SIZE / 2 - rect.width / (2 * camera.zoom);
-    const targetY = unit.position.z * TILE_SIZE + TILE_SIZE / 2 - rect.height / (2 * camera.zoom);
+    const tile = state.grid[unit.position.x]?.[unit.position.z];
+    const elev = tile?.elevation || 0;
+    const target = toIso(unit.position.x, unit.position.z, elev);
     setCamera(prev => ({
       ...prev,
-      x: prev.x + (targetX - prev.x) * 0.08,
-      y: prev.y + (targetY - prev.y) * 0.08,
+      x: prev.x + (target.sx - prev.x) * 0.06,
+      y: prev.y + (target.sy - 60 - prev.y) * 0.06,
     }));
-  }, [state.selectedUnitId, state.units, state.autoPlay, camera.zoom]);
+  }, [state.selectedUnitId, state.units, state.autoPlay, state.grid]);
 
   // ── Main render loop ──
   useEffect(() => {
@@ -480,466 +584,337 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     let running = true;
 
     function render(timestamp: number) {
       if (!running || !ctx || !canvas) return;
-      const dt = Math.min((timestamp - lastTime.current) / 1000, 0.05);
+      const rawDt = Math.min((timestamp - lastTime.current) / 1000, 0.05);
       lastTime.current = timestamp;
 
-      const container = containerRef.current;
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        canvas.width = rect.width * devicePixelRatio;
-        canvas.height = rect.height * devicePixelRatio;
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
+      // Impact freeze
+      if (freezeFrame.current > 0) {
+        freezeFrame.current -= rawDt * 1000;
+        animFrameId.current = requestAnimationFrame(render);
+        return; // skip frame — freeze effect
       }
+      const dt = rawDt;
+
+      const container = containerRef.current;
+      if (!container) { animFrameId.current = requestAnimationFrame(render); return; }
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width * devicePixelRatio;
+      canvas.height = rect.height * devicePixelRatio;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
 
       ctx.save();
       ctx.scale(devicePixelRatio, devicePixelRatio);
+      const w = rect.width;
+      const h = rect.height;
 
-      const w = canvas.width / devicePixelRatio;
-      const h = canvas.height / devicePixelRatio;
-
-      // Clear
-      ctx.fillStyle = '#0a0e14';
+      // Background gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+      bgGrad.addColorStop(0, '#1a2030');
+      bgGrad.addColorStop(1, '#0a1018');
+      ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, w, h);
 
-      // Apply camera
-      ctx.save();
-      ctx.translate(w / 2, h / 2);
-      ctx.scale(camera.zoom, camera.zoom);
-      ctx.translate(-camera.x - w / (2 * camera.zoom), -camera.y - h / (2 * camera.zoom));
+      // Screen shake
+      if (shake.current.intensity > 0.1) {
+        shake.current.offsetX = (Math.random() - 0.5) * shake.current.intensity;
+        shake.current.offsetY = (Math.random() - 0.5) * shake.current.intensity;
+        shake.current.intensity *= 0.88;
+      } else {
+        shake.current.offsetX = 0;
+        shake.current.offsetY = 0;
+      }
 
-      // ── Draw tiles ──
+      // Camera transform
+      ctx.save();
+      ctx.translate(w / 2 + shake.current.offsetX, h / 2 + shake.current.offsetY);
+      ctx.scale(camera.zoom, camera.zoom);
+      ctx.translate(-camera.x, -camera.y);
+
+      // ── Sort tiles back-to-front for painter's algorithm ──
+      // In iso, draw row by row: x+z ascending, then x ascending
+      const drawOrder: Array<{ x: number; z: number; tile: TileData }> = [];
       for (let x = 0; x < GRID_SIZE; x++) {
         for (let z = 0; z < GRID_SIZE; z++) {
           const tile = state.grid[x]?.[z];
-          if (!tile) continue;
+          if (tile) drawOrder.push({ x, z, tile });
+        }
+      }
+      drawOrder.sort((a, b) => (a.x + a.z) - (b.x + b.z) || a.x - b.x);
 
-          const px = x * TILE_SIZE;
-          const pz = z * TILE_SIZE;
-          const outOfZone = state.shrinkLevel > 0 && !isInZone(x, z, state.shrinkLevel);
-          const colors = TERRAIN_COLORS[tile.type] || TERRAIN_COLORS.grass;
-
-          // Base tile with subtle variation using noise
-          const n = tileNoise(x, z, 0);
-          if (outOfZone) {
-            ctx.fillStyle = n > 0.5 ? '#2a1515' : '#241212';
-            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-          } else {
-            // Main fill
-            ctx.fillStyle = (x + z) % 2 === 0 ? colors.base : colors.shade;
-            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-
-            // Natural noise patches — break up the grid
-            if (n > 0.55) {
-              ctx.fillStyle = colors.detail + '60';
-              ctx.fillRect(px + n * 4, pz + n * 6, TILE_SIZE * 0.5, TILE_SIZE * 0.4);
-            }
-            if (n < 0.3) {
-              ctx.fillStyle = colors.highlight + '30';
-              ctx.fillRect(px + 2, pz + 2, TILE_SIZE * 0.6, TILE_SIZE * 0.5);
-            }
-
-            // Bevel — subtle top-left highlight, bottom-right shadow
-            ctx.fillStyle = colors.highlight + '28';
-            ctx.fillRect(px, pz, TILE_SIZE, 1);
-            ctx.fillRect(px, pz, 1, TILE_SIZE);
-            ctx.fillStyle = '#00000018';
-            ctx.fillRect(px, pz + TILE_SIZE - 1, TILE_SIZE, 1);
-            ctx.fillRect(px + TILE_SIZE - 1, pz, 1, TILE_SIZE);
-
-            // Elevation shading
-            if (tile.elevation > 0.6) {
-              ctx.fillStyle = 'rgba(255,255,255,0.07)';
-              ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-            } else if (tile.elevation < 0.3) {
-              ctx.fillStyle = 'rgba(0,0,0,0.1)';
-              ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-            }
-
-            // Natural terrain detail (tufts, pebbles, ripples)
-            drawTerrainDetail(ctx, tile.type, px, pz, TILE_SIZE, tile.variant, tile.elevation);
-          }
-
-          // Grid line — very subtle
-          ctx.strokeStyle = outOfZone ? '#1a080808' : '#00000018';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(px + 0.25, pz + 0.25, TILE_SIZE - 0.5, TILE_SIZE - 0.5);
-
-          // Props — drawn as pixel art shapes
-          if (tile.prop) {
-            drawProp(ctx, tile.prop, px, pz, TILE_SIZE, tile.variant);
-          }
-
-          // Smoke
-          if (tile.hasSmoke) {
-            ctx.fillStyle = 'rgba(180,200,220,0.35)';
-            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-          }
-
-          // Loot
-          if (tile.loot) {
-            ctx.fillStyle = '#ffcc4488';
-            ctx.fillRect(px + 4, pz + 4, TILE_SIZE - 8, TILE_SIZE - 8);
-            ctx.fillStyle = '#ffcc44';
-            ctx.font = `${TILE_SIZE * 0.4}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('?', px + TILE_SIZE / 2, pz + TILE_SIZE / 2);
-          }
-
-          // Highlight overlays
-          const key = `${x},${z}`;
-          if (movableSet.has(key)) {
-            ctx.fillStyle = 'rgba(68,136,255,0.2)';
-            ctx.fillRect(px + 1, pz + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-            ctx.strokeStyle = '#4488ff55';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px + 1, pz + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          }
-          if (attackableSet.has(key)) {
-            ctx.fillStyle = 'rgba(255,68,68,0.2)';
-            ctx.fillRect(px + 1, pz + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-            ctx.strokeStyle = '#ff444488';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px + 1, pz + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          }
-          if (abilitySet.has(key)) {
-            ctx.fillStyle = 'rgba(68,204,68,0.2)';
-            ctx.fillRect(px + 1, pz + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-            ctx.strokeStyle = '#44cc4488';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(px + 1, pz + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          }
+      // Build unit position map for drawing units on their tiles
+      const unitMap = new Map<string, Unit>();
+      for (const u of state.units) {
+        if (u.isAlive) {
+          const anim = unitAnims.current[u.id];
+          const ux = anim ? Math.round(anim.x) : u.position.x;
+          const uz = anim ? Math.round(anim.z) : u.position.z;
+          unitMap.set(`${ux},${uz}`, u);
         }
       }
 
-      // ── Zone border ──
-      if (state.shrinkLevel > 0) {
-        const margin = state.shrinkLevel * 2;
-        ctx.strokeStyle = '#ff2222';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 4]);
-        ctx.strokeRect(
-          margin * TILE_SIZE,
-          margin * TILE_SIZE,
-          (GRID_SIZE - margin * 2) * TILE_SIZE,
-          (GRID_SIZE - margin * 2) * TILE_SIZE
-        );
-        ctx.setLineDash([]);
+      // ── Draw tiles + props + units in depth order ──
+      for (const { x, z, tile } of drawOrder) {
+        const outOfZone = state.shrinkLevel > 0 && !isInZone(x, z, state.shrinkLevel);
+        const colors = TILE_PALETTE[tile.type] || TILE_PALETTE.grass;
+        const { sx, sy } = toIso(x, z, tile.elevation);
 
-        // Pulsing glow
-        const pulse = 0.3 + Math.sin(timestamp * 0.003) * 0.2;
-        ctx.strokeStyle = `rgba(255,34,34,${pulse})`;
-        ctx.lineWidth = 4;
-        ctx.strokeRect(
-          margin * TILE_SIZE - 2,
-          margin * TILE_SIZE - 2,
-          (GRID_SIZE - margin * 2) * TILE_SIZE + 4,
-          (GRID_SIZE - margin * 2) * TILE_SIZE + 4
-        );
-      }
+        // Highlight
+        const key = `${x},${z}`;
+        let highlight: string | undefined;
+        if (movableSet.has(key)) highlight = 'rgba(68,136,255,0.25)';
+        if (attackableSet.has(key)) highlight = 'rgba(255,68,68,0.3)';
+        if (abilitySet.has(key)) highlight = 'rgba(68,204,68,0.25)';
 
-      // ── Move path preview ──
-      if (state.movePath && state.movePath.length > 1) {
-        ctx.strokeStyle = '#4488ffaa';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 3]);
+        // Draw tile
+        drawIsoTile(ctx, sx, sy, colors, tile.elevation, outOfZone, highlight);
+
+        // Tile edge outline
+        ctx.strokeStyle = outOfZone ? '#1a0808' : 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 0.5;
+        const hw = TILE_W / 2, hh = TILE_H / 2;
         ctx.beginPath();
-        ctx.moveTo(
-          state.movePath[0].x * TILE_SIZE + TILE_SIZE / 2,
-          state.movePath[0].z * TILE_SIZE + TILE_SIZE / 2
-        );
-        for (let i = 1; i < state.movePath.length; i++) {
-          ctx.lineTo(
-            state.movePath[i].x * TILE_SIZE + TILE_SIZE / 2,
-            state.movePath[i].z * TILE_SIZE + TILE_SIZE / 2
-          );
+        ctx.moveTo(sx, sy - hh); ctx.lineTo(sx + hw, sy); ctx.lineTo(sx, sy + hh); ctx.lineTo(sx - hw, sy); ctx.closePath();
+        ctx.stroke();
+
+        // Terrain decorations
+        if (!outOfZone && !tile.prop) {
+          drawTileDecor(ctx, tile.type, sx, sy, tile.variant);
         }
+
+        // Smoke
+        if (tile.hasSmoke) {
+          ctx.fillStyle = 'rgba(180,200,220,0.3)';
+          drawDiamond(ctx, sx, sy, hw, hh, 'rgba(180,200,220,0.3)');
+        }
+
+        // Loot glow
+        if (tile.loot) {
+          const lootPulse = 0.4 + Math.sin(timestamp * 0.004 + x + z) * 0.3;
+          drawDiamond(ctx, sx, sy, hw * 0.5, hh * 0.5, `rgba(255,204,68,${lootPulse})`);
+          ctx.fillStyle = '#ffcc44';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('?', sx, sy - 6);
+        }
+
+        // Props
+        if (tile.prop) {
+          drawIsoProp(ctx, tile.prop, sx, sy - 2);
+        }
+
+        // ── Draw unit on this tile ──
+        const unitOnTile = unitMap.get(key);
+        if (unitOnTile) {
+          const anim = unitAnims.current[unitOnTile.id];
+          if (anim) {
+            // Interpolate position in iso space
+            const dx = unitOnTile.position.x - anim.x;
+            const dz = unitOnTile.position.z - anim.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            anim.isMoving = dist > 0.05;
+            anim.x += dx * 0.12;
+            anim.z += dz * 0.12;
+
+            if (anim.isMoving) {
+              anim.walkCycle += dt * 12;
+              // Dust particles
+              if (Math.floor(anim.walkCycle * 2) !== Math.floor((anim.walkCycle - dt * 12) * 2)) {
+                for (let i = 0; i < 2; i++) {
+                  dustParticles.current.push({
+                    x: sx + (Math.random() - 0.5) * 8,
+                    y: sy + 2 + Math.random() * 3,
+                    vx: (Math.random() - 0.5) * 20,
+                    vy: -(Math.random() * 15 + 5),
+                    life: 0, maxLife: 0.35 + Math.random() * 0.2,
+                    size: 2 + Math.random() * 2,
+                  });
+                }
+              }
+            } else {
+              anim.walkCycle *= 0.85;
+            }
+
+            if (anim.flash > 0) anim.flash = Math.max(0, anim.flash - dt * 3.5);
+            if (!unitOnTile.isAlive && anim.deathProgress < 1) {
+              anim.deathProgress = Math.min(1, anim.deathProgress + dt * 1.5);
+            }
+
+            // Get interpolated iso position
+            const elev = tile.elevation;
+            const unitIso = toIso(anim.x, anim.z, elev);
+
+            drawUnit(ctx, unitIso.sx, unitIso.sy - 4, unitOnTile,
+              unitOnTile.id === state.selectedUnitId,
+              anim.flash, anim.walkCycle, anim.isMoving,
+              anim.deathProgress, timestamp);
+          }
+        }
+      }
+
+      // ── Also draw dead units fading out ──
+      for (const unit of state.units) {
+        if (unit.isAlive) continue;
+        const anim = unitAnims.current[unit.id];
+        if (!anim || anim.deathProgress >= 1) continue;
+        anim.deathProgress = Math.min(1, anim.deathProgress + dt * 1.5);
+        const tile = state.grid[Math.round(anim.x)]?.[Math.round(anim.z)];
+        const elev = tile?.elevation || 0;
+        const unitIso = toIso(anim.x, anim.z, elev);
+        drawUnit(ctx, unitIso.sx, unitIso.sy - 4, unit, false, anim.flash, 0, false, anim.deathProgress, timestamp);
+      }
+
+      // ── Zone border (iso diamond) ──
+      if (state.shrinkLevel > 0) {
+        const m = state.shrinkLevel * 2;
+        const pulse = 0.5 + Math.sin(timestamp * 0.003) * 0.3;
+        ctx.strokeStyle = `rgba(255,34,34,${pulse})`;
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([8, 5]);
+        const c1 = toIso(m, m, 0);
+        const c2 = toIso(GRID_SIZE - m, m, 0);
+        const c3 = toIso(GRID_SIZE - m, GRID_SIZE - m, 0);
+        const c4 = toIso(m, GRID_SIZE - m, 0);
+        ctx.beginPath();
+        ctx.moveTo(c1.sx, c1.sy);
+        ctx.lineTo(c2.sx, c2.sy);
+        ctx.lineTo(c3.sx, c3.sy);
+        ctx.lineTo(c4.sx, c4.sy);
+        ctx.closePath();
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
-      // ── Draw dust particles ──
+      // ── Dust particles ──
       dustParticles.current = dustParticles.current.filter(p => p.life < p.maxLife);
       for (const p of dustParticles.current) {
         p.life += dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        p.vy += 15 * dt; // gravity
+        p.vy += 30 * dt;
         const alpha = Math.max(0, 1 - p.life / p.maxLife);
-        ctx.fillStyle = `rgba(160,140,110,${alpha * 0.6})`;
+        ctx.fillStyle = `rgba(180,160,130,${alpha * 0.5})`;
         ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
       }
 
-      // ── Draw units ──
-      for (const unit of state.units) {
-        const anim = unitAnims.current[unit.id];
-        if (!anim) continue;
-
-        // Smooth position interpolation
-        const dx = unit.position.x - anim.x;
-        const dz = unit.position.z - anim.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-        const wasMoving = anim.isMoving;
-        anim.isMoving = dist > 0.05;
-
-        anim.x += dx * 0.12;
-        anim.z += dz * 0.12;
-
-        // Walk cycle — advance while moving
-        if (anim.isMoving) {
-          anim.walkCycle += dt * 14; // speed of leg pump
-          // Spawn dust every ~0.25 of walk cycle
-          if (Math.floor(anim.walkCycle * 2) !== Math.floor((anim.walkCycle - dt * 14) * 2)) {
-            const footX = anim.x * TILE_SIZE + TILE_SIZE / 2;
-            const footZ = anim.z * TILE_SIZE + TILE_SIZE / 2 + TILE_SIZE * 0.38 * 0.7;
-            for (let i = 0; i < 3; i++) {
-              dustParticles.current.push({
-                x: footX + (Math.random() - 0.5) * 6,
-                y: footZ + (Math.random() - 0.5) * 2,
-                vx: (Math.random() - 0.5) * 15,
-                vy: -(Math.random() * 12 + 3),
-                life: 0,
-                maxLife: 0.3 + Math.random() * 0.3,
-                size: 1.5 + Math.random() * 1.5,
-              });
-            }
-          }
-        } else {
-          // Smoothly decay walk cycle to nearest rest position
-          anim.walkCycle *= 0.85;
-        }
-
-        anim.prevX = anim.x;
-        anim.prevZ = anim.z;
-
-        // Flash decay
-        if (anim.flash > 0) anim.flash = Math.max(0, anim.flash - dt * 4);
-
-        // Death animation
-        if (!unit.isAlive && anim.deathProgress < 1) {
-          anim.deathProgress = Math.min(1, anim.deathProgress + dt * 2);
-        }
-
-        if (anim.deathProgress >= 1 && !unit.isAlive) continue; // Skip fully dead
-
-        const px = anim.x * TILE_SIZE + TILE_SIZE / 2;
-        const pz = anim.z * TILE_SIZE + TILE_SIZE / 2;
-        const teamColor = TEAM_COLORS[unit.team];
-        const isSelected = unit.id === state.selectedUnitId;
-        const size = TILE_SIZE * 0.38;
-
-        // Walk bob offset
-        const bobY = anim.isMoving ? Math.sin(anim.walkCycle * 2) * 2 : 0;
-        const tiltX = anim.isMoving ? Math.sin(anim.walkCycle) * 0.06 : 0;
-        // Leg offsets — alternate legs
-        const legPhase = anim.walkCycle;
-        const leftLegOffset = anim.isMoving ? Math.sin(legPhase) * size * 0.35 : 0;
-        const rightLegOffset = anim.isMoving ? Math.sin(legPhase + Math.PI) * size * 0.35 : 0;
-        // Arm swing
-        const armSwing = anim.isMoving ? Math.sin(legPhase + Math.PI) * size * 0.2 : 0;
+      // ── Combat tracer lines ──
+      const recentHits = state.combatEvents.filter(e =>
+        (e.type === 'damage' || e.type === 'crit') && Date.now() - e.timestamp < 500
+      );
+      for (const evt of recentHits) {
+        const age = (Date.now() - evt.timestamp) / 500;
+        const aTile = state.grid[evt.attackerPos.x]?.[evt.attackerPos.z];
+        const tTile = state.grid[evt.targetPos.x]?.[evt.targetPos.z];
+        const a = toIso(evt.attackerPos.x, evt.attackerPos.z, aTile?.elevation || 0);
+        const t = toIso(evt.targetPos.x, evt.targetPos.z, tTile?.elevation || 0);
 
         ctx.save();
-        ctx.translate(px, pz + bobY);
-        ctx.rotate(tiltX);
+        ctx.globalAlpha = (1 - age) * 0.8;
 
-        // Death fade
-        if (!unit.isAlive) {
-          ctx.globalAlpha = 1 - anim.deathProgress;
-          ctx.rotate(anim.deathProgress * 1.2);
-        }
+        // Tracer line
+        ctx.strokeStyle = evt.type === 'crit' ? '#ffaa00' : '#ff6644';
+        ctx.lineWidth = evt.type === 'crit' ? 3 : 2;
+        ctx.shadowColor = evt.type === 'crit' ? '#ffaa00' : '#ff4422';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(a.sx, a.sy - UNIT_H);
+        ctx.lineTo(t.sx, t.sy - UNIT_H);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
 
-        // Selected glow
-        if (isSelected) {
-          const glowPulse = 0.4 + Math.sin(timestamp * 0.005) * 0.2;
+        // Muzzle flash
+        if (age < 0.2) {
+          const flashSize = (1 - age / 0.2) * (evt.type === 'crit' ? 10 : 6);
+          ctx.fillStyle = '#ffffaa';
           ctx.beginPath();
-          ctx.arc(0, -bobY, size + 5, 0, Math.PI * 2);
-          ctx.fillStyle = teamColor + Math.floor(glowPulse * 255).toString(16).padStart(2, '0');
+          ctx.arc(a.sx, a.sy - UNIT_H, flashSize, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        // Unit shadow (squashes with bob)
-        const shadowSquash = 1 - Math.abs(bobY) * 0.04;
-        ctx.beginPath();
-        ctx.ellipse(0, size * 0.6 - bobY, size * 0.7, size * 0.25 * shadowSquash, 0, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fill();
-
-        // ── Legs (drawn behind body) ──
-        ctx.fillStyle = '#3a3a3a';
-        // Left leg
-        ctx.fillRect(-size * 0.35, size * 0.35 + leftLegOffset * 0.5, size * 0.28, size * 0.4);
-        // Right leg
-        ctx.fillRect(size * 0.08, size * 0.35 + rightLegOffset * 0.5, size * 0.28, size * 0.4);
-
-        // Boots — pixel detail
-        ctx.fillStyle = '#2a2a2a';
-        ctx.fillRect(-size * 0.38, size * 0.7 + leftLegOffset * 0.5, size * 0.34, size * 0.12);
-        ctx.fillRect(size * 0.05, size * 0.7 + rightLegOffset * 0.5, size * 0.34, size * 0.12);
-
-        // Body — pixel art soldier shape
-        // Torso
-        ctx.fillStyle = anim.flash > 0 ? `rgba(255,${Math.floor(100 * (1 - anim.flash))},${Math.floor(100 * (1 - anim.flash))},1)` : teamColor;
-        ctx.fillRect(-size * 0.45, -size * 0.7, size * 0.9, size * 1.1);
-
-        // Head
-        ctx.fillStyle = '#ddc8a0';
-        ctx.fillRect(-size * 0.3, -size * 1.1, size * 0.6, size * 0.45);
-
-        // Helmet
-        ctx.fillStyle = teamColor;
-        ctx.fillRect(-size * 0.35, -size * 1.2, size * 0.7, size * 0.25);
-
-        // Weapon (right side, swings with arm)
-        ctx.save();
-        ctx.translate(size * 0.4, -size * 0.1 + armSwing);
-        ctx.fillStyle = '#555';
-        ctx.fillRect(-size * 0.07, -size * 0.4, size * 0.15, size * 0.8);
-        ctx.restore();
-
-        // Class indicator
-        if (unit.unitClass === 'medic') {
-          ctx.fillStyle = '#fff';
-          ctx.fillRect(-size * 0.12, -size * 0.4, size * 0.24, size * 0.08);
-          ctx.fillRect(-size * 0.04, -size * 0.5, size * 0.08, size * 0.28);
-        }
-
-        // HP bar above unit
-        const barW = size * 1.8;
-        const barH = 3;
-        const barY = -size * 1.4;
-        ctx.fillStyle = '#000000aa';
-        ctx.fillRect(-barW / 2, barY, barW, barH);
-        const hpPct = unit.hp / unit.maxHp;
-        ctx.fillStyle = hpPct > 0.5 ? '#44cc44' : hpPct > 0.25 ? '#cc8800' : '#cc2222';
-        ctx.fillRect(-barW / 2, barY, barW * hpPct, barH);
-        ctx.strokeStyle = '#00000066';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(-barW / 2, barY, barW, barH);
-
-        // Overwatch indicator
-        if (unit.isOnOverwatch) {
-          ctx.fillStyle = '#4488ff';
-          ctx.font = `bold ${TILE_SIZE * 0.3}px monospace`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('👁', 0, -size * 1.7);
+        // Impact spark
+        if (age < 0.3) {
+          const sparkSize = (1 - age / 0.3) * 8;
+          ctx.fillStyle = '#ffcc44';
+          ctx.beginPath();
+          ctx.arc(t.sx, t.sy - UNIT_H / 2, sparkSize, 0, Math.PI * 2);
+          ctx.fill();
         }
 
         ctx.restore();
       }
 
       // ── Floating damage text ──
-      floatingTexts.current = floatingTexts.current.filter(ft => ft.age < 1.5);
-      for (const ft of floatingTexts.current) {
+      floatTexts.current = floatTexts.current.filter(ft => ft.age < 2);
+      for (const ft of floatTexts.current) {
         ft.age += dt;
-        const px = ft.x * TILE_SIZE + TILE_SIZE / 2;
-        const pz = ft.z * TILE_SIZE + TILE_SIZE / 2 - ft.age * 40;
-        const alpha = Math.max(0, 1 - ft.age / 1.5);
+        const tile = state.grid[ft.gx]?.[ft.gz];
+        const elev = tile?.elevation || 0;
+        const iso = toIso(ft.gx, ft.gz, elev);
+        const floatY = ft.age * 35;
+        const alpha = Math.max(0, 1 - ft.age / 2);
+        const scale = ft.isCrit ? 1.4 : 1;
+        const bounce = ft.age < 0.15 ? (1 + Math.sin(ft.age / 0.15 * Math.PI) * 0.3) : 1;
 
         ctx.save();
+        ctx.translate(iso.sx, iso.sy - UNIT_H - floatY);
+        ctx.scale(scale * bounce, scale * bounce);
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = ft.color;
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.font = `bold ${14 / camera.zoom > 10 ? 14 : 10}px 'Share Tech Mono', monospace`;
+        ctx.font = `bold ${ft.isCrit ? 14 : 11}px 'Share Tech Mono', monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.strokeText(ft.text, px, pz);
-        ctx.fillText(ft.text, px, pz);
+        // Shadow
+        ctx.fillStyle = '#000';
+        ctx.fillText(ft.text, 1, 1);
+        // Main
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, 0, 0);
         ctx.restore();
       }
 
-      // ── Combat lines (attacker → target) ──
-      const recentEvents = state.combatEvents.filter(e =>
-        (e.type === 'damage' || e.type === 'crit') && Date.now() - e.timestamp < 400
-      );
-      for (const evt of recentEvents) {
-        const age = (Date.now() - evt.timestamp) / 400;
-        ctx.save();
-        ctx.globalAlpha = 1 - age;
-        ctx.strokeStyle = evt.type === 'crit' ? '#ff8800' : '#ff4444';
-        ctx.lineWidth = evt.type === 'crit' ? 3 : 2;
-        ctx.beginPath();
-        ctx.moveTo(
-          evt.attackerPos.x * TILE_SIZE + TILE_SIZE / 2,
-          evt.attackerPos.z * TILE_SIZE + TILE_SIZE / 2
-        );
-        ctx.lineTo(
-          evt.targetPos.x * TILE_SIZE + TILE_SIZE / 2,
-          evt.targetPos.z * TILE_SIZE + TILE_SIZE / 2
-        );
-        ctx.stroke();
-
-        // Muzzle flash at attacker
-        if (age < 0.3) {
-          ctx.fillStyle = '#ffff88';
-          ctx.beginPath();
-          ctx.arc(
-            evt.attackerPos.x * TILE_SIZE + TILE_SIZE / 2,
-            evt.attackerPos.z * TILE_SIZE + TILE_SIZE / 2,
-            4 * (1 - age / 0.3), 0, Math.PI * 2
-          );
-          ctx.fill();
-        }
-
-        ctx.restore();
-      }
-
-      // ── Kill cam overlay glow ──
+      // ── Kill cam glow ──
       if (state.killCam) {
-        const kx = state.killCam.targetPos.x * TILE_SIZE + TILE_SIZE / 2;
-        const kz = state.killCam.targetPos.z * TILE_SIZE + TILE_SIZE / 2;
-        const grad = ctx.createRadialGradient(kx, kz, 0, kx, kz, TILE_SIZE * 4);
-        grad.addColorStop(0, 'rgba(255,50,30,0.25)');
-        grad.addColorStop(1, 'rgba(255,50,30,0)');
+        const kTile = state.grid[state.killCam.targetPos.x]?.[state.killCam.targetPos.z];
+        const kIso = toIso(state.killCam.targetPos.x, state.killCam.targetPos.z, kTile?.elevation || 0);
+        const grad = ctx.createRadialGradient(kIso.sx, kIso.sy, 0, kIso.sx, kIso.sy, 80);
+        grad.addColorStop(0, 'rgba(255,40,20,0.3)');
+        grad.addColorStop(1, 'rgba(255,40,20,0)');
         ctx.fillStyle = grad;
-        ctx.fillRect(kx - TILE_SIZE * 4, kz - TILE_SIZE * 4, TILE_SIZE * 8, TILE_SIZE * 8);
+        ctx.fillRect(kIso.sx - 80, kIso.sy - 80, 160, 160);
       }
 
-      ctx.restore(); // camera transform
-      ctx.restore(); // DPR scale
+      ctx.restore(); // camera
+      ctx.restore(); // DPR
 
       animFrameId.current = requestAnimationFrame(render);
     }
 
     animFrameId.current = requestAnimationFrame(render);
-    return () => {
-      running = false;
-      cancelAnimationFrame(animFrameId.current);
-    };
+    return () => { running = false; cancelAnimationFrame(animFrameId.current); };
   }, [state, camera, movableSet, attackableSet, abilitySet]);
 
-  // ── Mouse handlers ──
+  // ── Mouse → iso grid ──
   const screenToGrid = useCallback((clientX: number, clientY: number): Position | null => {
     const container = containerRef.current;
     if (!container) return null;
     const rect = container.getBoundingClientRect();
-    const sx = clientX - rect.left;
-    const sy = clientY - rect.top;
-    // Reverse camera transform
-    const wx = (sx - rect.width / 2) / camera.zoom + camera.x + rect.width / (2 * camera.zoom);
-    const wy = (sy - rect.height / 2) / camera.zoom + camera.y + rect.height / (2 * camera.zoom);
-    const gx = Math.floor(wx / TILE_SIZE);
-    const gz = Math.floor(wy / TILE_SIZE);
+    const sx = (clientX - rect.left - rect.width / 2) / camera.zoom + camera.x;
+    const sy = (clientY - rect.top - rect.height / 2) / camera.zoom + camera.y;
+    const { gx, gz } = fromIso(sx, sy);
     if (gx < 0 || gx >= GRID_SIZE || gz < 0 || gz >= GRID_SIZE) return null;
     return { x: gx, z: gz };
   }, [camera]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 0 || e.button === 2) {
-      isDragging.current = false;
-      dragStart.current = { x: e.clientX, y: e.clientY, camX: camera.x, camY: camera.y };
-    }
+    isDragging.current = false;
+    dragStart.current = { x: e.clientX, y: e.clientY, camX: camera.x, camY: camera.y };
   }, [camera]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    // Check if dragging (right-click or left-click drag)
     if (e.buttons > 0) {
       const dx = e.clientX - dragStart.current.x;
       const dy = e.clientY - dragStart.current.y;
@@ -952,51 +927,29 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
         }));
       }
     }
-
-    // Hover
     const pos = screenToGrid(e.clientX, e.clientY);
     onTileHover(pos);
   }, [screenToGrid, onTileHover]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (isDragging.current) {
-      isDragging.current = false;
-      return;
-    }
-
+    if (isDragging.current) { isDragging.current = false; return; }
     const pos = screenToGrid(e.clientX, e.clientY);
     if (!pos) return;
-
-    // Check if clicking a unit
-    const clickedUnit = state.units.find(u =>
-      u.isAlive && u.position.x === pos.x && u.position.z === pos.z
-    );
-
-    if (clickedUnit) {
-      onUnitClick(clickedUnit.id);
-    } else {
-      onTileClick(pos);
-    }
+    const clickedUnit = state.units.find(u => u.isAlive && u.position.x === pos.x && u.position.z === pos.z);
+    if (clickedUnit) onUnitClick(clickedUnit.id);
+    else onTileClick(pos);
   }, [screenToGrid, state.units, onUnitClick, onTileClick]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     setCamera(prev => ({
       ...prev,
-      zoom: Math.max(0.4, Math.min(3, prev.zoom * (e.deltaY < 0 ? 1.1 : 0.9))),
+      zoom: Math.max(0.5, Math.min(3, prev.zoom * (e.deltaY < 0 ? 1.1 : 0.9))),
     }));
   }, []);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-  }, []);
-
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full h-full overflow-hidden bg-background"
-      onContextMenu={handleContextMenu}
-    >
+    <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-background" onContextMenu={e => e.preventDefault()}>
       <canvas
         ref={canvasRef}
         className="absolute inset-0 cursor-crosshair"
@@ -1004,28 +957,28 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onWheel={handleWheel}
-        style={{ imageRendering: 'pixelated' }}
       />
 
       {/* Kill cam overlay */}
       {state.killCam && (
         <div className="absolute inset-0 z-30 pointer-events-none">
-          <div className="absolute top-0 left-0 right-0 h-[10%] bg-black transition-all duration-500" />
-          <div className="absolute bottom-0 left-0 right-0 h-[10%] bg-black transition-all duration-500" />
+          <div className="absolute top-0 left-0 right-0 h-[11%] bg-black transition-all duration-500" />
+          <div className="absolute bottom-0 left-0 right-0 h-[11%] bg-black transition-all duration-500" />
           <div className="absolute inset-0" style={{
-            background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.6) 100%)',
+            background: 'radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.65) 100%)',
           }} />
-          <div className="absolute bottom-[12%] left-6 animate-fade-in flex items-center gap-3">
-            <div className="w-1 h-10 bg-destructive rounded-full" />
+          <div className="absolute inset-0 opacity-20" style={{
+            background: 'radial-gradient(ellipse at center, transparent 40%, rgba(200,30,0,0.3) 100%)',
+          }} />
+          <div className="absolute bottom-[13%] left-8 animate-fade-in flex items-center gap-3">
+            <div className="w-1.5 h-12 bg-destructive rounded-full" />
             <div>
-              <div className="text-[8px] tracking-[0.5em] text-destructive/80 font-mono uppercase">
-                ELIMINATED
-              </div>
-              <div className="text-2xl font-black text-foreground tracking-wide"
-                style={{ textShadow: '0 0 20px rgba(255,50,50,0.4)' }}>
+              <div className="text-[9px] tracking-[0.5em] text-destructive/90 font-mono uppercase">ELIMINATED</div>
+              <div className="text-3xl font-black text-foreground tracking-wide"
+                style={{ textShadow: '0 0 25px rgba(255,50,50,0.5), 0 2px 6px rgba(0,0,0,0.8)' }}>
                 {state.killCam.victimName}
               </div>
-              <div className="text-[9px] tracking-[0.2em] text-muted-foreground/80 font-mono">
+              <div className="text-[10px] tracking-[0.2em] text-muted-foreground/80 font-mono mt-0.5">
                 ▸ {state.killCam.killerName}
               </div>
             </div>

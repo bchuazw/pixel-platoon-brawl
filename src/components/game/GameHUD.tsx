@@ -457,57 +457,69 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
             style={{ backgroundImage: `url(${bgTactical})` }}
           />
           <div className="absolute inset-0 bg-background/80" />
-          <div className="relative z-10 text-center space-y-6">
-            <div className="space-y-2">
-              <h1 className="text-[20px] text-primary glow-text tracking-[0.3em]">WARGAMING</h1>
-              <p className="text-[9px] text-muted-foreground tracking-wider">4 SQUADS • 8 COMBATANTS • 1 TEAM SURVIVES</p>
-              <p className="text-[7px] text-accent tracking-wider">EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE!</p>
-            </div>
 
-            {/* Unit previews */}
-            <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
-              {state.units.map(u => (
-                <div key={u.id} className="bg-card/80 border border-border/30 rounded-lg p-3 flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: TEAM_COLORS[u.team] + '22', border: `2px solid ${TEAM_COLORS[u.team]}` }}
-                  >
-                    {(() => { const I = CLASS_ICONS[u.unitClass]; return <I className="w-5 h-5" style={{ color: TEAM_COLORS[u.team] }} />; })()}
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-foreground font-bold">{u.name}</div>
-                    <div className="text-[7px] uppercase tracking-wider" style={{ color: TEAM_COLORS[u.team] }}>
-                      {u.unitClass} • {u.team}
-                    </div>
-                    <div className="text-[7px] text-muted-foreground">
-                      HP:{u.hp} • {u.weapon.name} • Vision:{u.visionRange}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Betting Panel */}
-            {onPlaceBet && sponsorPoints !== undefined && (
-              <BettingPanel onPlaceBet={onPlaceBet} sponsorPoints={sponsorPoints} />
-            )}
-
-            {betTeam && (
-              <div className="text-center bg-accent/10 border border-accent/30 rounded-lg px-4 py-2 max-w-[280px] mx-auto">
-                <span className="text-[8px] text-accent font-bold">🎰 BET PLACED: ⭐{betAmount} on {betTeam.toUpperCase()}</span>
-                <div className="text-[6px] text-muted-foreground">Win ⭐{(betAmount || 0) * 3} if they survive!</div>
+          {/* Side-by-side layout: center content + right betting panel */}
+          <div className="relative z-10 flex items-start justify-center gap-8 w-full max-w-4xl px-6">
+            {/* Main content (center) */}
+            <div className="text-center space-y-6 flex-1">
+              <div className="space-y-2">
+                <h1 className="text-[20px] text-primary glow-text tracking-[0.3em]">WARGAMING</h1>
+                <p className="text-[9px] text-muted-foreground tracking-wider">4 SQUADS • 8 COMBATANTS • 1 TEAM SURVIVES</p>
+                <p className="text-[7px] text-accent tracking-wider">EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE!</p>
               </div>
-            )}
 
-            <div className="space-y-2">
-              <button
-                onClick={onStartAutoPlay}
-                className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all glow-text text-[11px] tracking-[0.2em] flex items-center gap-3 mx-auto"
-              >
-                <Play className="w-5 h-5" />
-                START BATTLE
-              </button>
-              <p className="text-[7px] text-muted-foreground">AI commands each squad • Fog of War active • Medics heal allies!</p>
+              {/* Unit previews */}
+              <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
+                {state.units.map(u => (
+                  <div key={u.id} className="bg-card/80 border border-border/30 rounded-lg p-3 flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: TEAM_COLORS[u.team] + '22', border: `2px solid ${TEAM_COLORS[u.team]}` }}
+                    >
+                      {(() => { const I = CLASS_ICONS[u.unitClass]; return <I className="w-5 h-5" style={{ color: TEAM_COLORS[u.team] }} />; })()}
+                    </div>
+                    <div>
+                      <div className="text-[9px] text-foreground font-bold">{u.name}</div>
+                      <div className="text-[7px] uppercase tracking-wider" style={{ color: TEAM_COLORS[u.team] }}>
+                        {u.unitClass} • {u.team}
+                      </div>
+                      <div className="text-[7px] text-muted-foreground">
+                        HP:{u.hp} • {u.weapon.name} • Vision:{u.visionRange}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  onClick={onStartAutoPlay}
+                  className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all glow-text text-[11px] tracking-[0.2em] flex items-center gap-3 mx-auto"
+                >
+                  <Play className="w-5 h-5" />
+                  START BATTLE
+                </button>
+                <p className="text-[7px] text-muted-foreground">AI commands each squad • Fog of War active • Medics heal allies!</p>
+              </div>
+            </div>
+
+            {/* Betting panel (right side) */}
+            <div className="w-[280px] shrink-0 pt-4">
+              {onPlaceBet && sponsorPoints !== undefined && !betTeam && (
+                <BettingPanel onPlaceBet={onPlaceBet} sponsorPoints={sponsorPoints} />
+              )}
+
+              {betTeam && (
+                <div className="bg-accent/10 border border-accent/30 rounded-xl px-4 py-4 text-center">
+                  <div className="text-[10px] text-accent font-bold mb-1">🎰 BET PLACED</div>
+                  <div className="text-[14px] font-bold text-foreground">⭐{betAmount}</div>
+                  <div className="text-[8px] text-muted-foreground mt-0.5">
+                    on <span className="font-bold uppercase" style={{ color: TEAM_COLORS[betTeam] }}>{betTeam}</span>
+                  </div>
+                  <div className="mt-2 h-px bg-border/30" />
+                  <div className="text-[7px] text-accent mt-2">Potential win: ⭐{(betAmount || 0) * 3}</div>
+                </div>
+              )}
             </div>
           </div>
         </div>

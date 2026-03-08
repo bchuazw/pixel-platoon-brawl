@@ -18,8 +18,8 @@ interface GameBoardProps {
 }
 
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
-const CAM_DISTANCE = 24;
-const CAM_HEIGHT = 18;
+const CAM_DISTANCE = 34;
+const CAM_HEIGHT = 26;
 
 function getCameraPosition(angleIndex: number): [number, number, number] {
   const angle = (Math.PI / 4) + (angleIndex * Math.PI / 2);
@@ -143,7 +143,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
         <directionalLight position={[-10, 15, -10]} intensity={0.12} color="#6688cc" />
         <hemisphereLight intensity={0.3} color="#556677" groundColor="#1a2a12" />
-        <fog attach="fog" args={['#0c1a12', 20, 50]} />
+        <fog attach="fog" args={['#0c1a12', 25, 65]} />
 
         <DustParticles />
 

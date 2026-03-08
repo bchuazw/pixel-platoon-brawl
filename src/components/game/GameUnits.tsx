@@ -1,17 +1,10 @@
 import { useRef, useMemo, useEffect } from 'react';
-import { useFrame, useLoader } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
-import { Unit, TEAM_COLORS, CombatEvent, Position, TileData } from '@/game/types';
+import { Unit, TEAM_COLORS, CombatEvent, Position, TileData, VISION_RANGE } from '@/game/types';
 import { getTileY } from './GridTiles';
 import { playMove } from '@/game/sounds';
 import * as THREE from 'three';
-
-import spriteSoldierImg from '@/assets/sprite-soldier.png';
-import spriteSniperImg from '@/assets/sprite-sniper.png';
-import spriteHeavyImg from '@/assets/sprite-heavy.png';
-import spriteMedicImg from '@/assets/sprite-medic.png';
-import coverHalfImg from '@/assets/cover-half.png';
-import coverFullImg from '@/assets/cover-full.png';
 
 interface GameUnitsProps {
   units: Unit[];
@@ -24,144 +17,191 @@ interface GameUnitsProps {
   onMoveComplete?: () => void;
 }
 
-// Sprite sheet layout: 4 columns x 4 rows
-// Row 0: idle (4 frames), Row 1: walk (4 frames), Row 2: shoot (4 frames), Row 3: death (4 frames)
-const SPRITE_COLS = 4;
-const SPRITE_ROWS = 4;
-const FRAME_W = 1 / SPRITE_COLS;
-const FRAME_H = 1 / SPRITE_ROWS;
+type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing' | 'crouching';
 
-// Animation row mapping
-const ANIM_ROW: Record<string, number> = {
-  idle: 0,
-  walking: 1,
-  aiming: 2,
-  shooting: 2,
-  recoil: 2,
-  hit: 0,
-  dying: 3,
-  healing: 0,
-};
-
-// Frames per second for each animation
-const ANIM_FPS: Record<string, number> = {
-  idle: 3,
-  walking: 8,
-  aiming: 6,
-  shooting: 10,
-  recoil: 6,
-  hit: 8,
-  dying: 4,
-  healing: 4,
-};
-
-const SPRITE_MAP: Record<string, string> = {
-  blue: spriteSoldierImg,
-  red: spriteSniperImg,
-  green: spriteHeavyImg,
-  yellow: spriteMedicImg,
-};
-
-type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';
-
-function CoverProp({ coverType }: { coverType: 'none' | 'half' | 'full' }) {
-  const textureHalf = useLoader(THREE.TextureLoader, coverHalfImg);
-  const textureFull = useLoader(THREE.TextureLoader, coverFullImg);
-  const processedTex = useMemo(() => {
-    const tex = (coverType === 'full' ? textureFull : textureHalf).clone();
-    tex.magFilter = THREE.NearestFilter;
-    tex.minFilter = THREE.NearestFilter;
-    tex.needsUpdate = true;
-    return tex;
-  }, [coverType, textureHalf, textureFull]);
-
-  if (coverType === 'none') return null;
-
-  const height = coverType === 'full' ? 0.7 : 0.45;
-  const width = coverType === 'full' ? 0.7 : 0.55;
-
-  return (
-    <Billboard position={[0, height * 0.5, 0.25]} renderOrder={10}>
-      <mesh>
-        <planeGeometry args={[width, height]} />
-        <meshBasicMaterial
-          map={processedTex}
-          transparent
-          alphaTest={0.1}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-    </Billboard>
-  );
+// ── Material cache for performance ──
+const materialCache = new Map<string, THREE.MeshStandardMaterial>();
+function getMaterial(color: string, opts?: { metalness?: number; roughness?: number; emissive?: string; emissiveIntensity?: number }) {
+  const key = `${color}-${opts?.metalness}-${opts?.roughness}-${opts?.emissive}`;
+  if (materialCache.has(key)) return materialCache.get(key)!;
+  const mat = new THREE.MeshStandardMaterial({
+    color,
+    metalness: opts?.metalness ?? 0.1,
+    roughness: opts?.roughness ?? 0.7,
+    emissive: opts?.emissive || '#000000',
+    emissiveIntensity: opts?.emissiveIntensity ?? 0,
+  });
+  materialCache.set(key, mat);
+  return mat;
 }
 
-function StatusIcons({ unit }: { unit: Unit }) {
-  const icons: { text: string; color: string }[] = [];
-  if (unit.isOnOverwatch) icons.push({ text: '👁', color: '#44aaff' });
-  if (unit.isSuppressed) icons.push({ text: '⛔', color: '#ff4444' });
-  if (icons.length === 0) return null;
+// ── 3D Soldier Body Parts ──
+function SoldierBody({ teamColor, unitClass, isMedic }: { teamColor: string; unitClass: string; isMedic: boolean }) {
+  // Color palette based on team
+  const bodyColor = useMemo(() => {
+    const c = new THREE.Color(teamColor);
+    return '#' + c.clone().lerp(new THREE.Color('#333333'), 0.4).getHexString();
+  }, [teamColor]);
+
+  const armorColor = useMemo(() => {
+    const c = new THREE.Color(teamColor);
+    return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.3).getHexString();
+  }, [teamColor]);
+
+  const skinColor = '#c8a882';
+  const bootColor = '#2a2218';
+  const gearColor = '#3a3a30';
+
+  const torsoMat = useMemo(() => getMaterial(armorColor, { metalness: 0.15, roughness: 0.6 }), [armorColor]);
+  const limbMat = useMemo(() => getMaterial(bodyColor, { metalness: 0.05, roughness: 0.8 }), [bodyColor]);
+  const skinMat = useMemo(() => getMaterial(skinColor, { metalness: 0, roughness: 0.9 }), []);
+  const bootMat = useMemo(() => getMaterial(bootColor, { metalness: 0.1, roughness: 0.7 }), []);
+  const gearMat = useMemo(() => getMaterial(gearColor, { metalness: 0.2, roughness: 0.5 }), []);
+  const helmetMat = useMemo(() => getMaterial(armorColor, { metalness: 0.3, roughness: 0.4 }), [armorColor]);
+
   return (
     <>
-      {icons.map((icon, i) => (
-        <Billboard key={i} position={[-0.35 + i * 0.2, 0.9, 0]}>
-          <Text fontSize={0.14} color={icon.color} anchorX="center" anchorY="middle" font={undefined}
-            outlineWidth={0.02} outlineColor="#000000">
-            {icon.text}
-          </Text>
-        </Billboard>
-      ))}
+      {/* ── TORSO ── */}
+      <mesh position={[0, 0.42, 0]} castShadow material={torsoMat}>
+        <boxGeometry args={[0.22, 0.22, 0.12]} />
+      </mesh>
+      {/* Chest plate / vest */}
+      <mesh position={[0, 0.44, 0.035]} material={gearMat}>
+        <boxGeometry args={[0.2, 0.18, 0.04]} />
+      </mesh>
+      {/* Belt */}
+      <mesh position={[0, 0.31, 0]} material={bootMat}>
+        <boxGeometry args={[0.21, 0.03, 0.12]} />
+      </mesh>
+
+      {/* ── HEAD ── */}
+      <group position={[0, 0.6, 0]}>
+        {/* Neck */}
+        <mesh position={[0, -0.04, 0]} material={skinMat}>
+          <cylinderGeometry args={[0.035, 0.04, 0.05, 8]} />
+        </mesh>
+        {/* Head */}
+        <mesh position={[0, 0.04, 0]} castShadow material={skinMat}>
+          <boxGeometry args={[0.1, 0.1, 0.1]} />
+        </mesh>
+        {/* Helmet */}
+        <mesh position={[0, 0.08, 0]} castShadow material={helmetMat}>
+          <sphereGeometry args={[0.07, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
+        </mesh>
+        {/* Helmet rim */}
+        <mesh position={[0, 0.055, 0]} material={helmetMat}>
+          <cylinderGeometry args={[0.072, 0.072, 0.015, 12]} />
+        </mesh>
+        {/* Goggles/visor */}
+        <mesh position={[0, 0.05, 0.05]} material={useMemo(() => getMaterial('#111111', { metalness: 0.8, roughness: 0.2 }), [])}>
+          <boxGeometry args={[0.08, 0.02, 0.02]} />
+        </mesh>
+      </group>
+
+      {/* ── BACKPACK ── */}
+      <mesh position={[0, 0.42, -0.1]} material={gearMat} castShadow>
+        <boxGeometry args={[0.14, 0.16, 0.06]} />
+      </mesh>
+      {/* Pouch */}
+      <mesh position={[0.06, 0.34, -0.1]} material={gearMat}>
+        <boxGeometry args={[0.04, 0.06, 0.04]} />
+      </mesh>
+
+      {/* ── Medic cross ── */}
+      {isMedic && (
+        <>
+          <mesh position={[0, 0.46, 0.058]}>
+            <boxGeometry args={[0.06, 0.02, 0.005]} />
+            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh position={[0, 0.46, 0.058]}>
+            <boxGeometry args={[0.02, 0.06, 0.005]} />
+            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} />
+          </mesh>
+        </>
+      )}
+
+      {/* ── Shoulder pads ── */}
+      <mesh position={[-0.14, 0.5, 0]} material={helmetMat}>
+        <boxGeometry args={[0.05, 0.06, 0.1]} />
+      </mesh>
+      <mesh position={[0.14, 0.5, 0]} material={helmetMat}>
+        <boxGeometry args={[0.05, 0.06, 0.1]} />
+      </mesh>
     </>
   );
 }
 
-function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isMoving, grid, onMoveComplete }: {
+function Weapon({ unitClass }: { unitClass: string }) {
+  const metalMat = useMemo(() => getMaterial('#2a2a2a', { metalness: 0.7, roughness: 0.3 }), []);
+  const woodMat = useMemo(() => getMaterial('#4a3520', { metalness: 0, roughness: 0.8 }), []);
+
+  return (
+    <group position={[0.08, 0, 0.12]}>
+      {/* Gun body */}
+      <mesh material={metalMat}>
+        <boxGeometry args={[0.03, 0.04, 0.25]} />
+      </mesh>
+      {/* Barrel */}
+      <mesh position={[0, 0.005, 0.18]} material={metalMat}>
+        <cylinderGeometry args={[0.008, 0.008, 0.12, 6]} />
+      </mesh>
+      {/* Stock */}
+      <mesh position={[0, -0.005, -0.14]} material={woodMat}>
+        <boxGeometry args={[0.025, 0.05, 0.08]} />
+      </mesh>
+      {/* Magazine */}
+      <mesh position={[0, -0.04, 0.02]} material={metalMat}>
+        <boxGeometry args={[0.02, 0.05, 0.03]} />
+      </mesh>
+      {/* Scope (soldier only) */}
+      {unitClass === 'soldier' && (
+        <mesh position={[0, 0.03, 0.04]} material={metalMat}>
+          <cylinderGeometry args={[0.01, 0.012, 0.06, 6]} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+// ── Main 3D Soldier Character ──
+function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving, grid, onMoveComplete }: {
   unit: Unit; isSelected: boolean; onClick: () => void; combatEvents: CombatEvent[];
   movePath: Position[] | null; isMoving: boolean; grid: TileData[][]; onMoveComplete?: () => void;
 }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const innerRef = useRef<THREE.Group>(null);
-  const spriteRef = useRef<THREE.Mesh>(null);
+  const rootRef = useRef<THREE.Group>(null);
+  const bodyRef = useRef<THREE.Group>(null);
+  const leftArmRef = useRef<THREE.Group>(null);
+  const rightArmRef = useRef<THREE.Group>(null);
+  const leftLegRef = useRef<THREE.Group>(null);
+  const rightLegRef = useRef<THREE.Group>(null);
+  const weaponGroupRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
+
   const color = TEAM_COLORS[unit.team];
+  const isMedic = unit.unitClass === 'medic';
 
   // Animation state
   const animState = useRef<AnimState>('idle');
   const animTimer = useRef(0);
-  const prevPos = useRef({ x: unit.position.x, z: unit.position.z });
   const prevHp = useRef(unit.hp);
   const prevAlive = useRef(unit.isAlive);
   const deathTimer = useRef(0);
   const targetDir = useRef(new THREE.Vector2(1, 0));
   const flashIntensity = useRef(0);
+  const facingAngle = useRef(0);
 
-  // Path walking state
+  // Path walking
   const pathRef = useRef<Position[] | null>(null);
   const pathIndex = useRef(0);
-  const walkProgress = useRef(1); // 0-1 progress between path nodes
-  const walkFrom = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
-  const walkTo = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
-  const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
+  const walkProgress = useRef(1);
+  const walkFrom = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
+  const walkTo = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
+  const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
   const moveCompleted = useRef(false);
+  const prevPos = useRef({ x: unit.position.x, z: unit.position.z });
 
-  // Sprite sheet frame tracking
-  const frameTimer = useRef(0);
-  const currentFrame = useRef(0);
-
-  const texture = useLoader(THREE.TextureLoader, SPRITE_MAP[unit.team]);
-  const processedTexture = useMemo(() => {
-    const tex = texture.clone();
-    tex.magFilter = THREE.NearestFilter;
-    tex.minFilter = THREE.NearestFilter;
-    tex.wrapS = THREE.ClampToEdgeWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    // Set initial UV to show first frame (top-left)
-    tex.repeat.set(FRAME_W, FRAME_H);
-    tex.offset.set(0, 1 - FRAME_H); // Row 0, Col 0 (UV origin is bottom-left)
-    tex.needsUpdate = true;
-    return tex;
-  }, [texture]);
-
-  // Start walking along a new path
+  // Start walking
   useEffect(() => {
     if (movePath && isMoving && movePath.length > 0) {
       pathRef.current = movePath;
@@ -170,21 +210,19 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       moveCompleted.current = false;
       animState.current = 'walking';
       animTimer.current = 0;
-      currentFrame.current = 0;
 
-      // Set initial walk segment
       const fromElev = grid[prevPos.current.x]?.[prevPos.current.z]?.elevation || 0;
-      walkFrom.current.set(prevPos.current.x, getTileY(fromElev) + 0.1, prevPos.current.z);
+      walkFrom.current.set(prevPos.current.x, getTileY(fromElev) + 0.01, prevPos.current.z);
 
       const firstTarget = movePath[0];
       const toElev = grid[firstTarget.x]?.[firstTarget.z]?.elevation || 0;
-      walkTo.current.set(firstTarget.x, getTileY(toElev) + 0.1, firstTarget.z);
+      walkTo.current.set(firstTarget.x, getTileY(toElev) + 0.01, firstTarget.z);
 
       playMove();
     }
   }, [movePath, isMoving]);
 
-  // Detect combat events targeting this unit
+  // Detect combat
   useEffect(() => {
     const recent = combatEvents.filter(e => Date.now() - e.timestamp < 300);
     for (const e of recent) {
@@ -194,36 +232,33 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
           e.targetPos.x - e.attackerPos.x,
           e.targetPos.z - e.attackerPos.z
         ).normalize();
+        facingAngle.current = Math.atan2(targetDir.current.x, targetDir.current.y);
         animState.current = 'aiming';
         animTimer.current = 0;
-        currentFrame.current = 0;
       }
       if (e.targetPos.x === unit.position.x && e.targetPos.z === unit.position.z &&
           (e.type === 'damage' || e.type === 'crit')) {
         animState.current = 'hit';
         animTimer.current = 0;
-        currentFrame.current = 0;
       }
       if (e.targetPos.x === unit.position.x && e.targetPos.z === unit.position.z && e.type === 'heal') {
         animState.current = 'healing';
         animTimer.current = 0;
-        currentFrame.current = 0;
       }
     }
   }, [combatEvents, unit.position.x, unit.position.z]);
 
-  // Detect death
+  // Death
   useEffect(() => {
     if (prevAlive.current && !unit.isAlive) {
       animState.current = 'dying';
       animTimer.current = 0;
       deathTimer.current = 0;
-      currentFrame.current = 0;
     }
     prevAlive.current = unit.isAlive;
   }, [unit.isAlive]);
 
-  // Detect HP change (got hit)
+  // HP change flash
   useEffect(() => {
     if (unit.hp < prevHp.current && unit.isAlive) {
       flashIntensity.current = 1;
@@ -231,78 +266,73 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
     prevHp.current = unit.hp;
   }, [unit.hp, unit.isAlive]);
 
-  // Update prevPos when position changes (but not during path walking)
+  // Update prevPos
   useEffect(() => {
     if (!pathRef.current || pathRef.current.length === 0) {
       prevPos.current = { x: unit.position.x, z: unit.position.z };
     }
   }, [unit.position.x, unit.position.z]);
 
-  const WALK_SPEED = 4.0; // tiles per second
+  const WALK_SPEED = 4.0;
 
   useFrame(({ clock }, delta) => {
-    if (!groupRef.current || !innerRef.current) return;
+    if (!rootRef.current || !bodyRef.current) return;
     const t = clock.getElapsedTime();
     animTimer.current += delta;
 
-    // Get elevation-aware Y for unit's logical position
     const unitElev = grid[unit.position.x]?.[unit.position.z]?.elevation || 0;
-    const unitBaseY = getTileY(unitElev) + 0.1;
+    const unitBaseY = getTileY(unitElev) + 0.01;
 
-    // ── Death animation ──
-    if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 2)) {
+    // Reset limb rotations each frame
+    const resetLimbs = () => {
+      if (leftArmRef.current) leftArmRef.current.rotation.set(0, 0, 0);
+      if (rightArmRef.current) rightArmRef.current.rotation.set(0, 0, 0);
+      if (leftLegRef.current) leftLegRef.current.rotation.set(0, 0, 0);
+      if (rightLegRef.current) rightLegRef.current.rotation.set(0, 0, 0);
+    };
+
+    // ── DEATH ──
+    if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 3)) {
       deathTimer.current += delta;
       const dt = deathTimer.current;
-      innerRef.current.rotation.z = Math.min(Math.PI / 2, dt * 4);
-      innerRef.current.position.y = -dt * 0.3;
 
-      // Animate death sprite row
-      const deathFps = ANIM_FPS['dying'];
-      frameTimer.current += delta;
-      if (frameTimer.current >= 1 / deathFps) {
-        frameTimer.current = 0;
-        currentFrame.current = Math.min(currentFrame.current + 1, SPRITE_COLS - 1);
-      }
-      const deathRow = ANIM_ROW['dying'];
-      processedTexture.offset.set(currentFrame.current * FRAME_W, 1 - (deathRow + 1) * FRAME_H);
+      // Ragdoll collapse
+      bodyRef.current.rotation.x = Math.min(Math.PI / 2, dt * 2.5);
+      bodyRef.current.position.y = -Math.min(0.3, dt * 0.2);
 
-      if (spriteRef.current) {
-        const mat = spriteRef.current.material as THREE.MeshBasicMaterial;
-        mat.opacity = Math.max(0, 1 - dt * 0.8);
-      }
-      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+      if (leftArmRef.current) leftArmRef.current.rotation.z = -Math.min(Math.PI / 3, dt * 3);
+      if (rightArmRef.current) rightArmRef.current.rotation.z = Math.min(Math.PI / 3, dt * 3);
+      if (leftLegRef.current) leftLegRef.current.rotation.x = -Math.min(0.3, dt);
+      if (rightLegRef.current) rightLegRef.current.rotation.x = Math.min(0.2, dt * 0.8);
+
+      rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       return;
     }
 
     if (!unit.isAlive) return;
 
-    // ── Path walking animation ──
+    // ── WALKING ──
     if (animState.current === 'walking' && pathRef.current && pathRef.current.length > 0) {
       walkProgress.current += delta * WALK_SPEED;
 
       if (walkProgress.current >= 1) {
-        // Arrived at current path node
-        const currentTarget = pathRef.current[pathIndex.current];
         currentVisualPos.current.copy(walkTo.current);
-
         pathIndex.current++;
 
         if (pathIndex.current < pathRef.current.length) {
-          // Move to next segment
           walkProgress.current = 0;
           walkFrom.current.copy(walkTo.current);
           const nextTarget = pathRef.current[pathIndex.current];
           const nextElev = grid[nextTarget.x]?.[nextTarget.z]?.elevation || 0;
-          walkTo.current.set(nextTarget.x, getTileY(nextElev) + 0.1, nextTarget.z);
+          walkTo.current.set(nextTarget.x, getTileY(nextElev) + 0.01, nextTarget.z);
         } else {
-          // Path complete
           animState.current = 'idle';
           pathRef.current = null;
           prevPos.current = { x: unit.position.x, z: unit.position.z };
           currentVisualPos.current.set(unit.position.x, unitBaseY, unit.position.z);
-          innerRef.current.rotation.x = 0;
-          innerRef.current.rotation.z = 0;
-          innerRef.current.scale.set(1, 1, 1);
+          resetLimbs();
+          bodyRef.current.rotation.set(0, 0, 0);
+          bodyRef.current.position.set(0, 0, 0);
 
           if (!moveCompleted.current && onMoveComplete) {
             moveCompleted.current = true;
@@ -313,167 +343,211 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
 
       if (animState.current === 'walking') {
         const p = Math.min(1, walkProgress.current);
-        const eased = p; // linear for consistent walking speed
+        currentVisualPos.current.lerpVectors(walkFrom.current, walkTo.current, p);
 
-        // Interpolate position
-        currentVisualPos.current.lerpVectors(walkFrom.current, walkTo.current, eased);
+        // Face walk direction
+        const dx = walkTo.current.x - walkFrom.current.x;
+        const dz = walkTo.current.z - walkFrom.current.z;
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+          facingAngle.current = Math.atan2(dx, dz);
+        }
 
-        // Hop arc per step
-        const hopHeight = Math.sin(p * Math.PI) * 0.15;
-        groupRef.current.position.set(
+        // Walking animation cycle
+        const walkCycle = t * 8;
+        const legSwing = Math.sin(walkCycle) * 0.6;
+        const armSwing = Math.sin(walkCycle) * 0.4;
+        const bodyBob = Math.abs(Math.sin(walkCycle)) * 0.03;
+        const bodySway = Math.sin(walkCycle * 0.5) * 0.03;
+
+        if (leftLegRef.current) leftLegRef.current.rotation.x = legSwing;
+        if (rightLegRef.current) rightLegRef.current.rotation.x = -legSwing;
+        if (leftArmRef.current) leftArmRef.current.rotation.x = -armSwing;
+        if (rightArmRef.current) rightArmRef.current.rotation.x = armSwing;
+
+        bodyRef.current.position.y = bodyBob;
+        bodyRef.current.rotation.z = bodySway;
+        bodyRef.current.rotation.x = 0.05; // Lean forward
+
+        rootRef.current.position.set(
           currentVisualPos.current.x,
-          currentVisualPos.current.y + hopHeight,
+          currentVisualPos.current.y + bodyBob,
           currentVisualPos.current.z
         );
-
-        // Walking bobbing animation
-        const walkCycle = t * 12;
-        innerRef.current.rotation.x = Math.sin(walkCycle) * 0.08;
-        innerRef.current.rotation.z = Math.sin(walkCycle * 0.5) * 0.06;
-        // Slight lean in direction of travel
-        const dx = walkTo.current.x - walkFrom.current.x;
-        innerRef.current.rotation.z += dx * 0.1;
-        innerRef.current.scale.set(1, 1, 1);
       }
     } else if (animState.current === 'aiming') {
-      const aimT = Math.min(1, animTimer.current / 0.3);
-      const leanX = targetDir.current.x * 0.15 * aimT;
-      innerRef.current.position.x = leanX;
-      innerRef.current.rotation.z = -targetDir.current.x * 0.1 * aimT;
-      const aimScale = 1 - aimT * 0.05;
-      innerRef.current.scale.set(aimScale, aimScale, 1);
+      // ── AIMING ──
+      const aimT = Math.min(1, animTimer.current / 0.4);
+      resetLimbs();
+
+      // Raise weapon arm
+      if (rightArmRef.current) {
+        rightArmRef.current.rotation.x = -Math.PI / 2.5 * aimT;
+        rightArmRef.current.rotation.z = 0.1 * aimT;
+      }
+      if (leftArmRef.current) {
+        leftArmRef.current.rotation.x = -Math.PI / 3 * aimT;
+      }
+      // Slight crouch
+      bodyRef.current.rotation.x = 0.05 * aimT;
+      bodyRef.current.position.y = -0.02 * aimT;
 
       if (aimT >= 1) {
         animState.current = 'shooting';
         animTimer.current = 0;
       }
-      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+      rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+
     } else if (animState.current === 'shooting') {
-      const shootT = Math.min(1, animTimer.current / 0.15);
-      const recoilAmt = Math.sin(shootT * Math.PI) * 0.2;
-      innerRef.current.position.x = -targetDir.current.x * recoilAmt;
-      innerRef.current.position.y = Math.sin(shootT * Math.PI) * 0.08;
-      const burstScale = 1 + Math.sin(shootT * Math.PI) * 0.2;
-      innerRef.current.scale.set(burstScale, burstScale, 1);
-      innerRef.current.rotation.z = Math.sin(shootT * Math.PI * 8) * 0.06;
+      // ── SHOOTING ──
+      const shootT = Math.min(1, animTimer.current / 0.2);
+
+      // Recoil
+      const recoil = Math.sin(shootT * Math.PI) * 0.08;
+      bodyRef.current.rotation.x = 0.05 - recoil;
+      bodyRef.current.position.z = -recoil * 0.3;
+
+      if (rightArmRef.current) {
+        rightArmRef.current.rotation.x = -Math.PI / 2.5 + recoil * 2;
+      }
+
       flashIntensity.current = Math.max(0, 1 - shootT);
 
       if (shootT >= 1) {
         animState.current = 'recoil';
         animTimer.current = 0;
       }
-      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+      rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+
     } else if (animState.current === 'recoil') {
-      const recoilT = Math.min(1, animTimer.current / 0.3);
+      // ── RECOIL RECOVERY ──
+      const recoilT = Math.min(1, animTimer.current / 0.4);
       const ease = 1 - Math.pow(1 - recoilT, 2);
-      innerRef.current.position.x = THREE.MathUtils.lerp(innerRef.current.position.x, 0, ease);
-      innerRef.current.position.y = THREE.MathUtils.lerp(innerRef.current.position.y, 0, ease);
-      innerRef.current.rotation.z = THREE.MathUtils.lerp(innerRef.current.rotation.z, 0, ease);
-      innerRef.current.scale.set(
-        THREE.MathUtils.lerp(innerRef.current.scale.x, 1, ease),
-        THREE.MathUtils.lerp(innerRef.current.scale.y, 1, ease), 1
-      );
+
+      bodyRef.current.rotation.x = THREE.MathUtils.lerp(bodyRef.current.rotation.x, 0, ease);
+      bodyRef.current.position.y = THREE.MathUtils.lerp(bodyRef.current.position.y, 0, ease);
+      bodyRef.current.position.z = THREE.MathUtils.lerp(bodyRef.current.position.z, 0, ease);
+
+      if (rightArmRef.current) {
+        rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, ease);
+      }
+      if (leftArmRef.current) {
+        leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, 0, ease);
+      }
+
       if (recoilT >= 1) {
         animState.current = 'idle';
-        innerRef.current.position.set(0, 0, 0);
-        innerRef.current.scale.set(1, 1, 1);
+        resetLimbs();
+        bodyRef.current.rotation.set(0, 0, 0);
+        bodyRef.current.position.set(0, 0, 0);
       }
-      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+      rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+
     } else if (animState.current === 'hit') {
-      const hitT = Math.min(1, animTimer.current / 0.4);
-      const knockback = Math.sin(hitT * Math.PI) * 0.15;
-      innerRef.current.position.x = knockback;
+      // ── HIT REACTION ──
+      const hitT = Math.min(1, animTimer.current / 0.5);
+
+      const knockback = Math.sin(hitT * Math.PI) * 0.1;
+      bodyRef.current.rotation.x = -knockback * 2;
+      bodyRef.current.rotation.z = Math.sin(hitT * Math.PI * 6) * 0.08 * (1 - hitT);
+      bodyRef.current.position.y = -knockback * 0.3;
+
+      if (leftArmRef.current) leftArmRef.current.rotation.z = -knockback * 3;
+      if (rightArmRef.current) rightArmRef.current.rotation.z = knockback * 3;
+
       flashIntensity.current = Math.max(0, Math.sin(hitT * Math.PI * 3));
-      innerRef.current.rotation.z = Math.sin(hitT * Math.PI * 10) * 0.12 * (1 - hitT);
-      const hitSquash = 1 + Math.sin(hitT * Math.PI) * 0.1;
-      innerRef.current.scale.set(hitSquash, 1 / hitSquash, 1);
+
       if (hitT >= 1) {
         animState.current = 'idle';
-        innerRef.current.position.set(0, 0, 0);
-        innerRef.current.rotation.z = 0;
-        innerRef.current.scale.set(1, 1, 1);
+        resetLimbs();
+        bodyRef.current.rotation.set(0, 0, 0);
+        bodyRef.current.position.set(0, 0, 0);
         flashIntensity.current = 0;
       }
-      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+      rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+
     } else if (animState.current === 'healing') {
-      const healT = Math.min(1, animTimer.current / 0.6);
-      innerRef.current.position.y = Math.sin(healT * Math.PI) * 0.15;
-      const healScale = 1 + Math.sin(healT * Math.PI) * 0.08;
-      innerRef.current.scale.set(healScale, healScale, 1);
+      // ── HEALING ──
+      const healT = Math.min(1, animTimer.current / 0.8);
+
+      // Kneeling pose
+      if (leftLegRef.current) leftLegRef.current.rotation.x = -0.5 * Math.min(1, healT * 3);
+      if (rightLegRef.current) rightLegRef.current.rotation.x = 0.3 * Math.min(1, healT * 3);
+      bodyRef.current.position.y = -0.08 * Math.min(1, healT * 3);
+
+      // Arms forward (applying medicine)
+      if (leftArmRef.current) leftArmRef.current.rotation.x = -0.8 * Math.min(1, healT * 2);
+      if (rightArmRef.current) rightArmRef.current.rotation.x = -0.6 * Math.min(1, healT * 2);
+
       if (healT >= 1) {
         animState.current = 'idle';
-        innerRef.current.position.set(0, 0, 0);
-        innerRef.current.scale.set(1, 1, 1);
+        resetLimbs();
+        bodyRef.current.rotation.set(0, 0, 0);
+        bodyRef.current.position.set(0, 0, 0);
       }
-      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+      rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+
     } else {
-      // ── Idle animation ──
-      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
-      const bounce = Math.sin(t * 2.5 + unit.position.x * 1.5) * 0.04;
-      innerRef.current.position.x = 0;
-      innerRef.current.rotation.x = 0;
-      innerRef.current.rotation.z = Math.sin(t * 1.5) * 0.02;
+      // ── IDLE ──
+      rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
 
-      // Crouch behind cover
+      // Breathing animation
+      const breathe = Math.sin(t * 1.8 + unit.position.x * 2) * 0.008;
+      const weightShift = Math.sin(t * 0.7 + unit.position.z) * 0.015;
+
+      bodyRef.current.position.y = breathe;
+      bodyRef.current.rotation.z = weightShift;
+      bodyRef.current.rotation.x = 0;
+
+      // Subtle idle arm sway
+      if (leftArmRef.current) leftArmRef.current.rotation.x = Math.sin(t * 1.2) * 0.03;
+      if (rightArmRef.current) rightArmRef.current.rotation.x = Math.sin(t * 1.2 + 1) * 0.03;
+      if (leftLegRef.current) leftLegRef.current.rotation.x = 0;
+      if (rightLegRef.current) rightLegRef.current.rotation.x = 0;
+
+      // Cover crouch
       if (unit.coverType === 'full') {
-        // Deep crouch behind full cover
-        innerRef.current.position.y = bounce - 0.2;
-        innerRef.current.scale.set(0.95, 0.7, 1);
+        bodyRef.current.position.y = -0.1;
+        if (leftLegRef.current) leftLegRef.current.rotation.x = -0.4;
+        if (rightLegRef.current) rightLegRef.current.rotation.x = -0.3;
       } else if (unit.coverType === 'half') {
-        // Slight crouch behind half cover
-        innerRef.current.position.y = bounce - 0.1;
-        innerRef.current.scale.set(0.98, 0.85, 1);
-      } else {
-        innerRef.current.position.y = bounce;
-        innerRef.current.scale.set(1, 1, 1);
+        bodyRef.current.position.y = -0.05;
+        if (leftLegRef.current) leftLegRef.current.rotation.x = -0.2;
       }
 
+      // Suppressed shaking
       if (unit.isSuppressed) {
-        innerRef.current.position.x = Math.sin(t * 15) * 0.03;
-        innerRef.current.rotation.z = Math.sin(t * 12) * 0.04;
+        bodyRef.current.rotation.z += Math.sin(t * 20) * 0.02;
+        bodyRef.current.rotation.x += Math.sin(t * 15) * 0.01;
+      }
+
+      // Overwatch stance - weapon raised
+      if (unit.isOnOverwatch) {
+        if (rightArmRef.current) rightArmRef.current.rotation.x = -Math.PI / 4;
+        if (leftArmRef.current) leftArmRef.current.rotation.x = -Math.PI / 5;
+        bodyRef.current.rotation.x = 0.05;
       }
     }
 
-    // ── Sprite sheet frame animation ──
-    const animRow = ANIM_ROW[animState.current] ?? 0;
-    const fps = ANIM_FPS[animState.current] ?? 4;
-    frameTimer.current += delta;
-    if (frameTimer.current >= 1 / fps) {
-      frameTimer.current = 0;
-      // For death animation, don't loop - stay on last frame
-      const currentAnim = animState.current as string;
-      if (currentAnim === 'dying') {
-        currentFrame.current = Math.min(currentFrame.current + 1, SPRITE_COLS - 1);
-      } else {
-        currentFrame.current = (currentFrame.current + 1) % SPRITE_COLS;
-      }
-    }
-    // Update texture UV offset
-    const col = currentFrame.current;
-    // UV origin is bottom-left, so row 0 = top = offset Y = 1 - FRAME_H
-    const uvX = col * FRAME_W;
-    const uvY = 1 - (animRow + 1) * FRAME_H;
-    processedTexture.offset.set(uvX, uvY);
+    // Face direction
+    bodyRef.current.rotation.y = THREE.MathUtils.lerp(
+      bodyRef.current.rotation.y || 0,
+      facingAngle.current,
+      0.1
+    );
 
-    if (spriteRef.current) {
-      const mat = spriteRef.current.material as THREE.MeshBasicMaterial;
-      if (flashIntensity.current > 0) {
-        mat.color.setRGB(1, 1 - flashIntensity.current * 0.5, 1 - flashIntensity.current * 0.5);
-        flashIntensity.current = Math.max(0, flashIntensity.current - delta * 4);
-      } else {
-        mat.color.setRGB(1, 1, 1);
-      }
-      mat.opacity = 1;
-    }
-
-    // Selection ring pulse
+    // Selection ring
     if (isSelected && ringRef.current) {
       const scale = 1 + Math.sin(t * 4) * 0.1;
       ringRef.current.scale.set(scale, 1, scale);
     }
+
+    // Flash on hit (change emissive on all children)
+    if (flashIntensity.current > 0) {
+      flashIntensity.current = Math.max(0, flashIntensity.current - delta * 4);
+    }
   });
 
-  if (!unit.isAlive && deathTimer.current >= 2) return null;
+  if (!unit.isAlive && deathTimer.current >= 3) return null;
 
   const hpPercent = unit.hp / unit.maxHp;
   const apDots = [];
@@ -481,169 +555,240 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
     apDots.push(i < unit.ap);
   }
 
+  // Arm materials
+  const limbColor = useMemo(() => {
+    const c = new THREE.Color(color);
+    return '#' + c.clone().lerp(new THREE.Color('#333333'), 0.4).getHexString();
+  }, [color]);
+
+  const bootColor = '#2a2218';
+
   return (
     <group
-      ref={groupRef}
-      position={[unit.position.x, 0.1, unit.position.z]}
+      ref={rootRef}
+      position={[unit.position.x, 0.01, unit.position.z]}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
-      <group ref={innerRef}>
-        {/* Sprite */}
-        <Billboard position={[0, 0.55, 0]}>
-          <mesh ref={spriteRef}>
-            <planeGeometry args={[0.9, 0.9]} />
-            <meshBasicMaterial
-              map={processedTexture}
-              transparent
-              alphaTest={0.1}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-        </Billboard>
+      <group ref={bodyRef}>
+        {/* Main body */}
+        <SoldierBody teamColor={color} unitClass={unit.unitClass} isMedic={isMedic} />
 
-        {/* Muzzle flash light */}
+        {/* ── LEFT ARM ── */}
+        <group ref={leftArmRef} position={[-0.16, 0.46, 0]}>
+          {/* Upper arm */}
+          <mesh position={[0, -0.06, 0]} castShadow>
+            <boxGeometry args={[0.06, 0.12, 0.06]} />
+            <meshStandardMaterial color={limbColor} roughness={0.7} />
+          </mesh>
+          {/* Forearm */}
+          <mesh position={[0, -0.15, 0.02]}>
+            <boxGeometry args={[0.05, 0.1, 0.05]} />
+            <meshStandardMaterial color={limbColor} roughness={0.7} />
+          </mesh>
+          {/* Glove */}
+          <mesh position={[0, -0.2, 0.03]}>
+            <boxGeometry args={[0.04, 0.04, 0.04]} />
+            <meshStandardMaterial color="#1a1a14" roughness={0.6} />
+          </mesh>
+        </group>
+
+        {/* ── RIGHT ARM ── */}
+        <group ref={rightArmRef} position={[0.16, 0.46, 0]}>
+          {/* Upper arm */}
+          <mesh position={[0, -0.06, 0]} castShadow>
+            <boxGeometry args={[0.06, 0.12, 0.06]} />
+            <meshStandardMaterial color={limbColor} roughness={0.7} />
+          </mesh>
+          {/* Forearm */}
+          <mesh position={[0, -0.15, 0.02]}>
+            <boxGeometry args={[0.05, 0.1, 0.05]} />
+            <meshStandardMaterial color={limbColor} roughness={0.7} />
+          </mesh>
+          {/* Glove */}
+          <mesh position={[0, -0.2, 0.03]}>
+            <boxGeometry args={[0.04, 0.04, 0.04]} />
+            <meshStandardMaterial color="#1a1a14" roughness={0.6} />
+          </mesh>
+          {/* Weapon attached to right arm */}
+          <group ref={weaponGroupRef} position={[0, -0.12, 0.05]}>
+            <Weapon unitClass={unit.unitClass} />
+          </group>
+        </group>
+
+        {/* ── LEFT LEG ── */}
+        <group ref={leftLegRef} position={[-0.06, 0.28, 0]}>
+          {/* Thigh */}
+          <mesh position={[0, -0.08, 0]} castShadow>
+            <boxGeometry args={[0.07, 0.14, 0.07]} />
+            <meshStandardMaterial color={limbColor} roughness={0.7} />
+          </mesh>
+          {/* Shin */}
+          <mesh position={[0, -0.2, 0]}>
+            <boxGeometry args={[0.065, 0.12, 0.065]} />
+            <meshStandardMaterial color={limbColor} roughness={0.7} />
+          </mesh>
+          {/* Boot */}
+          <mesh position={[0, -0.28, 0.015]}>
+            <boxGeometry args={[0.07, 0.05, 0.09]} />
+            <meshStandardMaterial color={bootColor} roughness={0.6} metalness={0.1} />
+          </mesh>
+        </group>
+
+        {/* ── RIGHT LEG ── */}
+        <group ref={rightLegRef} position={[0.06, 0.28, 0]}>
+          {/* Thigh */}
+          <mesh position={[0, -0.08, 0]} castShadow>
+            <boxGeometry args={[0.07, 0.14, 0.07]} />
+            <meshStandardMaterial color={limbColor} roughness={0.7} />
+          </mesh>
+          {/* Shin */}
+          <mesh position={[0, -0.2, 0]}>
+            <boxGeometry args={[0.065, 0.12, 0.065]} />
+            <meshStandardMaterial color={limbColor} roughness={0.7} />
+          </mesh>
+          {/* Boot */}
+          <mesh position={[0, -0.28, 0.015]}>
+            <boxGeometry args={[0.07, 0.05, 0.09]} />
+            <meshStandardMaterial color={bootColor} roughness={0.6} metalness={0.1} />
+          </mesh>
+        </group>
+
+        {/* ── Muzzle flash ── */}
         {animState.current === 'shooting' && (
           <pointLight
-            position={[targetDir.current.x * 0.4, 0.6, targetDir.current.y * 0.4]}
+            position={[0.24, 0.34, 0.35]}
             color="#ffaa00"
-            intensity={3}
-            distance={3}
+            intensity={5}
+            distance={4}
           />
         )}
 
-        {/* Healing particles */}
+        {/* ── Healing particles ── */}
         {animState.current === 'healing' && (
           <>
-            {[0, 1, 2, 3, 4].map(i => (
-              <Billboard key={i} position={[
-                Math.sin(Date.now() * 0.003 + i * 1.2) * 0.3,
-                0.3 + ((Date.now() * 0.002 + i * 0.5) % 1) * 0.7,
-                Math.cos(Date.now() * 0.003 + i * 1.2) * 0.3
-              ]}>
-                <mesh>
-                  <planeGeometry args={[0.08, 0.08]} />
-                  <meshBasicMaterial color="#44ff88" transparent opacity={0.7} />
-                </mesh>
-              </Billboard>
-            ))}
-          </>
-        )}
-
-        {/* Walking dust particles */}
-        {animState.current === 'walking' && (
-          <>
-            {[0, 1].map(i => (
+            {[0, 1, 2, 3, 4, 5].map(i => (
               <mesh key={i} position={[
-                (Math.random() - 0.5) * 0.3,
-                0.05,
-                (Math.random() - 0.5) * 0.3
+                Math.sin(Date.now() * 0.003 + i * 1.2) * 0.2,
+                0.2 + ((Date.now() * 0.002 + i * 0.5) % 1) * 0.5,
+                Math.cos(Date.now() * 0.003 + i * 1.2) * 0.2
               ]}>
-                <sphereGeometry args={[0.06, 4, 4]} />
-                <meshBasicMaterial color="#8a7a60" transparent opacity={0.3} />
+                <sphereGeometry args={[0.015, 4, 4]} />
+                <meshBasicMaterial color="#44ff88" transparent opacity={0.6} />
               </mesh>
             ))}
           </>
         )}
 
-        {/* Shadow */}
-        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1, 0.6, 1]}>
-          <circleGeometry args={[0.25, 12]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.3} />
+        {/* ── Ground shadow ── */}
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.2, 12]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.35} />
         </mesh>
-
-        {/* HP Bar */}
-        {unit.isAlive && (
-          <Billboard position={[0, 1.15, 0]}>
-            <mesh position={[0, 0, -0.001]}>
-              <planeGeometry args={[0.6, 0.07]} />
-              <meshBasicMaterial color="#111111" />
-            </mesh>
-            <mesh position={[(hpPercent - 1) * 0.28, 0, 0]}>
-              <planeGeometry args={[0.56 * hpPercent, 0.05]} />
-              <meshBasicMaterial color={hpPercent > 0.5 ? '#44cc44' : hpPercent > 0.25 ? '#cccc44' : '#cc4444'} />
-            </mesh>
-          </Billboard>
-        )}
-
-        {/* AP Dots */}
-        {unit.isAlive && (
-          <Billboard position={[0, 1.05, 0]}>
-            {apDots.map((filled, i) => (
-              <mesh key={i} position={[-0.08 * (apDots.length - 1) / 2 + i * 0.08, 0, 0]}>
-                <circleGeometry args={[0.025, 6]} />
-                <meshBasicMaterial color={filled ? '#ffcc00' : '#333333'} />
-              </mesh>
-            ))}
-          </Billboard>
-        )}
-
-        {/* Name + Class */}
-        {unit.isAlive && (
-          <Billboard position={[0, 1.3, 0]}>
-            <Text fontSize={0.1} color={color} anchorX="center" anchorY="middle" font={undefined}
-              outlineWidth={0.02} outlineColor="#000000">
-              {unit.name}
-            </Text>
-            <Text fontSize={0.06} color="#aaaaaa" anchorX="center" anchorY="middle" position={[0, -0.11, 0]}
-              outlineWidth={0.015} outlineColor="#000000" font={undefined}>
-              {unit.unitClass.toUpperCase()} • {unit.weapon.name}{unit.weapon.ammo !== -1 ? ` [${unit.weapon.ammo}]` : ''}
-            </Text>
-          </Billboard>
-        )}
-
-        <CoverProp coverType={unit.coverType} />
-        <StatusIcons unit={unit} />
-
-        {/* Selection ring */}
-        {isSelected && (
-          <mesh ref={ringRef} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.38, 0.48, 20]} />
-            <meshBasicMaterial color={color} transparent opacity={0.7} />
-          </mesh>
-        )}
-
-        {/* Team dot */}
-        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.06, 8]} />
-          <meshBasicMaterial color={color} />
-        </mesh>
-
-        {/* Fog of War vision ring */}
-        {unit.isAlive && (
-          <>
-            <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[unit.visionRange - 0.08, unit.visionRange + 0.08, 48]} />
-              <meshBasicMaterial color="#ffffff" transparent opacity={0.08} side={THREE.DoubleSide} />
-            </mesh>
-            {/* Subtle filled vision area */}
-            <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[unit.visionRange, 48]} />
-              <meshBasicMaterial color="#ffffff" transparent opacity={0.02} side={THREE.DoubleSide} />
-            </mesh>
-          </>
-        )}
-
-        {/* Overwatch range indicator */}
-        {unit.isOnOverwatch && (
-          <>
-            {/* Filled overwatch area */}
-            <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[unit.attackRange, 32]} />
-              <meshBasicMaterial color="#44aaff" transparent opacity={0.06} side={THREE.DoubleSide} />
-            </mesh>
-            {/* Overwatch ring border */}
-            <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[unit.attackRange - 0.12, unit.attackRange + 0.12, 32]} />
-              <meshBasicMaterial color="#44aaff" transparent opacity={0.25} side={THREE.DoubleSide} />
-            </mesh>
-            {/* Dashed inner ring */}
-            <mesh position={[0, 0.028, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[unit.attackRange * 0.5 - 0.05, unit.attackRange * 0.5 + 0.05, 32]} />
-              <meshBasicMaterial color="#44aaff" transparent opacity={0.1} side={THREE.DoubleSide} />
-            </mesh>
-          </>
-        )}
       </group>
+
+      {/* ── HP Bar ── */}
+      {unit.isAlive && (
+        <Billboard position={[0, 0.85, 0]}>
+          <mesh position={[0, 0, -0.001]}>
+            <planeGeometry args={[0.5, 0.05]} />
+            <meshBasicMaterial color="#111111" transparent opacity={0.8} />
+          </mesh>
+          <mesh position={[(hpPercent - 1) * 0.235, 0, 0]}>
+            <planeGeometry args={[0.47 * hpPercent, 0.035]} />
+            <meshBasicMaterial color={hpPercent > 0.5 ? '#44cc44' : hpPercent > 0.25 ? '#cccc44' : '#cc4444'} />
+          </mesh>
+        </Billboard>
+      )}
+
+      {/* ── AP Dots ── */}
+      {unit.isAlive && (
+        <Billboard position={[0, 0.78, 0]}>
+          {apDots.map((filled, i) => (
+            <mesh key={i} position={[-0.06 * (apDots.length - 1) / 2 + i * 0.06, 0, 0]}>
+              <circleGeometry args={[0.018, 6]} />
+              <meshBasicMaterial color={filled ? '#ffcc00' : '#333333'} />
+            </mesh>
+          ))}
+        </Billboard>
+      )}
+
+      {/* ── Name ── */}
+      {unit.isAlive && (
+        <Billboard position={[0, 0.95, 0]}>
+          <Text fontSize={0.08} color={color} anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.015} outlineColor="#000000">
+            {unit.name}
+          </Text>
+          <Text fontSize={0.045} color="#999999" anchorX="center" anchorY="middle" position={[0, -0.09, 0]}
+            outlineWidth={0.01} outlineColor="#000000" font={undefined}>
+            {unit.unitClass.toUpperCase()} • {unit.weapon.name}
+          </Text>
+        </Billboard>
+      )}
+
+      {/* ── Status icons ── */}
+      {unit.isOnOverwatch && (
+        <Billboard position={[-0.25, 0.7, 0]}>
+          <Text fontSize={0.1} color="#44aaff" anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.015} outlineColor="#000000">
+            👁
+          </Text>
+        </Billboard>
+      )}
+      {unit.isSuppressed && (
+        <Billboard position={[0.25, 0.7, 0]}>
+          <Text fontSize={0.1} color="#ff4444" anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.015} outlineColor="#000000">
+            ⛔
+          </Text>
+        </Billboard>
+      )}
+
+      {/* ── Selection ring ── */}
+      {isSelected && (
+        <mesh ref={ringRef} position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.3, 0.38, 24]} />
+          <meshBasicMaterial color={color} transparent opacity={0.7} />
+        </mesh>
+      )}
+
+      {/* ── Team dot ── */}
+      <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.05, 8]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+
+      {/* ── Fog of war vision ring ── */}
+      {unit.isAlive && (
+        <>
+          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[unit.visionRange - 0.06, unit.visionRange + 0.06, 48]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.07} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[unit.visionRange, 48]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.015} side={THREE.DoubleSide} />
+          </mesh>
+        </>
+      )}
+
+      {/* ── Overwatch range ── */}
+      {unit.isOnOverwatch && (
+        <>
+          <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[unit.attackRange, 32]} />
+            <meshBasicMaterial color="#44aaff" transparent opacity={0.05} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[unit.attackRange - 0.1, unit.attackRange + 0.1, 32]} />
+            <meshBasicMaterial color="#44aaff" transparent opacity={0.2} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0, 0.022, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[unit.attackRange * 0.5 - 0.04, unit.attackRange * 0.5 + 0.04, 32]} />
+            <meshBasicMaterial color="#44aaff" transparent opacity={0.08} side={THREE.DoubleSide} />
+          </mesh>
+        </>
+      )}
     </group>
   );
 }
@@ -652,7 +797,7 @@ export function GameUnits({ units, selectedUnitId, onUnitClick, combatEvents, mo
   return (
     <group>
       {units.map(unit => (
-        <PixelCharacter
+        <Soldier3D
           key={unit.id}
           unit={unit}
           isSelected={unit.id === selectedUnitId}

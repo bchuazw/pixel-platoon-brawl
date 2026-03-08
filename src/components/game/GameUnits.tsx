@@ -112,16 +112,40 @@ function SoldierBody({ teamColor, isMedic }: { teamColor: string; isMedic: boole
         <boxGeometry args={[0.06, 0.07, 0.12]} />
       </mesh>
 
-      {/* ── Medic cross ── */}
+      {/* ── Medic red cross (front) ── */}
       {isMedic && (
         <>
+          {/* Front cross */}
           <mesh position={[0, 0.48, 0.069]}>
-            <boxGeometry args={[0.06, 0.02, 0.002]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+            <boxGeometry args={[0.08, 0.025, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.5} />
           </mesh>
           <mesh position={[0, 0.48, 0.069]}>
+            <boxGeometry args={[0.025, 0.08, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.5} />
+          </mesh>
+          {/* White background patch */}
+          <mesh position={[0, 0.48, 0.067]}>
+            <boxGeometry args={[0.1, 0.1, 0.002]} />
+            <meshStandardMaterial color="#dddddd" />
+          </mesh>
+          {/* Back cross on backpack */}
+          <mesh position={[0, 0.48, -0.163]}>
+            <boxGeometry args={[0.06, 0.02, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.4} />
+          </mesh>
+          <mesh position={[0, 0.48, -0.163]}>
             <boxGeometry args={[0.02, 0.06, 0.002]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.4} />
+          </mesh>
+          {/* Arm band cross (left) */}
+          <mesh position={[-0.17, 0.52, 0.065]}>
+            <boxGeometry args={[0.002, 0.04, 0.015]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh position={[-0.17, 0.52, 0.065]}>
+            <boxGeometry args={[0.002, 0.015, 0.04]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.3} />
           </mesh>
         </>
       )}

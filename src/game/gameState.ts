@@ -65,22 +65,30 @@ function getTerrainElevation(x: number, z: number, seed: number, flatZones?: Pos
 // ── Loot Generation ──
 function generateLootItem(rand: () => number): LootItem {
   const roll = rand();
-  if (roll < 0.18) {
+  if (roll < 0.14) {
     return { type: 'weapon', weaponId: 'rifle', value: 0, icon: '🔫', name: 'Assault Rifle' };
-  } else if (roll < 0.30) {
+  } else if (roll < 0.24) {
     return { type: 'weapon', weaponId: 'shotgun', value: 0, icon: '💥', name: 'Shotgun' };
-  } else if (roll < 0.40) {
+  } else if (roll < 0.32) {
     return { type: 'weapon', weaponId: 'sniper_rifle', value: 0, icon: '🎯', name: 'Sniper Rifle' };
-  } else if (roll < 0.46) {
+  } else if (roll < 0.37) {
     return { type: 'weapon', weaponId: 'rocket_launcher', value: 0, icon: '🚀', name: 'Rocket Launcher' };
-  } else if (roll < 0.56) {
+  } else if (roll < 0.45) {
     return { type: 'weapon', weaponId: 'smg', value: 0, icon: '⚡', name: 'SMG' };
-  } else if (roll < 0.72) {
+  } else if (roll < 0.58) {
     return { type: 'medkit', value: 40, icon: '❤️', name: 'Medkit' };
-  } else if (roll < 0.88) {
+  } else if (roll < 0.70) {
     return { type: 'armor', value: 8, icon: '🛡️', name: 'Armor Vest' };
-  } else {
+  } else if (roll < 0.80) {
     return { type: 'ammo', value: 0, icon: '📦', name: 'Ammo Crate' };
+  } else if (roll < 0.86) {
+    return { type: 'killstreak', killstreakId: 'uav', value: 0, icon: '📡', name: 'UAV' };
+  } else if (roll < 0.92) {
+    return { type: 'killstreak', killstreakId: 'supply_drop', value: 0, icon: '📦', name: 'Supply Drop' };
+  } else if (roll < 0.96) {
+    return { type: 'killstreak', killstreakId: 'airstrike', value: 0, icon: '✈️', name: 'Airstrike' };
+  } else {
+    return { type: 'killstreak', killstreakId: 'emp', value: 0, icon: '⚡', name: 'EMP Blast' };
   }
 }
 

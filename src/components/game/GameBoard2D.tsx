@@ -51,6 +51,21 @@ interface UnitAnim {
   floatOpacity: number;
   scale: number;
   deathProgress: number; // 0 = alive, 1 = fully dead
+  walkCycle: number; // 0-2π, drives leg alternation + bob
+  isMoving: boolean;
+  prevX: number;
+  prevZ: number;
+}
+
+// ── Dust particle ──
+interface DustParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
 }
 
 // ── Floating damage number ──

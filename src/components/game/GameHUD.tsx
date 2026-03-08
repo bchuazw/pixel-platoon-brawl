@@ -591,22 +591,23 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
         </div>
       </div>
 
-      {/* CRT Scanlines */}
-      <div className="absolute inset-0 crt-scanlines opacity-10" />
+      {/* Scanlines */}
+      <div className="absolute inset-0 crt-scanlines opacity-[0.06]" />
 
-      {/* Kill notification */}
-      {state.combatEvents.filter(e => e.type === 'kill' && Date.now() - e.timestamp < 2500).map(e => (
-        <div key={e.id} className="absolute top-1/4 left-1/2 -translate-x-1/2 animate-fade-in z-20">
-          <div className="bg-destructive/90 text-destructive-foreground px-6 py-2.5 rounded-lg text-[11px] tracking-[0.15em] font-bold whitespace-nowrap border border-destructive">
-            💀 {e.message.split('!')[0]}!
+      {/* Kill feed - top right */}
+      <div className="absolute top-14 right-3 z-20 flex flex-col gap-1.5 pointer-events-none max-w-[280px]">
+        {state.combatEvents.filter(e => e.type === 'kill' && Date.now() - e.timestamp < 3500).map(e => (
+          <div key={e.id} className="kill-notification glass-panel-dark rounded px-3 py-1.5 flex items-center gap-2 border-l-2 border-destructive">
+            <span className="text-[8px] text-destructive glow-destructive">☠</span>
+            <span className="text-[7px] text-foreground/90 tracking-wider">{e.message.split('!')[0]}</span>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
-      {/* Loot pickup notification */}
+      {/* Loot pickup - bottom center */}
       {state.combatEvents.filter(e => e.type === 'loot' && Date.now() - e.timestamp < 2000).map(e => (
-        <div key={e.id} className="absolute top-1/3 left-1/2 -translate-x-1/2 animate-fade-in z-20">
-          <div className="bg-accent/90 text-accent-foreground px-6 py-2 rounded-lg text-[10px] tracking-[0.1em] font-bold whitespace-nowrap border border-accent">
+        <div key={e.id} className="absolute bottom-28 left-1/2 -translate-x-1/2 animate-fade-in z-20">
+          <div className="glass-panel rounded-lg px-5 py-2 text-[9px] text-accent tracking-wider font-bold whitespace-nowrap border-l-2 border-accent">
             {e.message}
           </div>
         </div>

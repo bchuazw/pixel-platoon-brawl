@@ -14,6 +14,7 @@ interface GridTilesProps {
   movePath: Position[] | null;
   onTileClick: (pos: Position) => void;
   onTileHover: (pos: Position | null) => void;
+  weaponRangeTiles?: Position[];
 }
 
 // ── Naturalistic terrain palette ──

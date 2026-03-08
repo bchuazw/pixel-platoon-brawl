@@ -167,7 +167,7 @@ function CombatFeed({ log, visible }: { log: string[]; visible: boolean }) {
   };
 
   return (
-    <div className={`pointer-events-auto absolute right-0 top-12 sm:top-14 bottom-8 w-48 sm:w-64 flex flex-col overflow-hidden transition-transform duration-300 ${
+    <div className={`pointer-events-auto absolute right-0 top-[210px] sm:top-[220px] bottom-8 w-48 sm:w-64 flex flex-col overflow-hidden transition-transform duration-300 ${
       visible ? 'translate-x-0' : 'translate-x-full sm:translate-x-0'
     }`}
       style={{

@@ -428,9 +428,10 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Jersey barrier — proper concrete highway barrier (~0.45 tall)
-    case 'jersey_barrier':
+    case 'jersey_barrier': {
+      const jbColor = h > 0.5 ? '#a0a0a0' : '#909898';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar * 0.5 : Math.PI / 2 + rotVar * 0.5, 0]}>
           <mesh position={[0, 0.225, 0]} castShadow>
             <boxGeometry args={[0.72, 0.45, 0.28]} />
             <meshStandardMaterial color="#a0a0a0" roughness={0.85} />

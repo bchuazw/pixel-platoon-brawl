@@ -127,150 +127,112 @@ function drawRightFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, hw
   ctx.fill();
 }
 
-// ── Draw isometric prop on tile ──
+// ── Draw isometric prop on tile — simplified, cleaner shapes ──
 function drawIsoProp(ctx: CanvasRenderingContext2D, prop: string, sx: number, sy: number) {
+  ctx.save();
   switch (prop) {
     case 'tree': {
-      // Trunk
-      ctx.fillStyle = '#5a4020';
-      ctx.fillRect(sx - 2, sy - 18, 4, 18);
-      // Canopy layers
-      ctx.fillStyle = '#2a6a1a';
-      drawTriangle(ctx, sx, sy - 30, 14, 16);
-      ctx.fillStyle = '#3a8a28';
-      drawTriangle(ctx, sx, sy - 22, 12, 12);
-      ctx.fillStyle = '#4a9a38';
-      drawTriangle(ctx, sx, sy - 16, 8, 8);
+      ctx.fillStyle = '#4a3418';
+      ctx.fillRect(sx - 2, sy - 16, 4, 16);
+      ctx.fillStyle = '#2e7a20';
+      ctx.beginPath(); ctx.arc(sx, sy - 22, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a9a2c';
+      ctx.beginPath(); ctx.arc(sx - 2, sy - 25, 7, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'rock': {
-      ctx.fillStyle = '#707070';
+      ctx.fillStyle = '#6a6a6e';
       ctx.beginPath();
-      ctx.moveTo(sx - 8, sy);
-      ctx.lineTo(sx - 5, sy - 10);
-      ctx.lineTo(sx + 3, sy - 12);
-      ctx.lineTo(sx + 9, sy - 4);
-      ctx.lineTo(sx + 6, sy + 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#888';
-      ctx.fillRect(sx - 4, sy - 9, 5, 2);
+      ctx.moveTo(sx - 7, sy); ctx.lineTo(sx - 4, sy - 9); ctx.lineTo(sx + 4, sy - 10);
+      ctx.lineTo(sx + 7, sy - 3); ctx.lineTo(sx + 5, sy + 1); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#7e7e82';
+      ctx.fillRect(sx - 3, sy - 8, 4, 2);
       break;
     }
     case 'crate': {
-      // 3D box
-      ctx.fillStyle = '#b08030';
-      ctx.fillRect(sx - 7, sy - 14, 14, 14);
-      ctx.fillStyle = '#c89848';
-      ctx.fillRect(sx - 7, sy - 14, 14, 3); // top
-      ctx.fillStyle = '#906820';
-      ctx.fillRect(sx - 1, sy - 14, 2, 14); // plank
-      ctx.fillRect(sx - 7, sy - 7, 14, 2);
+      ctx.fillStyle = '#a07028';
+      ctx.fillRect(sx - 6, sy - 12, 12, 12);
+      ctx.fillStyle = '#b88838';
+      ctx.fillRect(sx - 6, sy - 12, 12, 2);
+      ctx.fillStyle = '#885818';
+      ctx.fillRect(sx - 1, sy - 12, 2, 12);
       break;
     }
     case 'sandbag': {
-      ctx.fillStyle = '#a89868';
-      ctx.beginPath();
-      ctx.ellipse(sx - 4, sy - 3, 7, 4, -0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(sx + 4, sy - 3, 7, 4, 0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#b8a878';
-      ctx.beginPath();
-      ctx.ellipse(sx, sy - 8, 6, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = '#a09060';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 4, 10, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b0a070';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 7, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'bush': {
       ctx.fillStyle = '#2a6820';
       ctx.beginPath(); ctx.arc(sx, sy - 5, 8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#3a8830';
-      ctx.beginPath(); ctx.arc(sx - 3, sy - 8, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#4a9840';
-      ctx.beginPath(); ctx.arc(sx + 3, sy - 7, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a8430';
+      ctx.beginPath(); ctx.arc(sx - 2, sy - 7, 5, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'barrel': {
-      ctx.fillStyle = '#6a4828';
-      ctx.fillRect(sx - 5, sy - 12, 10, 12);
-      ctx.fillStyle = '#8a6040';
-      ctx.beginPath(); ctx.ellipse(sx, sy - 12, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#555';
-      ctx.fillRect(sx - 5, sy - 9, 10, 2);
-      ctx.fillRect(sx - 5, sy - 4, 10, 2);
+      ctx.fillStyle = '#5a4020';
+      ctx.fillRect(sx - 5, sy - 11, 10, 11);
+      ctx.fillStyle = '#725030';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 11, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#444';
+      ctx.fillRect(sx - 5, sy - 8, 10, 1.5);
       break;
     }
     case 'ruins': {
-      ctx.fillStyle = '#686868';
-      ctx.fillRect(sx - 8, sy - 16, 6, 16);
-      ctx.fillRect(sx + 2, sy - 10, 6, 10);
-      ctx.fillStyle = '#585858';
-      ctx.fillRect(sx - 4, sy - 4, 8, 4);
-      ctx.fillStyle = '#787878';
-      ctx.fillRect(sx - 8, sy - 16, 6, 2);
+      ctx.fillStyle = '#606060';
+      ctx.fillRect(sx - 7, sy - 14, 5, 14);
+      ctx.fillRect(sx + 2, sy - 9, 5, 9);
+      ctx.fillStyle = '#707070';
+      ctx.fillRect(sx - 7, sy - 14, 5, 2);
       break;
     }
     case 'wire': {
-      ctx.strokeStyle = '#aaa';
+      ctx.strokeStyle = '#999';
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(sx - 10, sy - 4);
-      for (let i = 0; i < 5; i++) {
-        ctx.lineTo(sx - 10 + (i + 0.5) * 4, sy - 4 + (i % 2 === 0 ? -3 : 3));
-      }
-      ctx.lineTo(sx + 10, sy - 3);
-      ctx.stroke();
-      ctx.fillStyle = '#777';
-      ctx.fillRect(sx - 9, sy - 8, 2, 8);
-      ctx.fillRect(sx + 8, sy - 7, 2, 7);
+      ctx.beginPath(); ctx.moveTo(sx - 8, sy - 3);
+      for (let i = 0; i < 4; i++) ctx.lineTo(sx - 8 + (i + 0.5) * 4, sy - 3 + (i % 2 === 0 ? -2 : 2));
+      ctx.lineTo(sx + 8, sy - 2); ctx.stroke();
       break;
     }
     case 'jersey_barrier': {
-      ctx.fillStyle = '#a0a0a0';
-      ctx.fillRect(sx - 10, sy - 6, 20, 6);
-      ctx.fillStyle = '#b0b0b0';
-      ctx.fillRect(sx - 10, sy - 6, 20, 2);
-      ctx.fillStyle = '#e0a020';
-      ctx.fillRect(sx - 8, sy - 3, 16, 2);
+      ctx.fillStyle = '#9a9a9a';
+      ctx.fillRect(sx - 9, sy - 5, 18, 5);
+      ctx.fillStyle = '#aaa';
+      ctx.fillRect(sx - 9, sy - 5, 18, 1.5);
       break;
     }
     case 'burnt_vehicle': {
-      ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(sx - 12, sy - 8, 24, 8);
-      ctx.fillStyle = '#2a2a2a';
-      ctx.fillRect(sx - 8, sy - 14, 14, 7);
-      ctx.fillStyle = '#222';
-      ctx.beginPath(); ctx.arc(sx - 8, sy, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(sx + 8, sy, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#333';
+      ctx.fillRect(sx - 10, sy - 7, 20, 7);
+      ctx.fillStyle = '#282828';
+      ctx.fillRect(sx - 7, sy - 12, 12, 6);
       break;
     }
     case 'foxhole': {
       ctx.fillStyle = '#4a3828';
-      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#3a2818';
-      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#362818';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'hesco': {
-      ctx.fillStyle = '#8a8a60';
-      ctx.fillRect(sx - 8, sy - 10, 7, 10);
-      ctx.fillRect(sx + 1, sy - 10, 7, 10);
-      ctx.strokeStyle = '#6a6a48';
-      ctx.lineWidth = 0.8;
-      ctx.strokeRect(sx - 8, sy - 10, 7, 10);
-      ctx.strokeRect(sx + 1, sy - 10, 7, 10);
+      ctx.fillStyle = '#7a7a58';
+      ctx.fillRect(sx - 7, sy - 9, 6, 9);
+      ctx.fillRect(sx + 1, sy - 9, 6, 9);
       break;
     }
     case 'tank_trap': {
-      ctx.strokeStyle = '#666';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(sx - 8, sy + 2); ctx.lineTo(sx + 8, sy - 10); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(sx + 8, sy + 2); ctx.lineTo(sx - 8, sy - 10); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(sx, sy - 14); ctx.lineTo(sx, sy + 4); ctx.stroke();
+      ctx.strokeStyle = '#606060';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sx - 6, sy + 1); ctx.lineTo(sx + 6, sy - 9); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx + 6, sy + 1); ctx.lineTo(sx - 6, sy - 9); ctx.stroke();
       break;
     }
   }
+  ctx.restore();
 }
 
 function drawTriangle(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number) {

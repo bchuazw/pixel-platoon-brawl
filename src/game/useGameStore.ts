@@ -775,7 +775,7 @@ export function useGameStore() {
             for (const [k, v] of Object.entries(u.cooldowns)) {
               if (v > 0) newCooldowns[k] = v - 1;
             }
-            return { ...u, ap: u.maxAp, isSuppressed: false, cooldowns: newCooldowns, weapon: { ...u.weapon } };
+            return { ...u, ap: u.maxAp, isSuppressed: false, isHunkered: false, cooldowns: newCooldowns, weapon: { ...u.weapon } };
           }
           return { ...u, weapon: { ...u.weapon } };
         }),

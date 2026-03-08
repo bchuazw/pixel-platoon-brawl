@@ -5,7 +5,7 @@ import { GridTiles } from './GridTiles';
 import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
-import { GameState, Position, GRID_SIZE } from '@/game/types';
+import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw } from 'lucide-react';
 import * as THREE from 'three';
 
@@ -58,6 +58,63 @@ function CameraController({ angleIndex }: { angleIndex: number }) {
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
   }, [camera, angleIndex]);
+
+  return null;
+}
+
+// ── KILL CAM: Cinematic zoom to elimination ──
+function KillCamController({ killCam }: { killCam: KillCamData | null }) {
+  const { camera } = useThree();
+  const savedPos = useRef(new THREE.Vector3());
+  const isActive = useRef(false);
+  const progress = useRef(0);
+  const targetLook = useRef(new THREE.Vector3());
+  const targetCamPos = useRef(new THREE.Vector3());
+
+  useEffect(() => {
+    if (killCam && !isActive.current) {
+      // Save current camera position
+      savedPos.current.copy(camera.position);
+      isActive.current = true;
+      progress.current = 0;
+
+      // Compute kill cam position: look from attacker toward target, offset up and to side
+      const midX = (killCam.attackerPos.x + killCam.targetPos.x) / 2;
+      const midZ = (killCam.attackerPos.z + killCam.targetPos.z) / 2;
+      targetLook.current.set(killCam.targetPos.x, 0.5, killCam.targetPos.z);
+
+      const dx = killCam.targetPos.x - killCam.attackerPos.x;
+      const dz = killCam.targetPos.z - killCam.attackerPos.z;
+      const len = Math.sqrt(dx * dx + dz * dz) || 1;
+      // Position camera perpendicular to attack direction, elevated
+      const perpX = -dz / len;
+      const perpZ = dx / len;
+      targetCamPos.current.set(
+        midX + perpX * 3,
+        4,
+        midZ + perpZ * 3
+      );
+    } else if (!killCam && isActive.current) {
+      isActive.current = false;
+      progress.current = 0;
+    }
+  }, [killCam, camera]);
+
+  useFrame(() => {
+    if (!isActive.current || !killCam) return;
+    progress.current = Math.min(1, progress.current + 0.04);
+    const t = 1 - Math.pow(1 - progress.current, 3); // ease out cubic
+
+    camera.position.lerp(targetCamPos.current, t > 0.95 ? 1 : 0.1);
+    camera.lookAt(targetLook.current);
+  });
+
+  // Restore camera when killcam ends
+  useEffect(() => {
+    if (!killCam && savedPos.current.lengthSq() > 0) {
+      // Will be naturally overridden by CameraController lerp
+    }
+  }, [killCam]);
 
   return null;
 }
@@ -135,6 +192,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         shadows
       >
         <CameraController angleIndex={angleIndex} />
+        <KillCamController killCam={state.killCam} />
         <color attach="background" args={['#0c1a12']} />
         <Stars radius={80} depth={40} count={800} factor={2} saturation={0.1} fade speed={0.5} />
 
@@ -203,6 +261,36 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <RotateCw className="w-4 h-4 text-primary" />
         <span className="text-[8px] tracking-wider">ROTATE ({ANGLE_LABELS[angleIndex]})</span>
       </button>
+
+      {/* Kill Cam Overlay */}
+      {state.killCam && (
+        <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+          {/* Letterbox bars */}
+          <div className="absolute top-0 left-0 right-0 h-16 bg-black/80" />
+          <div className="absolute bottom-0 left-0 right-0 h-16 bg-black/80" />
+          {/* Vignette */}
+          <div className="absolute inset-0" style={{
+            background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%)',
+          }} />
+          {/* Kill info */}
+          <div className="animate-fade-in flex flex-col items-center gap-2">
+            <div className="text-[10px] tracking-[0.3em] text-red-400/80 font-mono uppercase">
+              Eliminated
+            </div>
+            <div className="text-3xl font-black text-red-500 tracking-wider drop-shadow-[0_0_20px_rgba(255,0,0,0.5)]"
+              style={{ fontFamily: "'Share Tech Mono', monospace", textShadow: '0 0 30px rgba(255,50,50,0.6)' }}>
+              ☠ {state.killCam.victimName}
+            </div>
+            <div className="text-[9px] tracking-[0.2em] text-muted-foreground/70 font-mono">
+              by {state.killCam.killerName}
+            </div>
+          </div>
+          {/* Scan lines effect */}
+          <div className="absolute inset-0 opacity-10" style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)',
+          }} />
+        </div>
+      )}
     </div>
   );
 }

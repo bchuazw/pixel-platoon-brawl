@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team,
+  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team, KillCamData,
 } from './types';
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
@@ -208,9 +208,27 @@ export function useGameStore() {
       let newState = result.state;
       const allEvents = [...result.events];
 
+      // ── KILL CAM: detect kill events ──
+      const killEvent = allEvents.find(e => e.type === 'kill');
+      let killCam: KillCamData | null = null;
+      if (killEvent) {
+        const killer = prev.units.find(u => u.id === nextUnitId);
+        // Find victim by position match
+        const victim = prev.units.find(u =>
+          u.position.x === killEvent.targetPos.x && u.position.z === killEvent.targetPos.z && u.id !== nextUnitId
+        );
+        killCam = {
+          targetPos: killEvent.targetPos,
+          attackerPos: killEvent.attackerPos,
+          victimName: victim?.name || 'Unknown',
+          killerName: killer?.name || 'Unknown',
+          timestamp: Date.now(),
+        };
+      }
+
       // Highlight the next unit that will act
       const nextInQueue = unitQueueRef.current[0] || null;
-      newState = { ...newState, selectedUnitId: nextInQueue };
+      newState = { ...newState, selectedUnitId: nextInQueue, killCam };
 
       // Check for game over
       const alive = getAliveTeams(newState.units);
@@ -316,11 +334,16 @@ export function useGameStore() {
   useEffect(() => {
     autoPlayRef.current = state.autoPlay;
     if (state.autoPlay && state.phase !== 'game_over' && state.phase !== 'pre_game') {
-      // Shorter delay if just switching teams (no queue), longer for unit actions
       const hasQueue = unitQueueRef.current.length > 0;
-      const delay = hasQueue ? 1400 : 600; // 1.4s per unit action, 0.6s for team switch
+      const isKillCam = state.killCam !== null;
+      // 3s pause for killcam, normal delays otherwise
+      const delay = isKillCam ? 3000 : hasQueue ? 1400 : 600;
       autoPlayTimerRef.current = setTimeout(() => {
         if (autoPlayRef.current) {
+          // Clear killcam before next step
+          if (isKillCam) {
+            setState(prev => ({ ...prev, killCam: null }));
+          }
           runSingleUnitStep();
         }
       }, delay);
@@ -328,7 +351,7 @@ export function useGameStore() {
     return () => {
       if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
     };
-  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, state.units, state.selectedUnitId, runSingleUnitStep]);
+  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, state.units, state.selectedUnitId, state.killCam, runSingleUnitStep]);
 
   const startAutoPlay = useCallback(() => {
     startBgMusic();

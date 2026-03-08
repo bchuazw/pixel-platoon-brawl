@@ -139,6 +139,14 @@ export interface AttackPreview {
   targetCover: 'none' | 'half' | 'full';
 }
 
+export interface KillCamData {
+  targetPos: Position;
+  attackerPos: Position;
+  victimName: string;
+  killerName: string;
+  timestamp: number;
+}
+
 export interface GameState {
   units: Unit[];
   currentTeam: Team;
@@ -157,8 +165,9 @@ export interface GameState {
   attackPreview: AttackPreview | null;
   hoveredTile: Position | null;
   autoPlay: boolean;
-  movePath: Position[] | null; // path animation: array of tiles the moving unit walks through
-  movingUnitId: string | null; // which unit is currently animating movement
+  movePath: Position[] | null;
+  movingUnitId: string | null;
+  killCam: KillCamData | null;
 }
 
 export const GRID_SIZE = 30;

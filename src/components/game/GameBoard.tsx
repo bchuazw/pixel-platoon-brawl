@@ -319,13 +319,22 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         />
       </Canvas>
 
-      <button
-        onClick={rotateCamera}
-        className="absolute bottom-36 right-4 z-20 pointer-events-auto bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 text-foreground hover:bg-secondary transition-colors"
-      >
-        <RotateCw className="w-4 h-4 text-primary" />
-        <span className="text-[8px] tracking-wider">ROTATE ({ANGLE_LABELS[angleIndex]})</span>
-      </button>
+      <div className="absolute bottom-36 right-4 z-20 pointer-events-auto flex flex-col gap-1.5">
+        <button
+          onClick={() => setAutoFollow(prev => !prev)}
+          className={`bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-secondary transition-colors ${autoFollow ? 'text-primary' : 'text-muted-foreground'}`}
+        >
+          {autoFollow ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+          <span className="text-[8px] tracking-wider">{autoFollow ? 'TRACKING ON' : 'TRACKING OFF'}</span>
+        </button>
+        <button
+          onClick={rotateCamera}
+          className="bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 text-foreground hover:bg-secondary transition-colors"
+        >
+          <RotateCw className="w-4 h-4 text-primary" />
+          <span className="text-[8px] tracking-wider">ROTATE ({ANGLE_LABELS[angleIndex]})</span>
+        </button>
+      </div>
 
       {/* Kill Cam Overlay */}
       {state.killCam && (

@@ -10,7 +10,7 @@ import { CombatVFX } from './CombatVFX';
 import { ScreenShake } from './ScreenShake';
 import { EmberParticles, LightShafts, GroundFog, DistantTrees } from './EnvironmentVFX';
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
 import { AutoFollowCamera } from './AutoFollowCamera';
 
@@ -178,7 +178,7 @@ function LoadingFallback() {
 
 export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
-
+  const [autoFollow, setAutoFollow] = useState(true);
   const rotateCamera = useCallback(() => {
     setAngleIndex(prev => (prev + 1) % 4);
   }, []);
@@ -198,7 +198,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
       >
         <CameraController angleIndex={angleIndex} />
         <KillCamController killCam={state.killCam} />
-        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay} />
+        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} />
         <color attach="background" args={['#0e1a2e']} />
         <Stars radius={80} depth={50} count={2500} factor={3} saturation={0.4} fade speed={0.3} />
 
@@ -319,13 +319,22 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         />
       </Canvas>
 
-      <button
-        onClick={rotateCamera}
-        className="absolute bottom-36 right-4 z-20 pointer-events-auto bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 text-foreground hover:bg-secondary transition-colors"
-      >
-        <RotateCw className="w-4 h-4 text-primary" />
-        <span className="text-[8px] tracking-wider">ROTATE ({ANGLE_LABELS[angleIndex]})</span>
-      </button>
+      <div className="absolute bottom-36 right-4 z-20 pointer-events-auto flex flex-col gap-1.5">
+        <button
+          onClick={() => setAutoFollow(prev => !prev)}
+          className={`bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-secondary transition-colors ${autoFollow ? 'text-primary' : 'text-muted-foreground'}`}
+        >
+          {autoFollow ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+          <span className="text-[8px] tracking-wider">{autoFollow ? 'TRACKING ON' : 'TRACKING OFF'}</span>
+        </button>
+        <button
+          onClick={rotateCamera}
+          className="bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 text-foreground hover:bg-secondary transition-colors"
+        >
+          <RotateCw className="w-4 h-4 text-primary" />
+          <span className="text-[8px] tracking-wider">ROTATE ({ANGLE_LABELS[angleIndex]})</span>
+        </button>
+      </div>
 
       {/* Kill Cam Overlay */}
       {state.killCam && (

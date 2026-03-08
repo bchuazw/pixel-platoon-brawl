@@ -156,12 +156,6 @@ function LootObject({ tile }: { tile: TileData }) {
                     tile.loot.type === 'armor' ? '#66aaff' :
                     '#aaee66';
 
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t = clock.getElapsedTime();
-    ref.current.position.y = baseY + 0.15 + Math.sin(t * 2 + tile.x * 0.7 + tile.z * 1.3) * 0.08;
-    ref.current.rotation.y = t * 1.5 + tile.x;
-  });
 
   return (
     <group ref={ref} position={[tile.x, baseY + 0.15, tile.z]}>

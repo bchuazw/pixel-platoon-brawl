@@ -5,6 +5,22 @@ import { Unit, TEAM_COLORS, Team } from '@/game/types';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as THREE from 'three';
 
+import fullbodySoldierBlue from '@/assets/fullbody-soldier-blue.png';
+import fullbodySoldierRed from '@/assets/fullbody-soldier-red.png';
+import fullbodySoldierGreen from '@/assets/fullbody-soldier-green.png';
+import fullbodySoldierYellow from '@/assets/fullbody-soldier-yellow.png';
+import fullbodyMedicBlue from '@/assets/fullbody-medic-blue.png';
+import fullbodyMedicRed from '@/assets/fullbody-medic-red.png';
+import fullbodyMedicGreen from '@/assets/fullbody-medic-green.png';
+import fullbodyMedicYellow from '@/assets/fullbody-medic-yellow.png';
+
+const FULLBODY_MAP: Record<string, string> = {
+  'blue-soldier': fullbodySoldierBlue, 'red-soldier': fullbodySoldierRed,
+  'green-soldier': fullbodySoldierGreen, 'yellow-soldier': fullbodySoldierYellow,
+  'blue-medic': fullbodyMedicBlue, 'red-medic': fullbodyMedicRed,
+  'green-medic': fullbodyMedicGreen, 'yellow-medic': fullbodyMedicYellow,
+};
+
 // ── Customization Types ──
 export type HelmetStyle = 'standard' | 'tactical' | 'beret' | 'bandana';
 export type VestStyle = 'light' | 'heavy' | 'tactical' | 'medic';
@@ -446,16 +462,38 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
       <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
 
       <div
-        className="relative z-10 w-full max-w-[700px] mx-4 rounded-xl overflow-hidden border-2 flex flex-col sm:flex-row"
+        className="relative z-10 w-full max-w-[900px] mx-4 rounded-xl overflow-hidden border-2 flex flex-col sm:flex-row"
         style={{ borderColor: teamColor + '50' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* 3D Viewer — using the actual game model */}
+        {/* Left: Full-body portrait */}
+        <div
+          className="hidden sm:flex w-[200px] shrink-0 flex-col items-center justify-end relative overflow-hidden"
+          style={{ background: `linear-gradient(180deg, ${teamColor}15 0%, ${teamColor}08 50%, hsl(220, 20%, 8%) 100%)` }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-20 opacity-30"
+            style={{ background: `radial-gradient(ellipse at center top, ${teamColor}, transparent 70%)` }} />
+          {(() => {
+            const fb = FULLBODY_MAP[`${unit.team}-${unit.unitClass}`];
+            return fb ? (
+              <img src={fb} alt={unit.name} className="relative z-10 w-[180px] h-auto object-contain drop-shadow-2xl"
+                style={{ filter: `drop-shadow(0 0 20px ${teamColor}40)` }} />
+            ) : null;
+          })()}
+          <div className="relative z-10 w-full bg-card/90 backdrop-blur-sm py-2 px-3 text-center border-t border-border/30">
+            <div className="text-[11px] font-bold text-foreground">{unit.name}</div>
+            <div className="text-[7px] uppercase tracking-[0.2em] mt-0.5" style={{ color: teamColor }}>
+              {unit.unitClass} • {unit.team} TEAM
+            </div>
+          </div>
+        </div>
+
+        {/* Center: 3D Viewer */}
         <div className="w-full sm:w-[300px] h-[280px] sm:h-[420px] bg-card/90 relative shrink-0">
           <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
             style={{ background: `linear-gradient(180deg, ${teamColor}15, transparent)` }} />
 
-          <Canvas camera={{ position: [0, 0.6, 3.5], fov: 40 }}>
+          <Canvas camera={{ position: [0, 0.5, 4.2], fov: 38 }}>
             <ambientLight intensity={0.5} />
             <directionalLight position={[3, 5, 3]} intensity={1} />
             <directionalLight position={[-2, 3, -1]} intensity={0.3} />
@@ -475,12 +513,9 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
             />
           </Canvas>
 
-          {/* Unit name overlay */}
-          <div className="absolute bottom-0 left-0 right-0 bg-card/80 backdrop-blur-sm px-4 py-2 border-t border-border/20 z-10">
-            <div className="text-sm font-bold text-foreground">{unit.name}</div>
-            <div className="text-[10px] uppercase tracking-[0.15em]" style={{ color: teamColor }}>
-              {unit.unitClass} • {unit.team} TEAM
-            </div>
+          {/* Label */}
+          <div className="absolute bottom-0 left-0 right-0 bg-card/80 backdrop-blur-sm px-3 py-1.5 border-t border-border/20 z-10">
+            <div className="text-[9px] text-muted-foreground tracking-wider text-center">3D PREVIEW</div>
           </div>
         </div>
 

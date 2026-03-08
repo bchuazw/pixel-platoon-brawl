@@ -1,10 +1,14 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
+import { OrbitControls, Stars, Cloud } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
+import { BlendFunction } from 'postprocessing';
 import { Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GridTiles } from './GridTiles';
 import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
+import { ScreenShake } from './ScreenShake';
+import { EmberParticles, LightShafts, GroundFog, DistantTrees } from './EnvironmentVFX';
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw } from 'lucide-react';
 import * as THREE from 'three';
@@ -193,48 +197,76 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
       >
         <CameraController angleIndex={angleIndex} />
         <KillCamController killCam={state.killCam} />
-        <color attach="background" args={['#1a2840']} />
-        <Stars radius={80} depth={50} count={1500} factor={3} saturation={0.3} fade speed={0.4} />
+        <color attach="background" args={['#0e1a2e']} />
+        <Stars radius={80} depth={50} count={2500} factor={3} saturation={0.4} fade speed={0.3} />
 
-        {/* Sky gradient dome */}
+        {/* Sky dome with gradient */}
         <mesh scale={[-1, 1, 1]}>
           <sphereGeometry args={[90, 32, 16]} />
           <meshBasicMaterial side={THREE.BackSide}>
-            <color attach="color" args={['#1a2840']} />
+            <color attach="color" args={['#0e1a2e']} />
           </meshBasicMaterial>
         </mesh>
 
-        {/* Ground plane extending beyond the map */}
+        {/* Moon */}
+        <mesh position={[-40, 45, -30]}>
+          <sphereGeometry args={[4, 16, 16]} />
+          <meshBasicMaterial color="#e8e0d0" />
+        </mesh>
+        <pointLight position={[-40, 45, -30]} color="#ccd8ee" intensity={0.5} distance={120} />
+
+        {/* Ground plane */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRID_SIZE / 2 - 0.5, -0.15, GRID_SIZE / 2 - 0.5]}>
-          <planeGeometry args={[120, 120]} />
-          <meshStandardMaterial color="#1a2a18" roughness={1} metalness={0} />
+          <planeGeometry args={[140, 140]} />
+          <meshStandardMaterial color="#141f14" roughness={1} metalness={0} />
         </mesh>
 
-        {/* Distant mountain silhouettes */}
-        {[0, 1, 2, 3, 4, 5].map(i => {
-          const angle = (i / 6) * Math.PI * 2;
-          const dist = 35 + Math.sin(i * 2.7) * 8;
-          const height = 6 + Math.sin(i * 1.3) * 4;
+        {/* Mountains */}
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => {
+          const angle = (i / 9) * Math.PI * 2;
+          const dist = 38 + Math.sin(i * 2.7) * 10;
+          const height = 8 + Math.sin(i * 1.3) * 5;
           return (
             <mesh key={i} position={[
               GRID_SIZE / 2 + Math.cos(angle) * dist,
-              height * 0.4,
+              height * 0.35,
               GRID_SIZE / 2 + Math.sin(angle) * dist
             ]}>
-              <coneGeometry args={[8 + i * 1.5, height, 5]} />
-              <meshStandardMaterial color="#0d1a10" roughness={1} />
+              <coneGeometry args={[10 + i * 1.2, height, 6]} />
+              <meshStandardMaterial color="#0a1208" roughness={1} />
             </mesh>
           );
         })}
 
-        <ambientLight intensity={0.55} color="#99aabb" />
-        <directionalLight position={[15, 25, 15]} intensity={0.9} castShadow color="#ffe0b0"
+        <DistantTrees />
+
+        <ambientLight intensity={0.5} color="#8899bb" />
+        <directionalLight position={[15, 25, 15]} intensity={1.0} castShadow color="#ffe0b0"
           shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-        <directionalLight position={[-10, 15, -10]} intensity={0.2} color="#7799dd" />
-        <hemisphereLight intensity={0.45} color="#778899" groundColor="#2a3a22" />
-        <fog attach="fog" args={['#1a2840', 35, 80]} />
+        <directionalLight position={[-10, 15, -10]} intensity={0.25} color="#6688cc" />
+        <hemisphereLight intensity={0.4} color="#667799" groundColor="#1a2a12" />
+        <fog attach="fog" args={['#0e1a2e', 40, 85]} />
 
         <DustParticles />
+        <EmberParticles />
+        <LightShafts />
+        <GroundFog />
+        <ScreenShake events={state.combatEvents} />
+
+        {/* Post-processing */}
+        <EffectComposer>
+          <Bloom
+            intensity={0.4}
+            luminanceThreshold={0.6}
+            luminanceSmoothing={0.9}
+            mipmapBlur
+          />
+          <Vignette
+            offset={0.3}
+            darkness={0.7}
+            blendFunction={BlendFunction.NORMAL}
+          />
+        </EffectComposer>
 
         <Suspense fallback={<LoadingFallback />}>
           <GridTiles

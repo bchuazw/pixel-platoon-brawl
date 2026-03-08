@@ -18,11 +18,11 @@ interface GridTilesProps {
 
 const TILE_COLORS: Record<string, string> = {
   grass: '#4a7a3a', dirt: '#8a7050', stone: '#6a6a72',
-  water: '#2a5a8a', sand: '#b8a060', wall: '#5a5a62',
+  water: '#2a5a8a', sand: '#b8a060', wall: '#5a5a62', trench: '#5a4a30',
 };
 const TILE_COLORS_ALT: Record<string, string> = {
   grass: '#3e6e30', dirt: '#7a6545', stone: '#606068',
-  water: '#225080', sand: '#a89555', wall: '#505058',
+  water: '#225080', sand: '#a89555', wall: '#505058', trench: '#4e4028',
 };
 
 // Get Y position for a tile based on elevation

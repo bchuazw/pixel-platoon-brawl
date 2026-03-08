@@ -391,7 +391,26 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       }
     }
 
-    // ── Flash overlay ──
+    // ── Sprite sheet frame animation ──
+    const animRow = ANIM_ROW[animState.current] ?? 0;
+    const fps = ANIM_FPS[animState.current] ?? 4;
+    frameTimer.current += delta;
+    if (frameTimer.current >= 1 / fps) {
+      frameTimer.current = 0;
+      // For death animation, don't loop - stay on last frame
+      if (animState.current === 'dying') {
+        currentFrame.current = Math.min(currentFrame.current + 1, SPRITE_COLS - 1);
+      } else {
+        currentFrame.current = (currentFrame.current + 1) % SPRITE_COLS;
+      }
+    }
+    // Update texture UV offset
+    const col = currentFrame.current;
+    // UV origin is bottom-left, so row 0 = top = offset Y = 1 - FRAME_H
+    const uvX = col * FRAME_W;
+    const uvY = 1 - (animRow + 1) * FRAME_H;
+    processedTexture.offset.set(uvX, uvY);
+
     if (spriteRef.current) {
       const mat = spriteRef.current.material as THREE.MeshBasicMaterial;
       if (flashIntensity.current > 0) {

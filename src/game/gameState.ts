@@ -117,7 +117,7 @@ function createGrid(): TileData[][] {
     }
   }
 
-  // Clear spawn corners (bigger for 2-unit squads)
+  // Clear spawn corners
   for (const corner of [[0, 0], [0, GRID_SIZE - 1], [GRID_SIZE - 1, 0], [GRID_SIZE - 1, GRID_SIZE - 1]]) {
     for (let dx = -3; dx <= 3; dx++) {
       for (let dz = -3; dz <= 3; dz++) {
@@ -129,7 +129,7 @@ function createGrid(): TileData[][] {
     }
   }
 
-  // ── Spawn loot (more since we have 8 units now) ──
+  // Spawn loot
   const lootCount = 18 + Math.floor(rand() * 8);
   let placed = 0;
   let attempts = 0;
@@ -226,21 +226,19 @@ export function teamCanSee(team: Team, targetPos: Position, units: Unit[]): bool
 }
 
 export function getVisibleEnemies(unit: Unit, allUnits: Unit[]): Unit[] {
-  // Squad vision: any alive teammate's vision counts
   return allUnits.filter(u =>
     u.isAlive && u.team !== unit.team &&
     teamCanSee(unit.team, u.position, allUnits)
   );
 }
 
-// ── State Init (2 units per team: 1 Soldier + 1 Medic) ──
+// ── State Init ──
 export function createInitialState(): GameState {
   const grid = createGrid();
 
   const soldierNames = ['Marco', 'Ralf', 'Knox', 'Hawk', 'Blaze', 'Steel', 'Rex', 'Ace'];
   const medicNames = ['Mercy', 'Patch', 'Doc', 'Vita', 'Sage', 'Pulse', 'Angel', 'Fern'];
 
-  // Shuffle to guarantee no duplicates
   const shuffle = (arr: string[]) => {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -254,7 +252,6 @@ export function createInitialState(): GameState {
   let soldierIdx = 0;
   let medicIdx = 0;
 
-  // Spawn positions: 2 units near each corner
   const cornerSpawns: Record<Team, Position[]> = {
     blue: [
       { x: 1 + Math.floor(globalRand() * 2), z: 1 + Math.floor(globalRand() * 2) },
@@ -279,12 +276,10 @@ export function createInitialState(): GameState {
 
   for (const team of teams) {
     const spawns = cornerSpawns[team];
-    // Soldier
     units.push(createUnit(`${team}-soldier`, shuffledSoldiers[soldierIdx++], 'soldier', team, spawns[0]));
     units.push(createUnit(`${team}-medic`, shuffledMedics[medicIdx++], 'medic', team, spawns[1]));
   }
 
-  // Ensure no two units share a tile
   const occupied = new Set<string>();
   for (const u of units) {
     let key = `${u.position.x},${u.position.z}`;
@@ -301,8 +296,7 @@ export function createInitialState(): GameState {
     units, currentTeam: 'blue', selectedUnitId: null,
     phase: 'pre_game', turn: 1,
     movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
-    activeAbility: null,
-    grid,
+    activeAbility: null, grid,
     log: [
       '═══════════════════════════',
       '⚔ WARGAMING',
@@ -374,7 +368,6 @@ export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]
   const dElev = grid[defender.position.x]?.[defender.position.z]?.elevation || 0;
   if (aElev > dElev) chance += 10;
 
-  // Shotgun bonus at close range
   if (attacker.weapon.id === 'shotgun' && dist <= 2) chance += 15;
 
   return Math.max(5, Math.min(95, chance));
@@ -458,8 +451,7 @@ export function getAbilityTargetTiles(unit: Unit, abilityId: AbilityId, state: G
       }
       break;
     case 'first_aid':
-      // Can heal self or nearby allies
-      if (unit.hp < unit.maxHp) tiles.push(unit.position); // self-heal
+      if (unit.hp < unit.maxHp) tiles.push(unit.position);
       for (const u of state.units) {
         if (u.isAlive && u.team === unit.team && u.id !== unit.id && u.hp < u.maxHp) {
           if (getManhattanDistance(unit.position, u.position) <= ability.range) {
@@ -496,6 +488,19 @@ export function getAbilityTargetTiles(unit: Unit, abilityId: AbilityId, state: G
 export function isInZone(x: number, z: number, shrinkLevel: number): boolean {
   const margin = shrinkLevel * 2;
   return x >= margin && x < GRID_SIZE - margin && z >= margin && z < GRID_SIZE - margin;
+}
+
+// ── Zone-aware movement scoring ──
+function getZonePenalty(pos: Position, shrinkLevel: number): number {
+  if (shrinkLevel === 0) return 0;
+  if (!isInZone(pos.x, pos.z, shrinkLevel)) return -100; // NEVER move outside zone
+  // Also penalize being close to the edge (anticipate next shrink)
+  const nextMargin = (shrinkLevel + 1) * 2;
+  if (pos.x < nextMargin || pos.x >= GRID_SIZE - nextMargin ||
+      pos.z < nextMargin || pos.z >= GRID_SIZE - nextMargin) {
+    return -15; // near the edge of next shrink
+  }
+  return 0;
 }
 
 // ── Combat Resolution ──
@@ -578,172 +583,195 @@ export function getAliveTeams(units: Unit[]): Team[] {
   return Array.from(teams);
 }
 
-// ── AI (Squad tactics with fog of war) ──
-export function runAiTurn(state: GameState): { state: GameState; events: CombatEvent[] } {
+// ══════════════════════════════════════════════
+// ── AI: Per-unit step (called once per unit) ──
+// ══════════════════════════════════════════════
+export function runAiUnitStep(
+  unitId: string,
+  state: GameState
+): { state: GameState; events: CombatEvent[] } {
   const newState = {
     ...state,
     units: state.units.map(u => ({ ...u, weapon: { ...u.weapon } })),
     grid: state.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null }))),
   };
   const allEvents: CombatEvent[] = [];
-  const teamUnits = newState.units.filter(u => u.team === newState.currentTeam && u.isAlive);
 
-  // Sort: soldier acts first, medic acts second (so medic can heal after soldier takes damage)
-  const sorted = [...teamUnits].sort((a, b) => {
-    if (a.unitClass === 'soldier' && b.unitClass === 'medic') return -1;
-    if (a.unitClass === 'medic' && b.unitClass === 'soldier') return 1;
-    return 0;
-  });
+  const unit = newState.units.find(u => u.id === unitId);
+  if (!unit || !unit.isAlive) return { state: newState, events: allEvents };
 
-  for (const unit of sorted) {
-    const allEnemies = newState.units.filter(u => u.isAlive && u.team !== unit.team);
-    if (allEnemies.length === 0) break;
+  const allEnemies = newState.units.filter(u => u.isAlive && u.team !== unit.team);
+  if (allEnemies.length === 0) return { state: newState, events: allEvents };
 
-    // Squad vision: share vision with teammates
-    const visibleEnemies = getVisibleEnemies(unit, newState.units);
-    const allies = newState.units.filter(u => u.isAlive && u.team === unit.team && u.id !== unit.id);
+  const visibleEnemies = getVisibleEnemies(unit, newState.units);
+  const allies = newState.units.filter(u => u.isAlive && u.team === unit.team && u.id !== unit.id);
 
-    // Find closest visible enemy
-    let closest: Unit | null = visibleEnemies.length > 0 ? visibleEnemies[0] : null;
-    if (closest) {
-      let closestDist = getManhattanDistance(unit.position, closest.position);
-      for (const e of visibleEnemies) {
-        const d = getManhattanDistance(unit.position, e.position);
-        if (d < closestDist) { closest = e; closestDist = d; }
+  let closest: Unit | null = visibleEnemies.length > 0 ? visibleEnemies[0] : null;
+  if (closest) {
+    let closestDist = getManhattanDistance(unit.position, closest.position);
+    for (const e of visibleEnemies) {
+      const d = getManhattanDistance(unit.position, e.position);
+      if (d < closestDist) { closest = e; closestDist = d; }
+    }
+  }
+
+  // ── Currently outside zone? FLEE TO SAFETY FIRST ──
+  const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);
+
+  if (currentlyOutsideZone && unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+    const movable = getMovableTiles(unit, newState);
+    if (movable.length > 0) {
+      // Find tile closest to center that is in zone
+      const center = { x: Math.floor(GRID_SIZE / 2), z: Math.floor(GRID_SIZE / 2) };
+      let bestTile = movable[0];
+      let bestScore = -Infinity;
+      for (const t of movable) {
+        let score = 0;
+        if (isInZone(t.x, t.z, newState.shrinkLevel)) score += 200; // huge bonus for getting in zone
+        score -= getManhattanDistance(t, center); // closer to center = better
+        if (score > bestScore) { bestTile = t; bestScore = score; }
+      }
+      unit.position = bestTile;
+      unit.ap -= AP_MOVE_COST;
+
+      // Pickup loot while fleeing
+      const arrivalTile = newState.grid[bestTile.x][bestTile.z];
+      if (arrivalTile.loot) {
+        const { picked, message } = pickupLoot(unit, arrivalTile);
+        if (picked) {
+          allEvents.push({ id: makeEventId(), type: 'loot', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message, timestamp: Date.now() });
+          newState.log = [...newState.log, message];
+        }
+      }
+    }
+    // After fleeing, still try to attack if possible
+    if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
+      const visAfterFlee = getVisibleEnemies(unit, newState.units);
+      const inRange = visAfterFlee.filter(e => getManhattanDistance(unit.position, e.position) <= unit.attackRange);
+      if (inRange.length > 0) {
+        let bestTarget = inRange[0];
+        for (const t of inRange) { if (t.hp < bestTarget.hp) bestTarget = t; }
+        const result = performAttack(unit, bestTarget, newState.grid);
+        allEvents.push(...result.events);
+        newState.log = [...newState.log, ...result.events.map(e => e.message)];
+        unit.ap -= AP_ATTACK_COST;
+      }
+    }
+    updateAllUnitsCover(newState.units, newState.grid);
+    return { state: newState, events: allEvents };
+  }
+
+  // ═══ MEDIC AI ═══
+  if (unit.unitClass === 'medic') {
+    // Heal first
+    const firstAid = unit.abilities.find(a => a.id === 'first_aid');
+    if (firstAid && unit.ap >= firstAid.apCost && (!unit.cooldowns['first_aid'] || unit.cooldowns['first_aid'] <= 0)) {
+      let healTarget: Unit | null = null;
+      if (unit.hp < unit.maxHp * 0.5) healTarget = unit;
+      if (!healTarget) {
+        const injuredAlly = allies.find(a =>
+          a.hp < a.maxHp * 0.6 && getManhattanDistance(unit.position, a.position) <= firstAid.range
+        );
+        if (injuredAlly) healTarget = injuredAlly;
+      }
+      if (healTarget) {
+        const healAmt = 35;
+        healTarget.hp = Math.min(healTarget.maxHp, healTarget.hp + healAmt);
+        unit.ap -= firstAid.apCost;
+        unit.cooldowns['first_aid'] = firstAid.cooldown;
+        const isSelf = healTarget.id === unit.id;
+        allEvents.push({
+          id: makeEventId(), type: 'heal',
+          attackerPos: { ...unit.position }, targetPos: { ...healTarget.position },
+          value: healAmt,
+          message: isSelf
+            ? `💊 ${unit.name} uses FIRST AID on self (+${healAmt} HP)!`
+            : `💊 ${unit.name} uses FIRST AID on ${healTarget.name} (+${healAmt} HP)!`,
+          timestamp: Date.now(),
+        });
+        newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
       }
     }
 
-    // ═══ MEDIC AI: prioritize healing, then support ═══
-    if (unit.unitClass === 'medic') {
-      // Check if any ally needs healing (First Aid ability)
-      const firstAid = unit.abilities.find(a => a.id === 'first_aid');
-      if (firstAid && unit.ap >= firstAid.apCost && (!unit.cooldowns['first_aid'] || unit.cooldowns['first_aid'] <= 0)) {
-        // Check self first
-        let healTarget: Unit | null = null;
-        if (unit.hp < unit.maxHp * 0.5) {
-          healTarget = unit;
-        }
-        // Check ally
-        if (!healTarget) {
-          const injuredAlly = allies.find(a =>
-            a.hp < a.maxHp * 0.6 && getManhattanDistance(unit.position, a.position) <= firstAid.range
-          );
-          if (injuredAlly) healTarget = injuredAlly;
-        }
+    // Move
+    if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+      const movable = getMovableTiles(unit, newState);
+      if (movable.length > 0) {
+        let bestTile = movable[0];
+        let bestScore = -Infinity;
+        const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
+        const stayNearTarget = injuredAlly || allies[0];
 
-        if (healTarget) {
-          const healAmt = 35;
-          healTarget.hp = Math.min(healTarget.maxHp, healTarget.hp + healAmt);
-          unit.ap -= firstAid.apCost;
-          unit.cooldowns['first_aid'] = firstAid.cooldown;
-          const isSelf = healTarget.id === unit.id;
-          allEvents.push({
-            id: makeEventId(), type: 'heal',
-            attackerPos: { ...unit.position }, targetPos: { ...healTarget.position },
-            value: healAmt,
-            message: isSelf
-              ? `💊 ${unit.name} uses FIRST AID on self (+${healAmt} HP)!`
-              : `💊 ${unit.name} uses FIRST AID on ${healTarget.name} (+${healAmt} HP)!`,
-            timestamp: Date.now(),
-          });
-          newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
-        }
-      }
-
-      // Medic moves toward injured allies or stays near soldiers
-      if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
-        const movable = getMovableTiles(unit, newState);
-        if (movable.length > 0) {
-          let bestTile = movable[0];
-          let bestScore = -Infinity;
-
-          const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
-          const stayNearTarget = injuredAlly || allies[0]; // stay near teammate
-
-          for (const t of movable) {
-            let score = 0;
-
-            if (stayNearTarget) {
-              // Stay 1-2 tiles from ally
-              const distToAlly = getManhattanDistance(t, stayNearTarget.position);
-              score = -Math.abs(distToAlly - 2) * 5; // ideal distance is 2
-            }
-
-            // Avoid enemies (medic is squishy)
-            if (closest) {
-              const distToEnemy = getManhattanDistance(t, closest.position);
-              if (distToEnemy <= 2) score -= 15; // danger zone
-            }
-
-            // Cover bonus
-            for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-              const nx = t.x + dx, nz = t.z + dz;
-              if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
-                score += newState.grid[nx][nz].coverValue * 4;
-              }
-            }
-
-            // Loot
-            const tileData = newState.grid[t.x][t.z];
-            if (tileData.loot) score += 12;
-
-            if (score > bestScore) { bestTile = t; bestScore = score; }
+        for (const t of movable) {
+          let score = getZonePenalty(t, newState.shrinkLevel);
+          if (stayNearTarget) {
+            const distToAlly = getManhattanDistance(t, stayNearTarget.position);
+            score += -Math.abs(distToAlly - 2) * 5;
           }
-
-          unit.position = bestTile;
-          unit.ap -= AP_MOVE_COST;
-
-          // Pickup loot
-          const arrivalTile = newState.grid[bestTile.x][bestTile.z];
-          if (arrivalTile.loot) {
-            const { picked, message } = pickupLoot(unit, arrivalTile);
-            if (picked) {
-              allEvents.push({ id: makeEventId(), type: 'loot', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message, timestamp: Date.now() });
-              newState.log = [...newState.log, message];
+          if (closest) {
+            const distToEnemy = getManhattanDistance(t, closest.position);
+            if (distToEnemy <= 2) score -= 15;
+          }
+          for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            const nx = t.x + dx, nz = t.z + dz;
+            if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+              score += newState.grid[nx][nz].coverValue * 4;
             }
+          }
+          const tileData = newState.grid[t.x][t.z];
+          if (tileData.loot) score += 12;
+          if (score > bestScore) { bestTile = t; bestScore = score; }
+        }
+
+        unit.position = bestTile;
+        unit.ap -= AP_MOVE_COST;
+
+        const arrivalTile = newState.grid[bestTile.x][bestTile.z];
+        if (arrivalTile.loot) {
+          const { picked, message } = pickupLoot(unit, arrivalTile);
+          if (picked) {
+            allEvents.push({ id: makeEventId(), type: 'loot', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message, timestamp: Date.now() });
+            newState.log = [...newState.log, message];
           }
         }
       }
-
-      // Medic attacks if has AP left and visible enemies in range
-      if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
-        const visibleAfterMove = getVisibleEnemies(unit, newState.units);
-        const inRange = visibleAfterMove.filter(e => getManhattanDistance(unit.position, e.position) <= unit.attackRange);
-        if (inRange.length > 0) {
-          let bestTarget = inRange[0];
-          for (const t of inRange) { if (t.hp < bestTarget.hp) bestTarget = t; }
-          const result = performAttack(unit, bestTarget, newState.grid);
-          allEvents.push(...result.events);
-          newState.log = [...newState.log, ...result.events.map(e => e.message)];
-          unit.ap -= AP_ATTACK_COST;
-        }
-      }
-
-      // Smoke screen if under pressure
-      const smokeAbility = unit.abilities.find(a => a.id === 'smoke');
-      if (smokeAbility && unit.ap >= smokeAbility.apCost && (!unit.cooldowns['smoke'] || unit.cooldowns['smoke'] <= 0)) {
-        if (closest && getManhattanDistance(unit.position, closest.position) <= 3) {
-          // Deploy smoke on self
-          const radius = smokeAbility.aoeRadius || 1;
-          for (let x = 0; x < GRID_SIZE; x++) {
-            for (let z = 0; z < GRID_SIZE; z++) {
-              if (getManhattanDistance({ x, z }, unit.position) <= radius) {
-                newState.grid[x][z].hasSmoke = true;
-              }
-            }
-          }
-          unit.ap -= smokeAbility.apCost;
-          unit.cooldowns['smoke'] = smokeAbility.cooldown;
-          allEvents.push({ id: makeEventId(), type: 'ability', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `💨 ${unit.name} deploys SMOKE SCREEN!`, timestamp: Date.now() });
-          newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
-        }
-      }
-
-      continue; // skip soldier AI logic
     }
 
-    // ═══ SOLDIER AI: aggressive, push toward enemies ═══
-    // Move toward visible enemy or center
+    // Attack
+    if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
+      const visibleAfterMove = getVisibleEnemies(unit, newState.units);
+      const inRange = visibleAfterMove.filter(e => getManhattanDistance(unit.position, e.position) <= unit.attackRange);
+      if (inRange.length > 0) {
+        let bestTarget = inRange[0];
+        for (const t of inRange) { if (t.hp < bestTarget.hp) bestTarget = t; }
+        const result = performAttack(unit, bestTarget, newState.grid);
+        allEvents.push(...result.events);
+        newState.log = [...newState.log, ...result.events.map(e => e.message)];
+        unit.ap -= AP_ATTACK_COST;
+      }
+    }
+
+    // Smoke
+    const smokeAbility = unit.abilities.find(a => a.id === 'smoke');
+    if (smokeAbility && unit.ap >= smokeAbility.apCost && (!unit.cooldowns['smoke'] || unit.cooldowns['smoke'] <= 0)) {
+      if (closest && getManhattanDistance(unit.position, closest.position) <= 3) {
+        const radius = smokeAbility.aoeRadius || 1;
+        for (let x = 0; x < GRID_SIZE; x++) {
+          for (let z = 0; z < GRID_SIZE; z++) {
+            if (getManhattanDistance({ x, z }, unit.position) <= radius) {
+              newState.grid[x][z].hasSmoke = true;
+            }
+          }
+        }
+        unit.ap -= smokeAbility.apCost;
+        unit.cooldowns['smoke'] = smokeAbility.cooldown;
+        allEvents.push({ id: makeEventId(), type: 'ability', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `💨 ${unit.name} deploys SMOKE SCREEN!`, timestamp: Date.now() });
+        newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
+      }
+    }
+  } else {
+    // ═══ SOLDIER AI ═══
+    // Move
     if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
       const movable = getMovableTiles(unit, newState);
       if (movable.length > 0) {
@@ -751,28 +779,25 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
         let bestScore = -Infinity;
 
         for (const t of movable) {
-          let score = 0;
+          let score = getZonePenalty(t, newState.shrinkLevel);
 
           if (closest) {
             const dist = getManhattanDistance(t, closest.position);
-            // Soldier wants to be in weapon range
             const idealDist = unit.attackRange;
-            score = -Math.abs(dist - idealDist) * 3;
+            score += -Math.abs(dist - idealDist) * 3;
             if (unit.weapon.id === 'shotgun') score += dist <= 2 ? 10 : -dist * 2;
             if (unit.weapon.id === 'sniper_rifle' && dist < 3) score -= 15;
           } else {
             const distToCenter = getManhattanDistance(t, { x: 10, z: 10 });
-            score = -distToCenter;
+            score += -distToCenter;
           }
 
-          // Loot
           const tileData = newState.grid[t.x][t.z];
           if (tileData.loot) {
             score += 15;
             if (tileData.loot.type === 'weapon') score += 12;
           }
 
-          // Cover
           for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const nx = t.x + dx, nz = t.z + dz;
             if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
@@ -786,7 +811,6 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
         unit.position = bestTile;
         unit.ap -= AP_MOVE_COST;
 
-        // Pickup loot
         const arrivalTile = newState.grid[bestTile.x][bestTile.z];
         if (arrivalTile.loot) {
           const { picked, message } = pickupLoot(unit, arrivalTile);
@@ -798,7 +822,7 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
       }
     }
 
-    // Attack (only visible enemies after move)
+    // Attack
     const visibleAfterMove = getVisibleEnemies(unit, newState.units);
 
     if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
@@ -806,7 +830,6 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
         getManhattanDistance(unit.position, e.position) <= unit.attackRange
       );
       if (inRangeVisible.length > 0) {
-        // Prioritize: lowest HP, then medics (take out healer)
         let bestTarget = inRangeVisible[0];
         for (const t of inRangeVisible) {
           const tIsMedic = t.unitClass === 'medic' ? 1 : 0;
@@ -821,10 +844,9 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
       }
     }
 
-    // Grenade if multiple enemies clustered
+    // Grenade
     const grenadeAbility = unit.abilities.find(a => a.id === 'grenade');
     if (grenadeAbility && unit.ap >= grenadeAbility.apCost && (!unit.cooldowns['grenade'] || unit.cooldowns['grenade'] <= 0)) {
-      // Find best grenade target (hit 2+ enemies)
       let bestGrenadePos: Position | null = null;
       let bestHits = 0;
       for (const enemy of visibleAfterMove) {
@@ -855,7 +877,7 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
       }
     }
 
-    // Overwatch with remaining AP
+    // Overwatch
     if (unit.ap >= 1 && !unit.isOnOverwatch && visibleAfterMove.length > 0) {
       const owAbility = unit.abilities.find(a => a.id === 'overwatch');
       if (owAbility && (!unit.cooldowns['overwatch'] || unit.cooldowns['overwatch'] <= 0)) {
@@ -868,6 +890,25 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
 
   updateAllUnitsCover(newState.units, newState.grid);
   return { state: newState, events: allEvents };
+}
+
+// Legacy wrapper (still used by manual endTurn)
+export function runAiTurn(state: GameState): { state: GameState; events: CombatEvent[] } {
+  const teamUnits = state.units.filter(u => u.team === state.currentTeam && u.isAlive);
+  const sorted = [...teamUnits].sort((a, b) => {
+    if (a.unitClass === 'soldier' && b.unitClass === 'medic') return -1;
+    if (a.unitClass === 'medic' && b.unitClass === 'soldier') return 1;
+    return 0;
+  });
+
+  let currentState = state;
+  const allEvents: CombatEvent[] = [];
+  for (const unit of sorted) {
+    const result = runAiUnitStep(unit.id, currentState);
+    currentState = result.state;
+    allEvents.push(...result.events);
+  }
+  return { state: currentState, events: allEvents };
 }
 
 // ── Overwatch Trigger ──

@@ -6,6 +6,19 @@ export interface Position {
   z: number;
 }
 
+export type AbilityId = 'grenade' | 'overwatch' | 'heal' | 'suppress' | 'smoke';
+
+export interface Ability {
+  id: AbilityId;
+  name: string;
+  description: string;
+  apCost: number;
+  cooldown: number;
+  range: number;
+  aoeRadius?: number;
+  icon: string;
+}
+
 export interface Unit {
   id: string;
   name: string;
@@ -16,13 +29,20 @@ export interface Unit {
   maxHp: number;
   attack: number;
   defense: number;
+  accuracy: number;
   moveRange: number;
   attackRange: number;
-  hasMoved: boolean;
-  hasAttacked: boolean;
+  ap: number;
+  maxAp: number;
   isAlive: boolean;
   level: number;
   xp: number;
+  abilities: Ability[];
+  cooldowns: Record<string, number>;
+  isOnOverwatch: boolean;
+  isSuppressed: boolean;
+  coverType: 'none' | 'half' | 'full';
+  kills: number;
 }
 
 export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand';
@@ -34,12 +54,31 @@ export interface TileData {
   elevation: number;
   type: TileType;
   prop: PropType;
-  isBlocked: boolean; // can't walk through
-  givesCover: boolean; // adjacent tiles get defense bonus
-  variant: number; // for visual variety
+  isBlocked: boolean;
+  coverValue: 0 | 1 | 2; // 0=none, 1=half, 2=full
+  variant: number;
+  hasSmoke: boolean;
 }
 
-export type GamePhase = 'select' | 'move' | 'attack' | 'enemy_turn' | 'game_over';
+export type GamePhase = 'select' | 'move' | 'attack' | 'ability' | 'enemy_turn' | 'game_over';
+
+export interface CombatEvent {
+  id: string;
+  type: 'damage' | 'miss' | 'crit' | 'kill' | 'heal' | 'ability' | 'overwatch';
+  attackerPos: Position;
+  targetPos: Position;
+  value?: number;
+  message: string;
+  timestamp: number;
+}
+
+export interface AttackPreview {
+  targetId: string;
+  hitChance: number;
+  expectedDamage: number;
+  critChance: number;
+  targetCover: 'none' | 'half' | 'full';
+}
 
 export interface GameState {
   units: Unit[];
@@ -49,13 +88,20 @@ export interface GameState {
   turn: number;
   movableTiles: Position[];
   attackableTiles: Position[];
+  abilityTargetTiles: Position[];
+  activeAbility: AbilityId | null;
   grid: TileData[][];
   log: string[];
   shrinkLevel: number;
   zoneTimer: number;
+  combatEvents: CombatEvent[];
+  attackPreview: AttackPreview | null;
+  hoveredTile: Position | null;
 }
 
 export const GRID_SIZE = 20;
+export const AP_MOVE_COST = 1;
+export const AP_ATTACK_COST = 1;
 
 export const TEAM_COLORS: Record<Team, string> = {
   blue: '#4488ff',
@@ -64,9 +110,34 @@ export const TEAM_COLORS: Record<Team, string> = {
   yellow: '#ffcc44',
 };
 
-export const CLASS_STATS: Record<UnitClass, { hp: number; attack: number; defense: number; moveRange: number; attackRange: number }> = {
-  soldier: { hp: 100, attack: 25, defense: 10, moveRange: 4, attackRange: 1 },
-  sniper: { hp: 60, attack: 40, defense: 5, moveRange: 3, attackRange: 5 },
-  medic: { hp: 80, attack: 10, defense: 8, moveRange: 4, attackRange: 2 },
-  heavy: { hp: 150, attack: 30, defense: 20, moveRange: 2, attackRange: 1 },
+export const CLASS_ABILITIES: Record<UnitClass, Ability[]> = {
+  soldier: [{
+    id: 'grenade', name: 'FRAG GRENADE', description: 'Explosive dealing 20 dmg in 2-tile radius',
+    apCost: 1, cooldown: 3, range: 4, aoeRadius: 2, icon: '💣',
+  }],
+  sniper: [{
+    id: 'overwatch', name: 'OVERWATCH', description: 'Shoot first enemy that moves in range',
+    apCost: 1, cooldown: 0, range: 0, icon: '👁',
+  }],
+  medic: [{
+    id: 'heal', name: 'FIELD HEAL', description: 'Restore 40 HP to adjacent ally',
+    apCost: 1, cooldown: 2, range: 2, icon: '💊',
+  }, {
+    id: 'smoke', name: 'SMOKE BOMB', description: 'Drop smoke granting cover in area',
+    apCost: 1, cooldown: 3, range: 3, aoeRadius: 1, icon: '💨',
+  }],
+  heavy: [{
+    id: 'suppress', name: 'SUPPRESS', description: 'Pin enemy: -50% accuracy, can\'t move next turn',
+    apCost: 2, cooldown: 2, range: 3, icon: '🔫',
+  }],
+};
+
+export const CLASS_STATS: Record<UnitClass, {
+  hp: number; attack: number; defense: number; accuracy: number;
+  moveRange: number; attackRange: number; maxAp: number;
+}> = {
+  soldier: { hp: 100, attack: 22, defense: 10, accuracy: 80, moveRange: 4, attackRange: 2, maxAp: 2 },
+  sniper: { hp: 60, attack: 38, defense: 5, accuracy: 90, moveRange: 3, attackRange: 6, maxAp: 2 },
+  medic: { hp: 85, attack: 12, defense: 8, accuracy: 70, moveRange: 5, attackRange: 2, maxAp: 3 },
+  heavy: { hp: 150, attack: 28, defense: 22, accuracy: 65, moveRange: 2, attackRange: 2, maxAp: 2 },
 };

@@ -6,6 +6,16 @@ import { getTileY } from './GridTiles';
 import { playMove } from '@/game/sounds';
 import * as THREE from 'three';
 
+// Get the Y position where units should stand (on TOP of the tile)
+function getUnitBaseY(grid: TileData[][], x: number, z: number): number {
+  const tile = grid[x]?.[z];
+  if (!tile) return 0.15;
+  const tileY = getTileY(tile.elevation);
+  const isTrench = tile.type === 'trench';
+  const height = tile.type === 'water' ? 0.08 : isTrench ? 0.08 : 0.15 + tile.elevation * 0.12;
+  return tileY + height / 2;
+}
+
 interface GameUnitsProps {
   units: Unit[];
   selectedUnitId: string | null;

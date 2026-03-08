@@ -79,7 +79,6 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
           className="w-[220px] relative flex flex-col items-center justify-end shrink-0 overflow-hidden"
           style={{ background: `linear-gradient(180deg, ${teamColor}15 0%, ${teamColor}08 50%, hsl(220, 20%, 8%) 100%)` }}
         >
-          {/* Team color glow */}
           <div
             className="absolute top-0 left-0 right-0 h-20 opacity-30"
             style={{ background: `radial-gradient(ellipse at center top, ${teamColor}, transparent 70%)` }}
@@ -94,14 +93,14 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
           )}
           {/* Name plate */}
           <div className="relative z-10 w-full bg-card/90 backdrop-blur-sm py-2 px-3 text-center border-t border-border/30">
-            <div className="text-[11px] font-bold text-foreground">{unit.name}</div>
-            <div className="text-[7px] uppercase tracking-[0.2em] mt-0.5" style={{ color: teamColor }}>
+            <div className="text-[13px] font-bold text-foreground">{unit.name}</div>
+            <div className="text-[9px] uppercase tracking-[0.2em] mt-0.5" style={{ color: teamColor }}>
               {unit.unitClass} • {unit.team} TEAM
             </div>
             <div className="flex items-center justify-center gap-2 mt-1">
-              <span className="text-[6px] text-muted-foreground">LVL {unit.level}</span>
-              <span className="text-[6px] text-muted-foreground">•</span>
-              <span className="text-[6px] text-muted-foreground">💀 {unit.kills} KILLS</span>
+              <span className="text-[8px] text-muted-foreground">LVL {unit.level}</span>
+              <span className="text-[8px] text-muted-foreground">•</span>
+              <span className="text-[8px] text-muted-foreground">💀 {unit.kills} KILLS</span>
             </div>
           </div>
         </div>
@@ -118,14 +117,14 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
 
           {/* Stats Section */}
           <div className="p-4 border-b border-border/30">
-            <div className="text-[8px] text-muted-foreground tracking-[0.2em] mb-2">COMBAT STATS</div>
+            <div className="text-[10px] text-muted-foreground tracking-[0.2em] mb-2">COMBAT STATS</div>
             <div className="grid grid-cols-4 gap-2">
               {statRows.map(({ icon: Icon, label, value, color }) => (
                 <div key={label} className="bg-secondary/50 rounded-md px-2 py-1.5 flex items-center gap-1.5">
                   <Icon className="w-3 h-3 shrink-0" style={{ color }} />
                   <div>
-                    <div className="text-[6px] text-muted-foreground">{label}</div>
-                    <div className="text-[9px] font-bold text-foreground">{value}</div>
+                    <div className="text-[8px] text-muted-foreground">{label}</div>
+                    <div className="text-[11px] font-bold text-foreground">{value}</div>
                   </div>
                 </div>
               ))}
@@ -147,27 +146,27 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
             {/* Weapon */}
             <div className="mt-2 bg-secondary/30 rounded-md px-3 py-2 flex items-center justify-between">
               <div>
-                <div className="text-[6px] text-muted-foreground tracking-wider">EQUIPPED WEAPON</div>
-                <div className="text-[9px] font-bold text-foreground">{unit.weapon.icon} {unit.weapon.name}</div>
+                <div className="text-[8px] text-muted-foreground tracking-wider">EQUIPPED WEAPON</div>
+                <div className="text-[11px] font-bold text-foreground">{unit.weapon.icon} {unit.weapon.name}</div>
               </div>
               <div className="text-right">
-                <div className="text-[6px] text-muted-foreground">AMMO</div>
-                <div className="text-[9px] font-bold text-foreground">{unit.weapon.ammo === -1 ? '∞' : unit.weapon.ammo}</div>
+                <div className="text-[8px] text-muted-foreground">AMMO</div>
+                <div className="text-[11px] font-bold text-foreground">{unit.weapon.ammo === -1 ? '∞' : unit.weapon.ammo}</div>
               </div>
             </div>
 
             {/* Abilities */}
             {unit.abilities.length > 0 && (
               <div className="mt-2">
-                <div className="text-[6px] text-muted-foreground tracking-wider mb-1">ABILITIES</div>
+                <div className="text-[8px] text-muted-foreground tracking-wider mb-1">ABILITIES</div>
                 <div className="flex gap-1.5">
                   {unit.abilities.map(a => {
                     const cd = unit.cooldowns[a.id] || 0;
                     return (
                       <div key={a.id} className={`bg-secondary/40 rounded px-2 py-1 border border-border/20 ${cd > 0 ? 'opacity-40' : ''}`}>
-                        <div className="text-[8px] text-foreground">{a.icon} {a.name}</div>
-                        <div className="text-[5px] text-muted-foreground">{a.description}</div>
-                        {cd > 0 && <div className="text-[5px] text-destructive mt-0.5">CD: {cd}</div>}
+                        <div className="text-[10px] text-foreground">{a.icon} {a.name}</div>
+                        <div className="text-[7px] text-muted-foreground">{a.description}</div>
+                        {cd > 0 && <div className="text-[7px] text-destructive mt-0.5">CD: {cd}</div>}
                       </div>
                     );
                   })}
@@ -178,21 +177,21 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
             {/* Status effects */}
             <div className="flex gap-2 mt-2 flex-wrap">
               {unit.isHunkered && (
-                <span className="text-[7px] bg-accent/20 text-accent px-2 py-0.5 rounded">🛡 HUNKERED</span>
+                <span className="text-[9px] bg-accent/20 text-accent px-2 py-0.5 rounded">🛡 HUNKERED</span>
               )}
               {unit.isSuppressed && (
-                <span className="text-[7px] bg-destructive/20 text-destructive px-2 py-0.5 rounded">⛔ SUPPRESSED</span>
+                <span className="text-[9px] bg-destructive/20 text-destructive px-2 py-0.5 rounded">⛔ SUPPRESSED</span>
               )}
               {unit.coverType !== 'none' && (
-                <span className="text-[7px] bg-primary/20 text-primary px-2 py-0.5 rounded">
+                <span className="text-[9px] bg-primary/20 text-primary px-2 py-0.5 rounded">
                   {unit.coverType === 'full' ? '🛡 FULL COVER' : '◐ HALF COVER'}
                 </span>
               )}
               {unit.armor > 0 && (
-                <span className="text-[7px] bg-[#4488ff]/20 text-[#4488ff] px-2 py-0.5 rounded">🛡️ ARMOR +{unit.armor}</span>
+                <span className="text-[9px] bg-[#4488ff]/20 text-[#4488ff] px-2 py-0.5 rounded">🛡️ ARMOR +{unit.armor}</span>
               )}
               {!unit.isAlive && (
-                <span className="text-[7px] bg-destructive/20 text-destructive px-2 py-0.5 rounded">💀 KIA</span>
+                <span className="text-[9px] bg-destructive/20 text-destructive px-2 py-0.5 rounded">💀 KIA</span>
               )}
             </div>
           </div>
@@ -200,13 +199,13 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
           {/* Sponsor Section */}
           <div className="p-4 flex-1 overflow-y-auto">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-[8px] text-accent tracking-[0.2em] glow-accent">🎁 SPONSOR GIFTS</div>
+              <div className="text-[10px] text-accent tracking-[0.2em] glow-accent">🎁 SPONSOR GIFTS</div>
               <div className="flex items-center gap-1 bg-accent/10 border border-accent/30 rounded px-2 py-0.5">
-                <span className="text-[7px] text-accent font-bold">⭐ {sponsorPoints}</span>
-                <span className="text-[5px] text-muted-foreground">POINTS</span>
+                <span className="text-[9px] text-accent font-bold">⭐ {sponsorPoints}</span>
+                <span className="text-[7px] text-muted-foreground">POINTS</span>
               </div>
             </div>
-            <p className="text-[6px] text-muted-foreground mb-3">
+            <p className="text-[8px] text-muted-foreground mb-3">
               As a sponsor, send gifts to give this combatant an edge in battle.
             </p>
 
@@ -216,7 +215,7 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
               const catLabel = cat === 'intel' ? '🔍 INTELLIGENCE' : cat === 'weapon' ? '⚔️ WEAPONS' : '📦 SUPPLIES';
               return (
                 <div key={cat} className="mb-3">
-                  <div className="text-[6px] text-muted-foreground tracking-wider mb-1">{catLabel}</div>
+                  <div className="text-[8px] text-muted-foreground tracking-wider mb-1">{catLabel}</div>
                   <div className="grid grid-cols-2 gap-1.5">
                     {items.map(opt => {
                       const canAfford = sponsorPoints >= opt.cost;
@@ -231,10 +230,10 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-[8px] text-foreground">{opt.icon} {opt.name}</span>
-                            <span className="text-[6px] text-accent">⭐{opt.cost}</span>
+                            <span className="text-[10px] text-foreground">{opt.icon} {opt.name}</span>
+                            <span className="text-[8px] text-accent">⭐{opt.cost}</span>
                           </div>
-                          <div className="text-[5px] text-muted-foreground mt-0.5">{opt.description}</div>
+                          <div className="text-[7px] text-muted-foreground mt-0.5">{opt.description}</div>
                         </button>
                       );
                     })}

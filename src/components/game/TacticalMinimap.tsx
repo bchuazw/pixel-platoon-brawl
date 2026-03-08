@@ -148,14 +148,13 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
   return (
     <div className="pointer-events-auto absolute right-1 sm:right-2 top-12 sm:top-14 z-20 hidden sm:block">
       <div className="glass-panel rounded-lg overflow-hidden" style={{ width: collapsed ? 'auto' : MAP_SIZE + 12 }}>
-        {/* Header — always visible, clickable to collapse */}
         <button
           onClick={() => setCollapsed(v => !v)}
           className="w-full px-2 py-1 flex items-center justify-between hover:bg-white/5 transition-colors"
         >
           <div className="flex items-center gap-1.5">
             <Map className="w-3 h-3 text-muted-foreground/50" />
-            <span className="text-[7px] text-muted-foreground/50 tracking-[0.2em] font-display">TACTICAL MAP</span>
+            <span className="text-[9px] text-muted-foreground/50 tracking-[0.2em] font-display">TACTICAL MAP</span>
           </div>
           {collapsed ? (
             <ChevronDown className="w-3 h-3 text-muted-foreground/40" />
@@ -163,7 +162,6 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
             <ChevronUp className="w-3 h-3 text-muted-foreground/40" />
           )}
         </button>
-        {/* Canvas — hidden when collapsed */}
         {!collapsed && (
           <div className="p-1.5 pt-0">
             <canvas

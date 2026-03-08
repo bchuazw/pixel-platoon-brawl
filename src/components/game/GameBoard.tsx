@@ -261,6 +261,36 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <RotateCw className="w-4 h-4 text-primary" />
         <span className="text-[8px] tracking-wider">ROTATE ({ANGLE_LABELS[angleIndex]})</span>
       </button>
+
+      {/* Kill Cam Overlay */}
+      {state.killCam && (
+        <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+          {/* Letterbox bars */}
+          <div className="absolute top-0 left-0 right-0 h-16 bg-black/80" />
+          <div className="absolute bottom-0 left-0 right-0 h-16 bg-black/80" />
+          {/* Vignette */}
+          <div className="absolute inset-0" style={{
+            background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%)',
+          }} />
+          {/* Kill info */}
+          <div className="animate-fade-in flex flex-col items-center gap-2">
+            <div className="text-[10px] tracking-[0.3em] text-red-400/80 font-mono uppercase">
+              Eliminated
+            </div>
+            <div className="text-3xl font-black text-red-500 tracking-wider drop-shadow-[0_0_20px_rgba(255,0,0,0.5)]"
+              style={{ fontFamily: "'Share Tech Mono', monospace", textShadow: '0 0 30px rgba(255,50,50,0.6)' }}>
+              ☠ {state.killCam.victimName}
+            </div>
+            <div className="text-[9px] tracking-[0.2em] text-muted-foreground/70 font-mono">
+              by {state.killCam.killerName}
+            </div>
+          </div>
+          {/* Scan lines effect */}
+          <div className="absolute inset-0 opacity-10" style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)',
+          }} />
+        </div>
+      )}
     </div>
   );
 }

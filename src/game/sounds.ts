@@ -254,3 +254,38 @@ export function stopBgMusic() {
     bgInterval = null;
   }
 }
+
+// ── Victory Fanfare ──
+export function playVictoryFanfare() {
+  try {
+    const ctx = getAudioCtx();
+    // Triumphant ascending chord progression
+    const playChord = (freqs: number[], time: number, dur: number, vol: number) => {
+      freqs.forEach(freq => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + time);
+        gain.gain.setValueAtTime(0, ctx.currentTime + time);
+        gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + time + 0.05);
+        gain.gain.setValueAtTime(vol, ctx.currentTime + time + dur * 0.7);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + time);
+        osc.stop(ctx.currentTime + time + dur);
+      });
+    };
+    // Fanfare melody
+    playChord([523, 659, 784], 0, 0.4, 0.08);       // C major
+    playChord([587, 740, 880], 0.35, 0.4, 0.08);     // D major
+    playChord([659, 831, 988], 0.7, 0.4, 0.08);      // E major
+    playChord([698, 880, 1047], 1.05, 0.8, 0.1);     // F major (hold)
+    playChord([784, 988, 1175], 1.8, 1.2, 0.1);      // G major (resolve)
+    // Drum hits
+    playNoiseBuffer(0.15, 0.12);
+    setTimeout(() => playNoiseBuffer(0.15, 0.12), 350);
+    setTimeout(() => playNoiseBuffer(0.15, 0.12), 700);
+    setTimeout(() => playNoiseBuffer(0.25, 0.18), 1050);
+  } catch { /* ignore */ }
+}

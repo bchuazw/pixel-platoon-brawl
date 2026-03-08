@@ -97,6 +97,7 @@ const Index = () => {
         onUseAbility={handleUseAbility}
         onStartAutoPlay={startAutoPlay}
         onStopAutoPlay={stopAutoPlay}
+        onMainMenu={restart}
         sponsorPoints={sponsorPoints}
         onUnitInspect={inspectUnit}
       />

@@ -949,11 +949,13 @@ export function getAliveTeams(units: Unit[]): Team[] {
 
 // ══════════════════════════════════════════════
 // ── AI: Per-unit step (called once per unit) ──
+// phase: 'move' = movement + loot only, 'combat' = attack/abilities only
 // ══════════════════════════════════════════════
 export function runAiUnitStep(
   unitId: string,
-  state: GameState
-): { state: GameState; events: CombatEvent[] } {
+  state: GameState,
+  phase: 'move' | 'combat' = 'combat'
+): { state: GameState; events: CombatEvent[]; didMove: boolean } {
   const newState = {
     ...state,
     units: state.units.map(u => ({ ...u, weapon: { ...u.weapon } })),

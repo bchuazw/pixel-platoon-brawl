@@ -10,7 +10,7 @@ import { CombatVFX } from './CombatVFX';
 import { ScreenShake } from './ScreenShake';
 import { EmberParticles, LightShafts, GroundFog, DistantTrees } from './EnvironmentVFX';
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
 import { AutoFollowCamera } from './AutoFollowCamera';
 

@@ -1,6 +1,7 @@
-import { GameState, Unit, TEAM_COLORS, AbilityId, AP_MOVE_COST, AP_ATTACK_COST } from '@/game/types';
-import { useEffect, useRef } from 'react';
+import { GameState, Unit, TEAM_COLORS, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, GRID_SIZE } from '@/game/types';
+import { useEffect, useRef, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Swords, Shield, Heart, Crosshair } from 'lucide-react';
+import { isInZone } from '@/game/gameState';
 import bgTactical from '@/assets/bg-tactical.png';
 
 interface GameHUDProps {

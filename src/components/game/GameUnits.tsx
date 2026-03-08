@@ -603,7 +603,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <group ref={bodyRef}>
-        <SoldierBody teamColor={color} isMedic={isMedic} />
+        <SoldierBody teamColor={color} isMedic={isMedic} unitId={unit.id} />
 
         {/* ── LEFT ARM ── */}
         <group ref={leftArmRef} position={[-0.19, 0.48, 0]}>

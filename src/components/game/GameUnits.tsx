@@ -805,16 +805,10 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
 
       {/* ── Fog of war vision ring ── */}
       {unit.isAlive && (
-        <>
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[unit.visionRange - 0.06, unit.visionRange + 0.06, 48]} />
-            <meshBasicMaterial color={color} transparent opacity={0.1} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[unit.visionRange, 48]} />
-            <meshBasicMaterial color={color} transparent opacity={0.02} side={THREE.DoubleSide} />
-          </mesh>
-        </>
+        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[unit.visionRange - 0.06, unit.visionRange + 0.06, 24]} />
+          <meshBasicMaterial color={color} transparent opacity={0.08} side={THREE.DoubleSide} />
+        </mesh>
       )}
 
       {/* ── Overwatch range ── */}

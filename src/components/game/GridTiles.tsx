@@ -369,17 +369,55 @@ function PropObject({ tile }: { tile: TileData }) {
         </group>
       );
 
-    // Sandbag wall — waist-high cover (~0.4)
+    // Sandbag wall — waist-high cover (~0.4) with variations
     case 'sandbag': {
       const sbColor1 = h > 0.5 ? '#c0a060' : '#b89858';
       const sbColor2 = h > 0.3 ? '#c8a868' : '#baa058';
+      const sbColor3 = h > 0.7 ? '#b09050' : '#a88848';
+      const variant = Math.floor(h * 5); // 0-4 variants
       return (
         <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
-          {/* Bottom row */}
-          <mesh position={[-0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
-          <mesh position={[0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
-          {/* Top row — offset */}
-          <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.20]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+          {variant === 0 && (
+            <>
+              {/* Standard L-shape */}
+              <mesh position={[-0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+              <mesh position={[0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.20]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+            </>
+          )}
+          {variant === 1 && (
+            <>
+              {/* Staggered pile */}
+              <mesh position={[-0.12, 0.07, -0.08]} castShadow rotation={[0, 0.2, 0]}><boxGeometry args={[0.3, 0.12, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              <mesh position={[0.1, 0.07, 0.06]} castShadow rotation={[0, -0.15, 0]}><boxGeometry args={[0.26, 0.12, 0.2]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
+              <mesh position={[0, 0.19, -0.02]} castShadow rotation={[0, 0.1, 0]}><boxGeometry args={[0.24, 0.12, 0.18]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+            </>
+          )}
+          {variant === 2 && (
+            <>
+              {/* Single tall stack */}
+              <mesh position={[0, 0.07, 0]} castShadow><boxGeometry args={[0.32, 0.12, 0.24]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+              <mesh position={[0.02, 0.19, -0.01]} castShadow><boxGeometry args={[0.3, 0.12, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              <mesh position={[-0.01, 0.31, 0.01]} castShadow><boxGeometry args={[0.26, 0.12, 0.2]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
+            </>
+          )}
+          {variant === 3 && (
+            <>
+              {/* Corner / V-shape */}
+              <mesh position={[-0.15, 0.08, -0.1]} castShadow rotation={[0, 0.3, 0]}><boxGeometry args={[0.28, 0.14, 0.18]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+              <mesh position={[0.05, 0.08, 0.12]} castShadow rotation={[0, -0.4, 0]}><boxGeometry args={[0.28, 0.14, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              <mesh position={[-0.05, 0.22, 0]} castShadow><boxGeometry args={[0.22, 0.12, 0.16]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
+            </>
+          )}
+          {variant >= 4 && (
+            <>
+              {/* Scattered with one toppled */}
+              <mesh position={[-0.18, 0.07, 0]} castShadow><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+              <mesh position={[0.12, 0.07, 0.05]} castShadow><boxGeometry args={[0.26, 0.12, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              {/* Toppled bag */}
+              <mesh position={[0.2, 0.04, -0.14]} castShadow rotation={[0, 0.8, 0.4]}><boxGeometry args={[0.24, 0.1, 0.16]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
+            </>
+          )}
         </group>
       );
     }
@@ -926,31 +964,59 @@ function PropObject({ tile }: { tile: TileData }) {
   }
 }
 
-// ── Loot ──
+// ── Loot — Treasure Chests ──
 function LootObject({ tile }: { tile: TileData }) {
   const ref = useRef<THREE.Group>(null);
   const qElev = quantizeElevation(tile.elevation);
-  const baseY = qElev * 0.6 + SURFACE_H + 0.15;
+  const baseY = qElev * 0.6 + SURFACE_H + 0.01;
+  const h = tileHash(tile.x, tile.z, 999);
 
   useFrame(({ clock }) => {
     if (!ref.current || !tile.loot) return;
     const t = clock.getElapsedTime();
-    ref.current.position.y = baseY + Math.sin(t * 2.5 + tile.x * 0.7 + tile.z * 1.3) * 0.06;
-    ref.current.rotation.y = t * 1.2 + tile.x;
+    // Gentle hover bob
+    ref.current.position.y = baseY + Math.sin(t * 1.8 + tile.x * 0.7 + tile.z * 1.3) * 0.02;
   });
 
   if (!tile.loot) return null;
   const color = tile.loot.type === 'weapon' ? '#ffaa22' : tile.loot.type === 'medkit' ? '#ff3366' :
                 tile.loot.type === 'armor' ? '#3388ff' : tile.loot.type === 'killstreak' ? '#bb44ff' : '#66cc33';
+  const woodColor = h > 0.5 ? '#5a3a1a' : '#4a3018';
+  const metalColor = h > 0.5 ? '#8a7a40' : '#7a6a30';
 
   return (
-    <group ref={ref} position={[tile.x, baseY, tile.z]}>
-      <mesh>
-        <boxGeometry args={[0.2, 0.2, 0.2]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} roughness={0.3} metalness={0.2} />
+    <group ref={ref} position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+      {/* Chest body */}
+      <mesh position={[0, 0.08, 0]} castShadow>
+        <boxGeometry args={[0.28, 0.16, 0.2]} />
+        <meshStandardMaterial color={woodColor} roughness={0.85} />
       </mesh>
-      <pointLight color={color} intensity={0.6} distance={2} />
-      <Billboard position={[0, 0.28, 0]}>
+      {/* Chest lid (rounded top) */}
+      <mesh position={[0, 0.18, 0]} castShadow>
+        <boxGeometry args={[0.3, 0.06, 0.22]} />
+        <meshStandardMaterial color={woodColor} roughness={0.8} />
+      </mesh>
+      {/* Metal bands */}
+      <mesh position={[0, 0.08, 0.101]}>
+        <boxGeometry args={[0.3, 0.04, 0.005]} />
+        <meshStandardMaterial color={metalColor} metalness={0.6} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.08, -0.101]}>
+        <boxGeometry args={[0.3, 0.04, 0.005]} />
+        <meshStandardMaterial color={metalColor} metalness={0.6} roughness={0.3} />
+      </mesh>
+      {/* Lock / clasp */}
+      <mesh position={[0, 0.14, 0.11]}>
+        <boxGeometry args={[0.04, 0.06, 0.02]} />
+        <meshStandardMaterial color={metalColor} metalness={0.7} roughness={0.25} />
+      </mesh>
+      {/* Colored glow indicator */}
+      <mesh position={[0, 0.22, 0]}>
+        <sphereGeometry args={[0.04, 6, 6]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} transparent opacity={0.8} />
+      </mesh>
+      <pointLight color={color} intensity={0.4} distance={1.5} position={[0, 0.25, 0]} />
+      <Billboard position={[0, 0.35, 0]}>
         <Text fontSize={0.07} color={color} anchorX="center" anchorY="middle" font={undefined} outlineWidth={0.012} outlineColor="#000000">
           {tile.loot.icon} {tile.loot.name}
         </Text>

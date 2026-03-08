@@ -1,6 +1,7 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import { GameState, TEAM_COLORS, GRID_SIZE, Team } from '@/game/types';
 import { isInZone } from '@/game/gameState';
+import { ChevronDown, ChevronUp, Map } from 'lucide-react';
 
 interface TacticalMinimapProps {
   state: GameState;
@@ -12,6 +13,7 @@ const CELL = MAP_SIZE / GRID_SIZE;
 
 export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const lootPositions = useMemo(() => {
     const positions: { x: number; z: number }[] = [];
@@ -25,7 +27,7 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || collapsed) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -35,116 +37,88 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
     ctx.scale(dpr, dpr);
 
     // Background
-    ctx.fillStyle = 'rgba(8, 12, 18, 0.95)';
+    ctx.fillStyle = 'rgba(8, 12, 18, 0.92)';
     ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
 
-    // Terrain hint
+    // Grid terrain
     for (let x = 0; x < GRID_SIZE; x++) {
       for (let z = 0; z < GRID_SIZE; z++) {
         const tile = state.grid[x]?.[z];
         if (!tile) continue;
         const px = x * CELL;
         const pz = z * CELL;
-        
-        if (tile.type === 'water') {
-          ctx.fillStyle = 'rgba(56, 136, 187, 0.3)';
+
+        const inZone = isInZone(x, z, state.shrinkLevel);
+        let tileColor = 'rgba(30, 40, 30, 0.4)';
+        if (tile.type === 'water' || tile.type === 'shallow_water') tileColor = 'rgba(50, 100, 140, 0.5)';
+        else if (tile.type === 'stone' || tile.type === 'wall' || tile.type === 'cobblestone') tileColor = 'rgba(80, 80, 90, 0.5)';
+        else if (tile.type === 'sand' || tile.type === 'beach_sand') tileColor = 'rgba(180, 160, 100, 0.3)';
+        else if (tile.type === 'dirt' || tile.type === 'mud') tileColor = 'rgba(120, 90, 50, 0.4)';
+
+        ctx.fillStyle = tileColor;
+        ctx.fillRect(px, pz, CELL, CELL);
+
+        if (!inZone) {
+          ctx.fillStyle = 'rgba(180, 40, 40, 0.2)';
           ctx.fillRect(px, pz, CELL, CELL);
-        } else if (tile.prop) {
-          ctx.fillStyle = 'rgba(100, 100, 100, 0.2)';
-          ctx.fillRect(px, pz, CELL, CELL);
-        } else if (tile.type === 'dirt' || tile.type === 'sand') {
-          ctx.fillStyle = 'rgba(176, 138, 88, 0.1)';
-          ctx.fillRect(px, pz, CELL, CELL);
+        }
+
+        if (tile.prop && tile.isBlocked) {
+          ctx.fillStyle = 'rgba(60, 60, 60, 0.6)';
+          ctx.fillRect(px + 1, pz + 1, CELL - 2, CELL - 2);
         }
       }
     }
 
-    // Zone boundary
-    if (state.shrinkLevel > 0) {
-      const margin = state.shrinkLevel * 2;
-      const zx = margin * CELL;
-      const zy = margin * CELL;
-      const zw = (GRID_SIZE - margin * 2) * CELL;
-      const zh = (GRID_SIZE - margin * 2) * CELL;
-      
-      // Red zone outside
-      ctx.fillStyle = 'rgba(204, 34, 34, 0.15)';
-      ctx.fillRect(0, 0, MAP_SIZE, zy);
-      ctx.fillRect(0, zy + zh, MAP_SIZE, MAP_SIZE - zy - zh);
-      ctx.fillRect(0, zy, zx, zh);
-      ctx.fillRect(zx + zw, zy, MAP_SIZE - zx - zw, zh);
-      
-      ctx.strokeStyle = 'rgba(255, 50, 50, 0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(zx, zy, zw, zh);
+    // Zone border
+    ctx.strokeStyle = 'rgba(255, 60, 60, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const inZ = isInZone(x, z, state.shrinkLevel);
+        if (!inZ) continue;
+        const px = x * CELL;
+        const pz = z * CELL;
+        if (!isInZone(x - 1, z, state.shrinkLevel)) { ctx.beginPath(); ctx.moveTo(px, pz); ctx.lineTo(px, pz + CELL); ctx.stroke(); }
+        if (!isInZone(x + 1, z, state.shrinkLevel)) { ctx.beginPath(); ctx.moveTo(px + CELL, pz); ctx.lineTo(px + CELL, pz + CELL); ctx.stroke(); }
+        if (!isInZone(x, z - 1, state.shrinkLevel)) { ctx.beginPath(); ctx.moveTo(px, pz); ctx.lineTo(px + CELL, pz); ctx.stroke(); }
+        if (!isInZone(x, z + 1, state.shrinkLevel)) { ctx.beginPath(); ctx.moveTo(px, pz + CELL); ctx.lineTo(px + CELL, pz + CELL); ctx.stroke(); }
+      }
     }
+    ctx.setLineDash([]);
 
-    // Loot dots
-    for (const loot of lootPositions) {
+    // Loot markers
+    for (const pos of lootPositions) {
+      const cx = pos.x * CELL + CELL / 2;
+      const cz = pos.z * CELL + CELL / 2;
       ctx.fillStyle = 'rgba(255, 204, 68, 0.7)';
       ctx.beginPath();
-      ctx.arc(loot.x * CELL + CELL / 2, loot.z * CELL + CELL / 2, 1.8, 0, Math.PI * 2);
+      ctx.arc(cx, cz, 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Airdrop markers
-    for (const drop of state.airdrops || []) {
-      if (drop.phase !== 'landed') continue;
-      ctx.fillStyle = 'rgba(255, 170, 0, 0.9)';
-      ctx.beginPath();
-      ctx.arc(drop.targetPos.x * CELL + CELL / 2, drop.targetPos.z * CELL + CELL / 2, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 170, 0, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-
-    // Weapon range overlay for inspected unit
-    const inspected = inspectedUnitId ? state.units.find(u => u.id === inspectedUnitId) : null;
-    if (inspected && inspected.isAlive) {
-      const range = inspected.attackRange;
-      ctx.fillStyle = `${TEAM_COLORS[inspected.team]}15`;
-      ctx.strokeStyle = `${TEAM_COLORS[inspected.team]}40`;
-      ctx.lineWidth = 0.5;
-      for (let x = 0; x < GRID_SIZE; x++) {
-        for (let z = 0; z < GRID_SIZE; z++) {
-          const dist = Math.abs(x - inspected.position.x) + Math.abs(z - inspected.position.z);
-          if (dist > 0 && dist <= range) {
-            ctx.fillRect(x * CELL, z * CELL, CELL, CELL);
-          }
-        }
+    // Airdrops
+    for (const drop of state.airdrops) {
+      if (drop.phase === 'landed') {
+        const cx = drop.targetPos.x * CELL + CELL / 2;
+        const cz = drop.targetPos.z * CELL + CELL / 2;
+        ctx.fillStyle = 'rgba(255, 170, 0, 0.8)';
+        ctx.fillRect(cx - 3, cz - 3, 6, 6);
       }
     }
 
-    // Units (draw dead ones faded, alive ones solid)
+    // Units
     for (const unit of state.units) {
+      if (!unit.isAlive) continue;
       const cx = unit.position.x * CELL + CELL / 2;
       const cz = unit.position.z * CELL + CELL / 2;
       const color = TEAM_COLORS[unit.team];
-      
-      if (!unit.isAlive) {
-        ctx.fillStyle = color + '30';
-        ctx.beginPath();
-        ctx.arc(cx, cz, 2, 0, Math.PI * 2);
-        ctx.fill();
-        // X mark
-        ctx.strokeStyle = color + '40';
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(cx - 1.5, cz - 1.5);
-        ctx.lineTo(cx + 1.5, cz + 1.5);
-        ctx.moveTo(cx + 1.5, cz - 1.5);
-        ctx.lineTo(cx - 1.5, cz + 1.5);
-        ctx.stroke();
-        continue;
-      }
 
-      // Alive unit
       const isActive = unit.id === state.selectedUnitId;
       const isInspected = unit.id === inspectedUnitId;
       const radius = unit.unitClass === 'soldier' ? 3.5 : 3;
 
-      // Selection/inspection ring
       if (isActive || isInspected) {
         ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
@@ -153,13 +127,11 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
         ctx.stroke();
       }
 
-      // Unit dot
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(cx, cz, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Medic cross
       if (unit.unitClass === 'medic') {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(cx - 1.2, cz - 0.4, 2.4, 0.8);
@@ -167,30 +139,40 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
       }
     }
 
-    // Border
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
     ctx.strokeRect(0.5, 0.5, MAP_SIZE - 1, MAP_SIZE - 1);
 
-  }, [state.units, state.shrinkLevel, state.selectedUnitId, state.grid, lootPositions, state.airdrops, inspectedUnitId]);
+  }, [state.units, state.shrinkLevel, state.selectedUnitId, state.grid, lootPositions, state.airdrops, inspectedUnitId, collapsed]);
 
   return (
-    <div className="pointer-events-auto absolute bottom-20 left-60 z-20">
-      <div className="glass-panel rounded-lg p-1.5 relative">
-        <div className="absolute top-0 left-0 right-0 px-2 py-1 flex items-center justify-between z-10">
-          <span className="text-[7px] text-muted-foreground/50 tracking-[0.2em] font-display">TACTICAL MAP</span>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-0.5">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'rgba(255, 204, 68, 0.7)' }} />
-              <span className="text-[6px] text-muted-foreground/40">LOOT</span>
-            </span>
+    <div className="pointer-events-auto absolute right-1 sm:right-2 top-12 sm:top-14 z-20 hidden sm:block">
+      <div className="glass-panel rounded-lg overflow-hidden" style={{ width: collapsed ? 'auto' : MAP_SIZE + 12 }}>
+        {/* Header — always visible, clickable to collapse */}
+        <button
+          onClick={() => setCollapsed(v => !v)}
+          className="w-full px-2 py-1 flex items-center justify-between hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-1.5">
+            <Map className="w-3 h-3 text-muted-foreground/50" />
+            <span className="text-[7px] text-muted-foreground/50 tracking-[0.2em] font-display">TACTICAL MAP</span>
           </div>
-        </div>
-        <canvas
-          ref={canvasRef}
-          style={{ width: MAP_SIZE, height: MAP_SIZE }}
-          className="rounded-sm"
-        />
+          {collapsed ? (
+            <ChevronDown className="w-3 h-3 text-muted-foreground/40" />
+          ) : (
+            <ChevronUp className="w-3 h-3 text-muted-foreground/40" />
+          )}
+        </button>
+        {/* Canvas — hidden when collapsed */}
+        {!collapsed && (
+          <div className="p-1.5 pt-0">
+            <canvas
+              ref={canvasRef}
+              style={{ width: MAP_SIZE, height: MAP_SIZE }}
+              className="rounded-sm"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -577,7 +577,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
           </Billboard>
         )}
 
-        <CoverShield coverType={unit.coverType} />
+        <CoverProp coverType={unit.coverType} />
         <StatusIcons unit={unit} />
 
         {/* Selection ring */}

@@ -479,7 +479,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Concertina wire — ankle-shin height
     case 'wire':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Posts */}
           <mesh position={[-0.32, 0.12, 0]}>
             <cylinderGeometry args={[0.015, 0.015, 0.24, 4]} />

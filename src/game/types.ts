@@ -103,7 +103,8 @@ export interface Unit {
 
 export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand' | 'trench' | 'crater';
 export type PropType = 'crate' | 'barrel' | 'sandbag' | 'rock' | 'bush' | 'tree' | 'ruins'
-  | 'wire' | 'jersey_barrier' | 'burnt_vehicle' | 'foxhole' | 'hesco' | 'tank_trap' | null;
+  | 'wire' | 'jersey_barrier' | 'burnt_vehicle' | 'foxhole' | 'hesco' | 'tank_trap'
+  | 'broken_wall' | 'wrecked_car' | 'rubble_pile' | null;
 
 export interface TileData {
   x: number;

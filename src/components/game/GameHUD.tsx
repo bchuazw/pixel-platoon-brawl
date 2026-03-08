@@ -258,7 +258,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
                 <Play className="w-5 h-5" />
                 START BATTLE
               </button>
-              <p className="text-[7px] text-muted-foreground">AI controls all teams • Fog of War active • Find weapons to win!</p>
+              <p className="text-[7px] text-muted-foreground">AI commands each squad • Fog of War active • Medics heal allies!</p>
             </div>
           </div>
         </div>

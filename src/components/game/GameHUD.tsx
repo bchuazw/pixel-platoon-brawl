@@ -1,6 +1,6 @@
 import { GameState, Unit, TEAM_COLORS, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, GRID_SIZE, VISION_RANGE, Team } from '@/game/types';
 import { useEffect, useRef, useMemo, useState } from 'react';
-import { Play, Pause, RotateCcw, Swords, Heart, Shield, Crosshair, Eye, Home, Trophy, Zap, Target } from 'lucide-react';
+import { Play, Pause, RotateCcw, Swords, Heart, Shield, Crosshair, Eye, Home, Trophy, Zap, Target, Activity } from 'lucide-react';
 import { isInZone } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import { PreGameScreen } from './PreGameScreen';
@@ -21,6 +21,10 @@ const PORTRAITS: Record<string, string> = {
   'green-medic': portraitMedicGreen, 'yellow-medic': portraitMedicYellow,
 };
 
+const TEAM_NAMES: Record<Team, string> = {
+  blue: 'AZURE', red: 'CRIMSON', green: 'JADE', yellow: 'GOLD',
+};
+
 interface GameHUDProps {
   state: GameState;
   onEndTurn: () => void;
@@ -34,7 +38,7 @@ interface GameHUDProps {
   onUnitInspect?: (unitId: string) => void;
 }
 
-/* ── Unit Card (compact) ── */
+/* ── Compact Unit Card ── */
 function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; onClick?: () => void }) {
   const hpPct = (unit.hp / unit.maxHp) * 100;
   const tc = TEAM_COLORS[unit.team];
@@ -43,18 +47,18 @@ function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; 
   return (
     <div
       onClick={onClick}
-      className={`relative flex items-center gap-2 px-2 py-1.5 rounded border transition-all ${onClick ? 'cursor-pointer' : ''} ${
+      className={`relative flex items-center gap-1.5 px-1.5 py-1 rounded border transition-all ${onClick ? 'cursor-pointer hover:brightness-110' : ''} ${
         isActive
-          ? 'bg-secondary/60 border-primary/30'
-          : 'bg-card/30 border-border/10 hover:bg-secondary/30'
-      } ${!unit.isAlive ? 'opacity-10 grayscale pointer-events-none' : ''}`}
+          ? 'bg-secondary/60 border-primary/25'
+          : 'bg-card/20 border-border/8 hover:bg-secondary/20'
+      } ${!unit.isAlive ? 'opacity-8 grayscale pointer-events-none' : ''}`}
     >
       {/* Portrait */}
-      <div className="w-8 h-8 rounded overflow-hidden shrink-0 relative border" style={{ borderColor: tc + '30' }}>
+      <div className="w-7 h-7 rounded overflow-hidden shrink-0 relative" style={{ border: `1px solid ${tc}30` }}>
         {portrait ? (
           <img src={portrait} alt={unit.name} className="w-full h-full object-cover object-top" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[10px]" style={{ backgroundColor: tc + '15', color: tc }}>
+          <div className="w-full h-full flex items-center justify-center text-[8px]" style={{ backgroundColor: tc + '12', color: tc }}>
             {unit.unitClass === 'medic' ? '✚' : '⚔'}
           </div>
         )}
@@ -64,11 +68,14 @@ function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <span className="text-[9px] text-foreground font-bold truncate">{unit.name}</span>
-          {unit.kills > 0 && <span className="text-[7px] text-destructive font-bold ml-1">×{unit.kills}</span>}
+          <span className="text-[8px] text-foreground font-bold truncate leading-none">{unit.name}</span>
+          <div className="flex items-center gap-0.5">
+            {unit.kills > 0 && <span className="text-[6px] text-destructive font-bold">×{unit.kills}</span>}
+            <span className="text-[6px] text-muted-foreground/50">{unit.weapon.icon}</span>
+          </div>
         </div>
         {/* HP bar */}
-        <div className="mt-0.5 h-[3px] bg-muted/40 rounded-full overflow-hidden">
+        <div className="mt-0.5 h-[2px] bg-muted/30 rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -77,10 +84,14 @@ function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; 
             }}
           />
         </div>
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="text-[7px] text-muted-foreground font-mono">{unit.hp}/{unit.maxHp}</span>
-          <span className="text-[6px] text-muted-foreground/60">{unit.weapon.icon}</span>
+        <div className="flex items-center gap-1 mt-px">
+          <span className="text-[6px] text-muted-foreground/60 font-mono">{unit.hp}/{unit.maxHp}</span>
           {unit.isOnOverwatch && <span className="text-[6px] text-[#4488ff]">◉</span>}
+          {unit.coverType !== 'none' && (
+            <span className={`text-[6px] ${unit.coverType === 'full' ? 'text-[#4488ff]' : 'text-accent/60'}`}>
+              {unit.coverType === 'full' ? '▣' : '▤'}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -92,29 +103,32 @@ function TeamRoster({ state, onUnitInspect }: { state: GameState; onUnitInspect?
   const teams = (['blue', 'red', 'green', 'yellow'] as const);
 
   return (
-    <div className="pointer-events-auto absolute left-0 top-12 bottom-0 w-48 glass-panel-dark border-r border-border/15 flex flex-col overflow-hidden">
-      <div className="px-3 py-2 border-b border-border/15">
-        <span className="text-[7px] text-muted-foreground tracking-[0.25em] font-bold">TEAM ROSTER</span>
+    <div className="pointer-events-auto absolute left-0 top-10 bottom-0 w-44 flex flex-col overflow-hidden"
+      style={{
+        background: 'linear-gradient(90deg, rgba(10,14,20,0.92) 0%, rgba(10,14,20,0.85) 80%, rgba(10,14,20,0) 100%)',
+      }}>
+      <div className="px-2.5 py-1.5 border-b border-border/10">
+        <span className="text-[6px] text-muted-foreground/60 tracking-[0.3em] font-bold">ROSTER</span>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 py-1.5 space-y-2">
+      <div className="flex-1 overflow-y-auto px-1.5 py-1 space-y-1.5">
         {teams.map(team => {
           const teamUnits = state.units.filter(u => u.team === team);
           const alive = teamUnits.filter(u => u.isAlive).length;
+          const totalKills = teamUnits.reduce((s, u) => s + u.kills, 0);
 
           return (
-            <div key={team} className={alive === 0 ? 'opacity-20' : ''}>
-              <div className="flex items-center gap-1.5 px-1 mb-1">
+            <div key={team} className={alive === 0 ? 'opacity-15' : ''}>
+              <div className="flex items-center gap-1 px-0.5 mb-0.5">
                 <div className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team] }} />
-                <span className="text-[7px] font-bold tracking-[0.12em] uppercase" style={{ color: TEAM_COLORS[team] }}>
-                  {team}
+                <span className="text-[6px] font-bold tracking-[0.1em]" style={{ color: TEAM_COLORS[team] }}>
+                  {TEAM_NAMES[team]}
                 </span>
-                <span className="text-[6px] text-muted-foreground ml-auto">{alive}/{teamUnits.length}</span>
+                <span className="text-[5px] text-muted-foreground/40 ml-auto">{alive}/{teamUnits.length}</span>
+                {totalKills > 0 && <span className="text-[5px] text-destructive/50">☠{totalKills}</span>}
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-px">
                 {teamUnits.map(u => (
-                  <UnitCard
-                    key={u.id}
-                    unit={u}
+                  <UnitCard key={u.id} unit={u}
                     isActive={u.id === state.selectedUnitId || (state.autoPlay && u.team === state.currentTeam && u.isAlive)}
                     onClick={() => onUnitInspect?.(u.id)}
                   />
@@ -129,7 +143,7 @@ function TeamRoster({ state, onUnitInspect }: { state: GameState; onUnitInspect?
 }
 
 /* ── Right Sidebar: Combat Feed ── */
-function CombatFeed({ log }: { log: string[] }) {
+function CombatFeed({ log, events }: { log: string[]; events: any[] }) {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -137,112 +151,35 @@ function CombatFeed({ log }: { log: string[] }) {
   }, [log]);
 
   const getLogStyle = (msg: string) => {
-    if (msg.includes('═')) return 'text-border/30 text-[5px]';
+    if (msg.includes('═')) return 'text-border/20 text-[4px]';
     if (msg.includes('ELIMINATED') || msg.includes('killed')) return 'text-destructive font-bold';
-    if (msg.includes('WINS')) return 'text-accent glow-accent font-bold text-[9px]';
-    if (msg.includes('CRITICAL')) return 'text-destructive font-bold';
+    if (msg.includes('WINS')) return 'text-accent glow-accent font-bold text-[8px]';
+    if (msg.includes('CRITICAL')) return 'text-[#ffaa00] font-bold';
     if (msg.includes('ZONE') || msg.includes('DANGER')) return 'text-destructive';
-    if (msg.includes('MISSED')) return 'text-muted-foreground/30 italic';
+    if (msg.includes('MISSED')) return 'text-muted-foreground/25 italic';
     if (msg.includes('heals') || msg.includes('💊')) return 'text-primary';
     if (msg.includes('OVERWATCH')) return 'text-[#44aaff]';
-    if (msg.includes('picks up') || msg.includes('equips')) return 'text-accent';
-    if (msg.includes('»')) return 'text-foreground/80';
-    return 'text-muted-foreground/60';
-  };
-
-  const getLogIcon = (msg: string) => {
-    if (msg.includes('ELIMINATED') || msg.includes('killed')) return '☠';
-    if (msg.includes('CRITICAL')) return '!';
-    if (msg.includes('ZONE') || msg.includes('DANGER')) return '⚠';
-    if (msg.includes('MISSED')) return '○';
-    if (msg.includes('heals') || msg.includes('💊')) return '+';
-    if (msg.includes('OVERWATCH')) return '◉';
-    if (msg.includes('picks up') || msg.includes('equips')) return '▸';
-    if (msg.includes('»') || msg.includes('hits') || msg.includes('shoots')) return '›';
-    if (msg.includes('═')) return '';
-    return '·';
+    if (msg.includes('picks up') || msg.includes('equips')) return 'text-accent/80';
+    if (msg.includes('»')) return 'text-foreground/70';
+    return 'text-muted-foreground/50';
   };
 
   return (
-    <div className="pointer-events-auto absolute right-0 top-12 bottom-0 w-56 glass-panel-dark border-l border-border/15 flex flex-col overflow-hidden">
-      <div className="px-3 py-2 border-b border-border/15 flex items-center gap-2">
-        <div className="w-1.5 h-1.5 rounded-full bg-destructive/50 animate-pulse" />
-        <span className="text-[7px] text-muted-foreground tracking-[0.25em] font-bold">COMBAT FEED</span>
+    <div className="pointer-events-auto absolute right-0 top-10 bottom-0 w-52 flex flex-col overflow-hidden"
+      style={{
+        background: 'linear-gradient(270deg, rgba(10,14,20,0.92) 0%, rgba(10,14,20,0.85) 80%, rgba(10,14,20,0) 100%)',
+      }}>
+      <div className="px-2.5 py-1.5 border-b border-border/10 flex items-center gap-1.5">
+        <div className="w-1 h-1 rounded-full bg-destructive/50 animate-pulse" />
+        <span className="text-[6px] text-muted-foreground/60 tracking-[0.3em] font-bold">LIVE FEED</span>
       </div>
-      <div ref={logRef} className="flex-1 overflow-y-auto px-2.5 py-1.5 font-mono space-y-px">
-        {log.slice(-40).map((msg, i) => {
-          const icon = getLogIcon(msg);
-          return (
-            <div key={i} className={`text-[7px] leading-relaxed flex items-start gap-1 ${getLogStyle(msg)}`}>
-              {icon && <span className="shrink-0 w-2.5 text-center opacity-50">{icon}</span>}
-              <span className="break-words">{msg}</span>
-            </div>
-          );
-        })}
+      <div ref={logRef} className="flex-1 overflow-y-auto px-2 py-1 space-y-px">
+        {log.slice(-50).map((msg, i) => (
+          <div key={i} className={`text-[6px] leading-relaxed ${getLogStyle(msg)}`}>
+            {msg}
+          </div>
+        ))}
       </div>
-    </div>
-  );
-}
-
-/* ── Minimap (small, bottom-right) ── */
-const MINIMAP_SIZE = 120;
-const CELL = MINIMAP_SIZE / GRID_SIZE;
-
-function Minimap({ state }: { state: GameState }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
-    ctx.fillStyle = '#0c1018';
-    ctx.fillRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
-
-    for (let x = 0; x < GRID_SIZE; x++) {
-      for (let z = 0; z < GRID_SIZE; z++) {
-        const tile = state.grid[x][z];
-        const outOfZone = state.shrinkLevel > 0 && !isInZone(x, z, state.shrinkLevel);
-        const colors: Record<string, string> = {
-          grass: '#2a3a1e', dirt: '#4a3d2a', stone: '#3a3a40',
-          water: '#1a3050', sand: '#6a5d3a', wall: '#2a2a30',
-        };
-        ctx.fillStyle = outOfZone ? '#1a0e0e' : (colors[tile.type] || '#2a3a1e');
-        ctx.fillRect(x * CELL, z * CELL, CELL + 0.5, CELL + 0.5);
-      }
-    }
-
-    // Zone border
-    if (state.shrinkLevel > 0) {
-      const margin = state.shrinkLevel * 2;
-      ctx.strokeStyle = '#ff4444';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(margin * CELL, margin * CELL, (GRID_SIZE - margin * 2) * CELL, (GRID_SIZE - margin * 2) * CELL);
-    }
-
-    // Units
-    for (const unit of state.units) {
-      if (!unit.isAlive) continue;
-      const cx = unit.position.x * CELL + CELL / 2;
-      const cz = unit.position.z * CELL + CELL / 2;
-      ctx.fillStyle = TEAM_COLORS[unit.team];
-      ctx.beginPath();
-      ctx.arc(cx, cz, Math.max(CELL * 0.6, 1.5), 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }, [state.units, state.grid, state.shrinkLevel]);
-
-  return (
-    <div className="pointer-events-auto absolute right-60 bottom-4 glass-panel rounded p-1.5">
-      <canvas
-        ref={canvasRef}
-        width={MINIMAP_SIZE}
-        height={MINIMAP_SIZE}
-        className="rounded"
-        style={{ width: MINIMAP_SIZE, height: MINIMAP_SIZE, imageRendering: 'pixelated' }}
-      />
     </div>
   );
 }
@@ -252,7 +189,7 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
   const [show, setShow] = useState(false);
   const [showStats, setShowStats] = useState(false);
 
-  const winnerLine = state.log.find(l => l.includes('WINS'))?.replace('🏆 ', '') || 'BATTLE COMPLETE';
+  const winnerLine = state.log.find(l => l.includes('WINS'))?.replace('🏆 ', '') || '';
   const winningTeam = (['blue', 'red', 'green', 'yellow'] as const).find(t =>
     state.units.some(u => u.team === t && u.isAlive)
   );
@@ -260,68 +197,63 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
   const mvp = [...state.units].sort((a, b) => b.kills - a.kills)[0];
   const mvpPortrait = mvp ? (PORTRAITS[mvp.id] || PORTRAITS[`${mvp.team}-${mvp.unitClass}`]) : null;
   const totalKills = state.units.reduce((s, u) => s + u.kills, 0);
-  const survivors = state.units.filter(u => u.isAlive);
 
   useEffect(() => {
     playVictoryFanfare();
     setTimeout(() => setShow(true), 200);
-    setTimeout(() => setShowStats(true), 1000);
+    setTimeout(() => setShowStats(true), 900);
   }, []);
 
   return (
     <div className="absolute inset-0 z-40 pointer-events-auto">
-      <div className="absolute inset-0 bg-background/92 backdrop-blur-lg transition-opacity duration-1000" style={{ opacity: show ? 1 : 0 }} />
+      <div className="absolute inset-0 bg-background/94 backdrop-blur-xl transition-opacity duration-1000" style={{ opacity: show ? 1 : 0 }} />
 
-      {/* Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full transition-all duration-[2s]"
-        style={{ background: `radial-gradient(circle, ${winnerColor}12 0%, transparent 70%)`, opacity: show ? 1 : 0 }}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full transition-all duration-[2s]"
+        style={{ background: `radial-gradient(circle, ${winnerColor}10 0%, transparent 70%)`, opacity: show ? 1 : 0 }}
       />
 
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
-        <div className="text-center transition-all duration-700" style={{ opacity: show ? 1 : 0, transform: `translateY(${show ? 0 : 30}px)` }}>
-          <h1 className="text-3xl font-display font-black tracking-[0.5em]"
-            style={{ color: winnerColor, textShadow: `0 0 30px ${winnerColor}66` }}>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+        <div className="text-center transition-all duration-700" style={{ opacity: show ? 1 : 0, transform: `translateY(${show ? 0 : 20}px)` }}>
+          <h1 className="text-2xl font-display font-black tracking-[0.6em]"
+            style={{ color: winnerColor, textShadow: `0 0 20px ${winnerColor}44` }}>
             VICTORY
           </h1>
-          <p className="text-[10px] text-foreground/60 tracking-[0.15em] mt-2">{winnerLine}</p>
+          <p className="text-[9px] text-foreground/50 tracking-[0.12em] mt-1.5">{winnerLine}</p>
         </div>
 
-        <div className="flex gap-4 transition-all duration-700" style={{ opacity: showStats ? 1 : 0, transform: `translateY(${showStats ? 0 : 20}px)` }}>
-          {/* MVP */}
+        <div className="flex gap-3 transition-all duration-700" style={{ opacity: showStats ? 1 : 0, transform: `translateY(${showStats ? 0 : 15}px)` }}>
           {mvp && (
-            <div className="glass-panel rounded-lg p-4 text-center min-w-[140px]">
-              <div className="text-[7px] text-accent tracking-[0.3em] mb-2">MVP</div>
+            <div className="glass-panel rounded-lg p-3 text-center min-w-[120px]">
+              <div className="text-[6px] text-accent tracking-[0.3em] mb-1.5">MVP</div>
               {mvpPortrait && (
-                <div className="w-14 h-14 rounded-lg overflow-hidden mx-auto mb-2 border" style={{ borderColor: TEAM_COLORS[mvp.team] + '40' }}>
+                <div className="w-12 h-12 rounded overflow-hidden mx-auto mb-1.5 border" style={{ borderColor: TEAM_COLORS[mvp.team] + '30' }}>
                   <img src={mvpPortrait} alt={mvp.name} className="w-full h-full object-cover object-top" />
                 </div>
               )}
-              <div className="text-xs font-bold text-foreground">{mvp.name}</div>
-              <div className="text-xl font-bold text-accent mt-1">{mvp.kills}</div>
-              <div className="text-[7px] text-muted-foreground">KILLS</div>
+              <div className="text-[10px] font-bold text-foreground">{mvp.name}</div>
+              <div className="text-lg font-bold text-accent mt-0.5">{mvp.kills}</div>
+              <div className="text-[6px] text-muted-foreground">KILLS</div>
             </div>
           )}
 
-          {/* Stats */}
-          <div className="glass-panel rounded-lg p-4 text-center min-w-[110px]">
-            <div className="text-[7px] text-muted-foreground tracking-[0.3em] mb-2">STATS</div>
-            <div className="space-y-2">
-              <div><div className="text-lg font-bold text-foreground font-mono">{state.turn}</div><div className="text-[7px] text-muted-foreground">TURNS</div></div>
-              <div><div className="text-lg font-bold text-destructive font-mono">{totalKills}</div><div className="text-[7px] text-muted-foreground">KILLS</div></div>
-              <div><div className="text-lg font-bold text-primary font-mono">{survivors.length}</div><div className="text-[7px] text-muted-foreground">ALIVE</div></div>
+          <div className="glass-panel rounded-lg p-3 text-center min-w-[90px]">
+            <div className="text-[6px] text-muted-foreground tracking-[0.3em] mb-1.5">STATS</div>
+            <div className="space-y-1.5">
+              <div><div className="text-sm font-bold text-foreground font-mono">{state.turn}</div><div className="text-[6px] text-muted-foreground">TURNS</div></div>
+              <div><div className="text-sm font-bold text-destructive font-mono">{totalKills}</div><div className="text-[6px] text-muted-foreground">KILLS</div></div>
             </div>
           </div>
         </div>
 
-        <div className="flex gap-2 mt-2 transition-all duration-700" style={{ opacity: showStats ? 1 : 0, transitionDelay: '0.3s' }}>
+        <div className="flex gap-2 mt-1 transition-all duration-700" style={{ opacity: showStats ? 1 : 0, transitionDelay: '0.2s' }}>
           <button onClick={onRestart}
-            className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all text-[10px] tracking-[0.2em] flex items-center gap-2 font-bold">
-            <RotateCcw className="w-3.5 h-3.5" /> PLAY AGAIN
+            className="px-5 py-2 bg-primary text-primary-foreground rounded hover:opacity-90 transition-all text-[9px] tracking-[0.2em] flex items-center gap-1.5 font-bold">
+            <RotateCcw className="w-3 h-3" /> AGAIN
           </button>
           {onMainMenu && (
             <button onClick={onMainMenu}
-              className="px-6 py-2.5 bg-secondary text-secondary-foreground rounded-lg hover:bg-muted transition-colors text-[10px] tracking-[0.2em] flex items-center gap-2 border border-border/30">
-              <Home className="w-3.5 h-3.5" /> MENU
+              className="px-5 py-2 bg-secondary text-secondary-foreground rounded hover:bg-muted transition-colors text-[9px] tracking-[0.2em] flex items-center gap-1.5 border border-border/20">
+              <Home className="w-3 h-3" /> MENU
             </button>
           )}
         </div>
@@ -346,104 +278,102 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
     <div className="absolute inset-0 pointer-events-none">
       {isPreGame && <PreGameScreen state={state} onStartAutoPlay={onStartAutoPlay} />}
 
-      {/* ── Top Bar ── */}
-      <div className="pointer-events-auto flex items-center justify-between px-4 py-1.5 glass-panel-dark border-b border-border/15 h-12">
-        {/* Left: Title + Turn */}
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] font-display font-bold text-primary tracking-[0.2em]">WARGAMING</span>
-          <div className="h-4 w-px bg-border/15" />
-          <div className="flex items-center gap-1.5">
-            <span className="text-[7px] text-muted-foreground tracking-wider">TURN</span>
-            <span className="text-xs font-display font-bold text-foreground">{state.turn}</span>
+      {/* ── Top Bar — minimal, transparent ── */}
+      <div className="pointer-events-auto flex items-center justify-between px-4 h-10"
+        style={{ background: 'linear-gradient(180deg, rgba(10,14,20,0.8) 0%, rgba(10,14,20,0) 100%)' }}>
+        {/* Left */}
+        <div className="flex items-center gap-2.5">
+          <span className="text-[9px] font-display font-bold text-primary/80 tracking-[0.25em]">WARGAMING</span>
+          <div className="h-3 w-px bg-border/10" />
+          <div className="flex items-center gap-1">
+            <span className="text-[6px] text-muted-foreground/40 tracking-wider">TURN</span>
+            <span className="text-[10px] font-display font-bold text-foreground/80">{state.turn}</span>
           </div>
         </div>
 
-        {/* Center: Team pips */}
-        <div className="flex items-center gap-2">
+        {/* Center: Team indicators */}
+        <div className="flex items-center gap-1.5">
           {(['blue', 'red', 'green', 'yellow'] as const).map(team => {
             const alive = aliveByTeam[team];
             const isCurrent = state.currentTeam === team;
             return (
-              <div key={team} className={`flex items-center gap-1 px-2 py-0.5 rounded transition-all ${
-                alive === 0 ? 'opacity-10' : isCurrent ? 'bg-secondary/50' : ''
+              <div key={team} className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-all ${
+                alive === 0 ? 'opacity-8' : isCurrent ? 'bg-white/5' : ''
               }`}>
-                <div className={`w-2 h-2 rounded-sm ${isCurrent && alive > 0 ? 'animate-pulse' : ''}`}
-                  style={{ backgroundColor: TEAM_COLORS[team] }} />
-                <span className="text-[8px] font-bold font-mono" style={{ color: alive > 0 ? TEAM_COLORS[team] : undefined }}>
+                <div className={`w-1.5 h-1.5 rounded-sm ${isCurrent && alive > 0 ? 'animate-pulse' : ''}`}
+                  style={{ backgroundColor: alive > 0 ? TEAM_COLORS[team] : TEAM_COLORS[team] + '30' }} />
+                <span className="text-[7px] font-bold font-mono" style={{ color: alive > 0 ? TEAM_COLORS[team] : TEAM_COLORS[team] + '30' }}>
                   {alive}
                 </span>
               </div>
             );
           })}
           {state.autoPlay && (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 ml-1">
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/8 ml-1">
               <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
-              <span className="text-[7px] text-primary font-bold tracking-wider">LIVE</span>
+              <span className="text-[6px] text-primary/70 font-bold tracking-wider">LIVE</span>
             </div>
           )}
         </div>
 
-        {/* Right: Zone + Controls */}
+        {/* Right */}
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-mono font-bold ${
-            state.shrinkLevel > 0 ? 'bg-destructive/10 text-destructive' : 'text-muted-foreground'
+          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[7px] font-mono font-bold ${
+            state.shrinkLevel > 0 ? 'text-destructive/70' : 'text-muted-foreground/30'
           }`}>
-            <Target className="w-3 h-3" />
+            <Target className="w-2.5 h-2.5" />
             {state.shrinkLevel > 0 ? `LV${state.shrinkLevel}` : 'SAFE'}
-            <span className="text-muted-foreground/50 ml-0.5">{state.zoneTimer}t</span>
           </div>
-          <div className="h-4 w-px bg-border/15" />
+          <div className="h-3 w-px bg-border/10" />
+          <span className="text-[6px] text-muted-foreground/30 font-mono">{aliveUnits.length} ALIVE</span>
+          <div className="h-3 w-px bg-border/10" />
           {isGameOver ? (
             <button onClick={onRestart}
-              className="text-[8px] px-3 py-1 bg-accent text-accent-foreground rounded hover:opacity-90 transition-all tracking-wider font-bold flex items-center gap-1">
-              <RotateCcw className="w-3 h-3" /> NEW
+              className="text-[7px] px-2.5 py-1 bg-accent/80 text-accent-foreground rounded hover:opacity-90 transition-all tracking-wider font-bold flex items-center gap-1">
+              <RotateCcw className="w-2.5 h-2.5" /> NEW
             </button>
           ) : state.autoPlay ? (
             <button onClick={onStopAutoPlay}
-              className="text-[8px] px-3 py-1 bg-destructive/80 text-destructive-foreground rounded hover:opacity-90 transition-all tracking-wider font-bold flex items-center gap-1">
-              <Pause className="w-3 h-3" /> PAUSE
+              className="text-[7px] px-2.5 py-1 bg-destructive/60 text-destructive-foreground rounded hover:opacity-90 transition-all tracking-wider font-bold flex items-center gap-1">
+              <Pause className="w-2.5 h-2.5" /> PAUSE
             </button>
           ) : (
             <button onClick={onStartAutoPlay}
-              className="text-[8px] px-3 py-1 bg-primary text-primary-foreground rounded hover:opacity-90 transition-all tracking-wider font-bold flex items-center gap-1">
-              <Play className="w-3 h-3" /> PLAY
+              className="text-[7px] px-2.5 py-1 bg-primary/80 text-primary-foreground rounded hover:opacity-90 transition-all tracking-wider font-bold flex items-center gap-1">
+              <Play className="w-2.5 h-2.5" /> PLAY
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Left Sidebar: Team Roster ── */}
+      {/* ── Sidebars ── */}
       {!isPreGame && <TeamRoster state={state} onUnitInspect={onUnitInspect} />}
+      {!isPreGame && <CombatFeed log={state.log} events={state.combatEvents} />}
 
-      {/* ── Right Sidebar: Combat Feed ── */}
-      {!isPreGame && <CombatFeed log={state.log} />}
-
-      {/* ── Minimap ── */}
-      {!isPreGame && <Minimap state={state} />}
-
-      {/* ── Kill Feed (top-right, inside combat feed area) ── */}
-      <div className="absolute top-14 right-60 z-20 flex flex-col gap-1 pointer-events-none max-w-[260px]">
+      {/* ── Kill Feed ── */}
+      <div className="absolute top-12 right-56 z-20 flex flex-col gap-1 pointer-events-none max-w-[240px]">
         {state.combatEvents.filter(e => e.type === 'kill' && Date.now() - e.timestamp < 3000).map(e => (
-          <div key={e.id} className="kill-notification glass-panel rounded px-3 py-1.5 flex items-center gap-2 border-l-2 border-destructive">
-            <span className="text-[10px] text-destructive">☠</span>
-            <span className="text-[8px] text-foreground/80 tracking-wider font-bold">{e.message.split('!')[0]}</span>
+          <div key={e.id} className="kill-notification rounded px-3 py-1 flex items-center gap-2"
+            style={{ background: 'rgba(10,14,20,0.85)', borderLeft: '2px solid hsl(0,75%,55%)' }}>
+            <span className="text-[9px] text-destructive">☠</span>
+            <span className="text-[7px] text-foreground/70 tracking-wider font-bold">{e.message.split('!')[0]}</span>
           </div>
         ))}
       </div>
 
-      {/* ── Alive count bottom-center ── */}
+      {/* ── Bottom center: alive + turn indicator ── */}
       {!isPreGame && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
-          <div className="glass-panel rounded px-3 py-1 text-[8px] text-muted-foreground font-mono tracking-wider">
-            {aliveUnits.length} COMBATANTS REMAINING
+          <div className="rounded px-3 py-1 text-[7px] text-muted-foreground/30 font-mono tracking-wider"
+            style={{ background: 'rgba(10,14,20,0.6)' }}>
+            {aliveUnits.length} COMBATANTS • ROUND {state.turn}
           </div>
         </div>
       )}
 
       {/* Scanlines */}
-      <div className="absolute inset-0 crt-scanlines opacity-[0.03] pointer-events-none" />
+      <div className="absolute inset-0 crt-scanlines opacity-[0.02] pointer-events-none" />
 
-      {/* Victory screen */}
       {isGameOver && <VictoryScreen state={state} onRestart={onRestart} onMainMenu={onMainMenu} />}
     </div>
   );

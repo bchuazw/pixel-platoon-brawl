@@ -6,9 +6,13 @@ import {
 
 // ── Random ──
 function seededRandom(seed: number) {
-  let s = seed;
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
   return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
+
+// Global random for variety
+const globalRand = () => Math.random();
 
 let eventCounter = 0;
 function makeEventId() { return `evt-${++eventCounter}-${Date.now()}`; }

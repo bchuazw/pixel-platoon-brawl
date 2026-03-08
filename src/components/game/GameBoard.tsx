@@ -5,7 +5,7 @@ import { GridTiles } from './GridTiles';
 import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
-import { GameState, Position, GRID_SIZE } from '@/game/types';
+import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw } from 'lucide-react';
 import * as THREE from 'three';
 

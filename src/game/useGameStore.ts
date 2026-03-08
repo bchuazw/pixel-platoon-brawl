@@ -352,16 +352,23 @@ export function useGameStore() {
           log.push(`💣 ${unit.name} throws GRENADE! ${damaged.join(', ')}`);
           break;
         }
+        case 'first_aid':
         case 'heal': {
-          const target = units.find(u => u.isAlive && u.position.x === pos.x && u.position.z === pos.z && u.team === unit.team);
+          // first_aid can target self or ally
+          let target = units.find(u => u.isAlive && u.position.x === pos.x && u.position.z === pos.z && u.team === unit.team);
+          if (!target && pos.x === unit.position.x && pos.z === unit.position.z) target = unit; // self
           if (target) {
-            const healAmt = 40;
+            const healAmt = prev.activeAbility === 'first_aid' ? 35 : 40;
             target.hp = Math.min(target.maxHp, target.hp + healAmt);
-            log.push(`💊 ${unit.name} heals ${target.name} for ${healAmt} HP!`);
+            const isSelf = target.id === unit.id;
+            log.push(isSelf
+              ? `💊 ${unit.name} uses FIRST AID on self (+${healAmt} HP)!`
+              : `💊 ${unit.name} uses FIRST AID on ${target.name} (+${healAmt} HP)!`
+            );
             events.push({
               id: `evt-${Date.now()}`, type: 'heal',
               attackerPos: unit.position, targetPos: target.position, value: healAmt,
-              message: `💊 ${target.name} healed for ${healAmt} HP`,
+              message: isSelf ? `💊 Self-heal +${healAmt} HP` : `💊 ${target.name} healed +${healAmt} HP`,
               timestamp: Date.now(),
             });
           }

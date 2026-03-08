@@ -275,6 +275,9 @@ export function useGameStore() {
           log.push(`» ${newState.units.filter(u => u.isAlive).length} combatants remaining`);
         }
 
+        // Tick killstreak effects at start of each new round
+        tickKillstreakEffects(nextTeam, newState.units);
+
         const alive2 = getAliveTeams(newState.units);
         if (alive2.length <= 1) {
           stopBgMusic();

@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { GameBoard2D } from '@/components/game/GameBoard2D';
+import { GameBoard } from '@/components/game/GameBoard';
 import { GameHUD } from '@/components/game/GameHUD';
 import { useGameStore } from '@/game/useGameStore';
 import { CharacterPanel, SponsorAction } from '@/components/game/CharacterPanel';
@@ -84,7 +84,7 @@ const Index = () => {
 
   return (
     <div className="w-screen h-screen overflow-hidden relative">
-      <GameBoard2D
+      <GameBoard
         state={state}
         onTileClick={handleTileClick}
         onUnitClick={handleUnitClick}

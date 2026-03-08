@@ -422,6 +422,27 @@ function GameSoldierPreview({ teamColor, isMedic, customization, hasBeard }: { t
         <mesh position={[0, 0.05, 0.055]} material={visorMat}>
           <boxGeometry args={[0.1, 0.025, 0.02]} />
         </mesh>
+
+        {/* ── BEARD (for bearded units) ── */}
+        {hasBeard && (
+          <>
+            {/* Chin beard */}
+            <mesh position={[0, -0.005, 0.04]} material={beardMat}>
+              <boxGeometry args={[0.08, 0.05, 0.06]} />
+            </mesh>
+            {/* Jaw sides */}
+            <mesh position={[-0.05, 0.01, 0.03]} material={beardMat}>
+              <boxGeometry args={[0.03, 0.06, 0.04]} />
+            </mesh>
+            <mesh position={[0.05, 0.01, 0.03]} material={beardMat}>
+              <boxGeometry args={[0.03, 0.06, 0.04]} />
+            </mesh>
+            {/* Mustache */}
+            <mesh position={[0, 0.025, 0.058]} material={beardMat}>
+              <boxGeometry args={[0.06, 0.015, 0.02]} />
+            </mesh>
+          </>
+        )}
       </group>
 
       {/* ── BACKPACK ── */}

@@ -192,6 +192,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         shadows
       >
         <CameraController angleIndex={angleIndex} />
+        <KillCamController killCam={state.killCam} />
         <color attach="background" args={['#0c1a12']} />
         <Stars radius={80} depth={40} count={800} factor={2} saturation={0.1} fade speed={0.5} />
 

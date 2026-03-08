@@ -1414,38 +1414,36 @@ export function runAiUnitStep(
         }
       }
 
-      // Medic movement — use remaining AP for movement
-      while (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+      // Medic movement — ONE move per step (to sync with walk animation)
+      if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
         const movable = getMovableTiles(unit, newState);
-        if (movable.length === 0) break;
+        if (movable.length > 0) {
+          const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
+          let bestTile = unit.position;
+          let bestScore = currentScore;
 
-        const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
-        let bestTile = unit.position;
-        let bestScore = currentScore;
+          const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
+          const stayNearTarget = injuredAlly || allies[0];
 
-        const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
-        const stayNearTarget = injuredAlly || allies[0];
-
-        for (const t of movable) {
-          let score = evaluateWithLookahead(t, unit, allEnemies, newState);
-          if (stayNearTarget) {
-            const distToAlly = getManhattanDistance(t, stayNearTarget.position);
-            score += -Math.abs(distToAlly - 2) * 5;
+          for (const t of movable) {
+            let score = evaluateWithLookahead(t, unit, allEnemies, newState);
+            if (stayNearTarget) {
+              const distToAlly = getManhattanDistance(t, stayNearTarget.position);
+              score += -Math.abs(distToAlly - 2) * 5;
+            }
+            if (closest) {
+              const distToEnemy = getManhattanDistance(t, closest.position);
+              if (distToEnemy <= 2) score -= 15;
+            }
+            if (score > bestScore) { bestTile = t; bestScore = score; }
           }
-          if (closest) {
-            const distToEnemy = getManhattanDistance(t, closest.position);
-            if (distToEnemy <= 2) score -= 15;
+
+          if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
+            if (bestScore > currentScore + 3) {
+              moveToTile(bestTile);
+            }
           }
-          if (score > bestScore) { bestTile = t; bestScore = score; }
         }
-
-        if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
-          if (bestScore > currentScore + 3) {
-            moveToTile(bestTile);
-            continue; // Try to spend another AP on movement
-          }
-        }
-        break; // Not worth moving further
       }
     } else {
       // SOLDIER MOVE — can spend 1 or 2 AP on movement

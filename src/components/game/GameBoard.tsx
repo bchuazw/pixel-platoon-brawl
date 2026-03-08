@@ -241,6 +241,9 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
             onMoveComplete={onMoveComplete}
           />
           <CombatVFX events={state.combatEvents} />
+          {state.airdrops && state.airdrops.length > 0 && onAirdropLanded && (
+            <AirdropVFX airdrops={state.airdrops} grid={state.grid} onAirdropLanded={onAirdropLanded} />
+          )}
         </Suspense>
 
         <ZoneBorder shrinkLevel={state.shrinkLevel} />

@@ -226,54 +226,127 @@ function GameSoldierPreview({ teamColor, isMedic, customization, hasBeard }: { t
         <boxGeometry args={[0.28, 0.24, 0.16]} />
       </mesh>
 
-      {/* ── VEST VARIANTS ── */}
+      {/* ── VEST VARIANTS (dramatically different) ── */}
       {customization.vest === 'light' && (
-        <mesh position={[0, 0.46, 0.045]} material={gearMat}>
-          <boxGeometry args={[0.26, 0.2, 0.04]} />
-        </mesh>
+        <>
+          {/* Thin minimal plate - just a small front plate */}
+          <mesh position={[0, 0.47, 0.06]} material={gearMat}>
+            <boxGeometry args={[0.18, 0.12, 0.02]} />
+          </mesh>
+          {/* Thin straps */}
+          <mesh position={[-0.1, 0.52, 0]} material={gearMat}>
+            <boxGeometry args={[0.025, 0.08, 0.04]} />
+          </mesh>
+          <mesh position={[0.1, 0.52, 0]} material={gearMat}>
+            <boxGeometry args={[0.025, 0.08, 0.04]} />
+          </mesh>
+        </>
       )}
       {customization.vest === 'heavy' && (
         <>
-          <mesh position={[0, 0.46, 0.045]} material={gearMat}>
-            <boxGeometry args={[0.28, 0.22, 0.06]} />
+          {/* Massive front plate carrier - much thicker and wider */}
+          <mesh position={[0, 0.45, 0.06]} material={gearMat}>
+            <boxGeometry args={[0.3, 0.26, 0.08]} />
           </mesh>
-          <mesh position={[0, 0.44, -0.1]} material={gearMat}>
-            <boxGeometry args={[0.26, 0.2, 0.04]} />
+          {/* Rear plate */}
+          <mesh position={[0, 0.45, -0.12]} material={gearMat}>
+            <boxGeometry args={[0.28, 0.24, 0.06]} />
+          </mesh>
+          {/* Collar / neck guard */}
+          <mesh position={[0, 0.59, 0]} material={gearMat}>
+            <boxGeometry args={[0.24, 0.04, 0.16]} />
+          </mesh>
+          <mesh position={[0, 0.59, 0.06]}>
+            <boxGeometry args={[0.22, 0.06, 0.02]} />
+            <meshStandardMaterial color="#1a1a18" metalness={0.3} roughness={0.5} />
+          </mesh>
+          {/* Side plates */}
+          <mesh position={[-0.16, 0.44, 0]} material={gearMat}>
+            <boxGeometry args={[0.04, 0.2, 0.12]} />
+          </mesh>
+          <mesh position={[0.16, 0.44, 0]} material={gearMat}>
+            <boxGeometry args={[0.04, 0.2, 0.12]} />
+          </mesh>
+          {/* Groin plate */}
+          <mesh position={[0, 0.33, 0.04]} material={gearMat}>
+            <boxGeometry args={[0.2, 0.06, 0.04]} />
           </mesh>
         </>
       )}
       {customization.vest === 'tactical' && (
         <>
-          <mesh position={[0, 0.46, 0.045]} material={gearMat}>
+          {/* Medium vest */}
+          <mesh position={[0, 0.46, 0.05]} material={gearMat}>
             <boxGeometry args={[0.26, 0.2, 0.04]} />
           </mesh>
-          {/* Pouches */}
-          <mesh position={[-0.12, 0.38, 0.07]} material={darkMat}>
-            <boxGeometry args={[0.05, 0.06, 0.03]} />
+          {/* Lots of pouches - magazine holders */}
+          <mesh position={[-0.1, 0.38, 0.075]} material={darkMat}>
+            <boxGeometry args={[0.05, 0.08, 0.035]} />
           </mesh>
-          <mesh position={[0.12, 0.38, 0.07]} material={darkMat}>
-            <boxGeometry args={[0.05, 0.06, 0.03]} />
+          <mesh position={[-0.04, 0.38, 0.075]} material={darkMat}>
+            <boxGeometry args={[0.04, 0.08, 0.035]} />
           </mesh>
-          <mesh position={[0, 0.36, 0.07]} material={darkMat}>
-            <boxGeometry args={[0.06, 0.04, 0.03]} />
+          <mesh position={[0.04, 0.38, 0.075]} material={darkMat}>
+            <boxGeometry args={[0.04, 0.08, 0.035]} />
+          </mesh>
+          <mesh position={[0.1, 0.38, 0.075]} material={darkMat}>
+            <boxGeometry args={[0.05, 0.08, 0.035]} />
+          </mesh>
+          {/* Utility pouch on side */}
+          <mesh position={[-0.14, 0.42, 0.05]} material={darkMat}>
+            <boxGeometry args={[0.03, 0.06, 0.06]} />
+          </mesh>
+          <mesh position={[0.14, 0.42, 0.05]} material={darkMat}>
+            <boxGeometry args={[0.03, 0.06, 0.06]} />
+          </mesh>
+          {/* Ammo belt across chest */}
+          <mesh position={[0, 0.5, 0.07]} rotation={[0, 0, 0.3]}>
+            <boxGeometry args={[0.28, 0.025, 0.015]} />
+            <meshStandardMaterial color="#5a5a44" metalness={0.2} roughness={0.6} />
           </mesh>
         </>
       )}
       {customization.vest === 'medic' && (
         <>
-          <mesh position={[0, 0.46, 0.045]}>
-            <boxGeometry args={[0.26, 0.2, 0.04]} />
+          {/* White medic vest - very distinct */}
+          <mesh position={[0, 0.46, 0.05]}>
+            <boxGeometry args={[0.27, 0.22, 0.05]} />
             <meshStandardMaterial color="#dddddd" metalness={0.05} roughness={0.7} />
           </mesh>
-          {/* Red cross */}
-          <mesh position={[0, 0.48, 0.069]}>
+          {/* Large red cross on front */}
+          <mesh position={[0, 0.48, 0.078]}>
+            <boxGeometry args={[0.1, 0.03, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.4} />
+          </mesh>
+          <mesh position={[0, 0.48, 0.078]}>
+            <boxGeometry args={[0.03, 0.1, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.4} />
+          </mesh>
+          {/* Medical pouches on sides */}
+          <mesh position={[-0.14, 0.42, 0.04]}>
+            <boxGeometry args={[0.04, 0.06, 0.05]} />
+            <meshStandardMaterial color="#bbbbbb" />
+          </mesh>
+          <mesh position={[0.14, 0.42, 0.04]}>
+            <boxGeometry args={[0.04, 0.06, 0.05]} />
+            <meshStandardMaterial color="#bbbbbb" />
+          </mesh>
+          {/* Rear white plate */}
+          <mesh position={[0, 0.46, -0.11]}>
+            <boxGeometry args={[0.24, 0.18, 0.04]} />
+            <meshStandardMaterial color="#cccccc" />
+          </mesh>
+          {/* Rear cross */}
+          <mesh position={[0, 0.48, -0.133]}>
             <boxGeometry args={[0.06, 0.02, 0.002]} />
             <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.3} />
           </mesh>
-          <mesh position={[0, 0.48, 0.069]}>
+          <mesh position={[0, 0.48, -0.133]}>
             <boxGeometry args={[0.02, 0.06, 0.002]} />
             <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.3} />
           </mesh>
+        </>
+      )}
         </>
       )}
 

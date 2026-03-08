@@ -24,8 +24,8 @@ interface GameBoardProps {
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
 
 // FFT-style isometric camera — high angle, moderate distance
-const CAM_DISTANCE = 28;
-const CAM_HEIGHT = 22;
+const CAM_DISTANCE = 22;
+const CAM_HEIGHT = 18;
 
 function getCameraPosition(angleIndex: number): [number, number, number] {
   const angle = (Math.PI / 4) + (angleIndex * Math.PI / 2);

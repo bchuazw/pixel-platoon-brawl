@@ -35,34 +35,28 @@ function getCameraPosition(angleIndex: number): [number, number, number] {
 
 const ANGLE_LABELS = ['SW', 'SE', 'NE', 'NW'];
 
-function CameraController({ angleIndex }: { angleIndex: number }) {
+function CameraController({ angleIndex, orbitRef }: { angleIndex: number; orbitRef: React.RefObject<any> }) {
   const { camera } = useThree();
-  const targetPos = useRef(new THREE.Vector3());
-  const animating = useRef(false);
   const progress = useRef(1);
+  const startPos = useRef(new THREE.Vector3());
+  const targetPos = useRef(new THREE.Vector3());
 
   useEffect(() => {
     const [x, y, z] = getCameraPosition(angleIndex);
+    startPos.current.copy(camera.position);
     targetPos.current.set(x, y, z);
     progress.current = 0;
-    animating.current = true;
-  }, [angleIndex]);
+  }, [angleIndex, camera]);
 
-  useEffect(() => {
-    let raf: number;
-    const animate = () => {
-      if (animating.current && progress.current < 1) {
-        progress.current = Math.min(1, progress.current + 0.04);
-        const t = 1 - Math.pow(1 - progress.current, 3);
-        camera.position.lerp(targetPos.current, t > 0.99 ? 1 : 0.08);
-        camera.lookAt(CENTER);
-        if (progress.current >= 1) animating.current = false;
-      }
-      raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [camera, angleIndex]);
+  useFrame(() => {
+    if (progress.current >= 1) return;
+    progress.current = Math.min(1, progress.current + 0.03);
+    const t = 1 - Math.pow(1 - progress.current, 3);
+    camera.position.lerpVectors(startPos.current, targetPos.current, t);
+    if (orbitRef.current) {
+      orbitRef.current.update();
+    }
+  });
 
   return null;
 }

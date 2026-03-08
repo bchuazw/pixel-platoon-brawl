@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber';
-import { Suspense, useState, useCallback, useMemo } from 'react';
+import { Suspense, useState, useCallback } from 'react';
 import { GridTiles } from './GridTiles';
 import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
@@ -21,25 +21,6 @@ const CAMERA_ANGLES = [
   { position: [-2, 18, -2] as [number, number, number], label: 'NE' },
   { position: [-2, 18, 22] as [number, number, number], label: 'SE' },
 ];
-
-const CENTER: [number, number, number] = [GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5];
-
-function FixedCamera({ angleIndex }: { angleIndex: number }) {
-  const { position } = CAMERA_ANGLES[angleIndex];
-  
-  // Use drei's camera controls approach - set camera directly
-  return (
-    <group>
-      <perspectiveCamera
-        makeDefault
-        position={position}
-        fov={38}
-        near={0.1}
-        far={100}
-      />
-    </group>
-  );
-}
 
 function LoadingFallback() {
   return (

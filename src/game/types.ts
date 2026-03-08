@@ -34,11 +34,11 @@ export interface Weapon {
 }
 
 export const WEAPONS: Record<WeaponId, Weapon> = {
-  pistol: { id: 'pistol', name: 'Pistol', attack: 15, accuracy: 70, range: 3, ammo: -1, maxAmmo: -1, icon: '🔫' },
+  pistol: { id: 'pistol', name: 'Pistol', attack: 15, accuracy: 70, range: 2, ammo: -1, maxAmmo: -1, icon: '🔫' },
   rifle: { id: 'rifle', name: 'Assault Rifle', attack: 22, accuracy: 78, range: 4, ammo: 12, maxAmmo: 12, icon: '🔫' },
-  shotgun: { id: 'shotgun', name: 'Shotgun', attack: 35, accuracy: 60, range: 2, ammo: 6, maxAmmo: 6, icon: '💥' },
-  sniper_rifle: { id: 'sniper_rifle', name: 'Sniper Rifle', attack: 45, accuracy: 90, range: 8, ammo: 4, maxAmmo: 4, icon: '🎯' },
-  rocket_launcher: { id: 'rocket_launcher', name: 'Rocket Launcher', attack: 60, accuracy: 55, range: 5, ammo: 2, maxAmmo: 2, icon: '🚀' },
+  shotgun: { id: 'shotgun', name: 'Shotgun', attack: 35, accuracy: 65, range: 2, ammo: 6, maxAmmo: 6, icon: '💥' },
+  sniper_rifle: { id: 'sniper_rifle', name: 'Sniper Rifle', attack: 45, accuracy: 90, range: 7, ammo: 4, maxAmmo: 4, icon: '🎯' },
+  rocket_launcher: { id: 'rocket_launcher', name: 'Rocket Launcher', attack: 60, accuracy: 55, range: 4, ammo: 2, maxAmmo: 2, icon: '🚀' },
   smg: { id: 'smg', name: 'SMG', attack: 18, accuracy: 65, range: 3, ammo: 20, maxAmmo: 20, icon: '⚡' },
 };
 

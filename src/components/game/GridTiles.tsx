@@ -273,6 +273,9 @@ function PropObject({ tile }: { tile: TileData }) {
   const qElev = quantizeElevation(tile.elevation);
   const baseY = qElev * 0.6 + SURFACE_H;
   const h = tileHash(tile.x, tile.z, 99);
+  // Per-prop variation: random scale and rotation offset
+  const scaleVar = 0.85 + tileHash(tile.x, tile.z, 200) * 0.3; // 0.85-1.15
+  const rotVar = tileHash(tile.x, tile.z, 201) * 0.3 - 0.15; // small tilt
 
   switch (tile.prop) {
     // Wooden supply crate — waist height (~0.35)

@@ -182,7 +182,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <KillCamController killCam={state.killCam} />
         <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} />
         <color attach="background" args={['#080e1a']} />
-        <Stars radius={100} depth={60} count={4000} factor={3} saturation={0.3} fade speed={0.2} />
+        <Stars radius={100} depth={60} count={1500} factor={3} saturation={0.3} fade speed={0.2} />
 
         {/* Sky dome */}
         <mesh scale={[-1, 1, 1]}>

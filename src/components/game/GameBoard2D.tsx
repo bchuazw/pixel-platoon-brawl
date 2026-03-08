@@ -639,14 +639,13 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
 
         // Smoke
         if (tile.hasSmoke) {
-          ctx.fillStyle = 'rgba(180,200,220,0.3)';
-          drawDiamond(ctx, sx, sy, hw, hh, 'rgba(180,200,220,0.3)');
+          drawDiamond(ctx, sx, sy, TILE_W / 2, TILE_H / 2, 'rgba(180,200,220,0.3)');
         }
 
         // Loot glow
         if (tile.loot) {
           const lootPulse = 0.4 + Math.sin(timestamp * 0.004 + x + z) * 0.3;
-          drawDiamond(ctx, sx, sy, hw * 0.5, hh * 0.5, `rgba(255,204,68,${lootPulse})`);
+          drawDiamond(ctx, sx, sy, TILE_W * 0.25, TILE_H * 0.25, `rgba(255,204,68,${lootPulse})`);
           ctx.fillStyle = '#ffcc44';
           ctx.font = 'bold 10px monospace';
           ctx.textAlign = 'center';

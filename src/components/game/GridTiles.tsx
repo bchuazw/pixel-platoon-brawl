@@ -541,7 +541,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Czech hedgehog / tank trap — waist height, angular
     case 'tank_trap':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 3, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * Math.PI / 3, rotVar * 0.2]} scale={[scaleVar, scaleVar, scaleVar]}>
           <mesh position={[0, 0.2, 0]} rotation={[0, 0, Math.PI / 4]} castShadow>
             <boxGeometry args={[0.05, 0.48, 0.05]} />
             <meshStandardMaterial color="#4a4035" metalness={0.5} roughness={0.45} />

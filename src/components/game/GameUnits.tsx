@@ -76,8 +76,8 @@ function PixelCharacter({ unit, isSelected, onClick }: { unit: Unit; isSelected:
         </Billboard>
 
         {/* Shadow */}
-        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ellipseGeometry args={[0.25, 0.15, 12]} />
+        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1, 0.6, 1]}>
+          <circleGeometry args={[0.25, 12]} />
           <meshBasicMaterial color="#000000" transparent opacity={0.3} />
         </mesh>
 

@@ -374,17 +374,17 @@ function PropObject({ tile }: { tile: TileData }) {
           {/* Trunk */}
           <mesh position={[0, 0.35, 0]} castShadow>
             <cylinderGeometry args={[0.05, 0.09, 0.7, 7]} />
-            <meshStandardMaterial color="#5a3818" roughness={0.95} />
+            <meshStandardMaterial color={trunkColor} roughness={0.95} />
           </mesh>
           {/* Lower canopy — dense, wide */}
           <mesh position={[0, 0.85, 0]} castShadow>
             <sphereGeometry args={[0.42, 8, 6]} />
-            <meshStandardMaterial color="#2e7018" roughness={0.9} />
+            <meshStandardMaterial color={leafColor1} roughness={0.9} />
           </mesh>
           {/* Upper canopy */}
           <mesh position={[0.08, 1.15, 0.05]} castShadow>
             <sphereGeometry args={[0.32, 7, 6]} />
-            <meshStandardMaterial color="#389222" roughness={0.9} />
+            <meshStandardMaterial color={leafColor2} roughness={0.9} />
           </mesh>
           {/* Top cluster */}
           <mesh position={[-0.05, 1.38, -0.03]}>

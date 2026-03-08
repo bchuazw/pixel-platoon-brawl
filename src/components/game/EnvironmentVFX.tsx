@@ -56,7 +56,7 @@ export function RainParticles() {
 
 // ── Floating embers / ash particles ──
 export function EmberParticles() {
-  const count = 50;
+  const count = 25;
   const ref = useRef<THREE.Points>(null);
 
   const positions = useMemo(() => {

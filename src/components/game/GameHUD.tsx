@@ -4,7 +4,7 @@ import { Play, Pause, RotateCcw, Swords, Shield, Heart, Crosshair, Eye, Home, Tr
 import { isInZone, getManhattanDistance } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import bgTactical from '@/assets/bg-tactical.png';
-import { CryptoBettingPanel } from './CryptoBettingPanel';
+import { PreGameScreen } from './PreGameScreen';
 
 interface GameHUDProps {
   state: GameState;
@@ -415,67 +415,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {/* Pre-game overlay */}
-      {isPreGame && (
-        <div className="absolute inset-0 z-30 pointer-events-auto flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-30"
-            style={{ backgroundImage: `url(${bgTactical})` }}
-          />
-          <div className="absolute inset-0 bg-background/80" />
-
-          {/* Side-by-side layout: center content + right betting panel */}
-          <div className="relative z-10 flex items-start justify-center gap-6 w-full max-w-5xl px-6">
-            {/* Main content (center) */}
-            <div className="text-center space-y-6 flex-1">
-            <div className="space-y-3">
-                <h1 className="text-2xl font-display font-bold text-primary glow-text tracking-[0.3em]">WARGAMING</h1>
-                <p className="text-xs text-muted-foreground tracking-wider font-mono-game">4 SQUADS • 8 COMBATANTS • 1 TEAM SURVIVES</p>
-                <p className="text-[10px] text-accent tracking-wider font-mono-game">EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE!</p>
-              </div>
-
-              {/* Unit previews */}
-              <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
-                {state.units.map(u => (
-                  <div key={u.id} className="bg-card/80 border border-border/30 rounded-lg p-3 flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: TEAM_COLORS[u.team] + '22', border: `2px solid ${TEAM_COLORS[u.team]}` }}
-                    >
-                      {(() => { const I = CLASS_ICONS[u.unitClass]; return <I className="w-5 h-5" style={{ color: TEAM_COLORS[u.team] }} />; })()}
-                    </div>
-                    <div>
-                      <div className="text-[9px] text-foreground font-bold">{u.name}</div>
-                      <div className="text-[7px] uppercase tracking-wider" style={{ color: TEAM_COLORS[u.team] }}>
-                        {u.unitClass} • {u.team}
-                      </div>
-                      <div className="text-[7px] text-muted-foreground">
-                        HP:{u.hp} • {u.weapon.name} • Vision:{u.visionRange}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-2">
-                <button
-                  onClick={onStartAutoPlay}
-                  className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all glow-text text-[11px] tracking-[0.2em] flex items-center gap-3 mx-auto"
-                >
-                  <Play className="w-5 h-5" />
-                  START BATTLE
-                </button>
-                <p className="text-[7px] text-muted-foreground">AI commands each squad • Fog of War active • Medics heal allies!</p>
-              </div>
-            </div>
-
-            {/* Crypto Betting Panel (right side) */}
-            <div className="w-[320px] shrink-0 pt-2">
-              <CryptoBettingPanel disabled />
-            </div>
-          </div>
-        </div>
-      )}
+      {isPreGame && <PreGameScreen state={state} onStartAutoPlay={onStartAutoPlay} />}
 
       {/* Top bar */}
       <div className="pointer-events-auto flex items-center justify-between px-5 py-2.5 glass-panel border-b border-border/30">

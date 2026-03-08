@@ -201,8 +201,8 @@ export const SOLDIER_ABILITIES: Ability[] = [{
   id: 'grenade', name: 'FRAG GRENADE', description: 'Explosive dealing 25 dmg in 2-tile radius',
   apCost: 1, cooldown: 3, range: 4, aoeRadius: 2, icon: '💣',
 }, {
-  id: 'overwatch', name: 'OVERWATCH', description: 'Shoot first enemy that moves in range',
-  apCost: 1, cooldown: 0, range: 0, icon: '👁',
+  id: 'hunker_down', name: 'HUNKER DOWN', description: 'Brace for impact: +50% defense, much harder to hit until next turn',
+  apCost: 1, cooldown: 0, range: 0, icon: '🛡',
 }];
 
 export const MEDIC_ABILITIES: Ability[] = [{

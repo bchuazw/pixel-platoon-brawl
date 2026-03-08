@@ -7,6 +7,7 @@ interface Announcement {
   subtext?: string;
   color: string;
   duration: number;
+  size?: 'normal' | 'large';
 }
 
 interface BroadcastOverlayProps {
@@ -25,7 +26,6 @@ export function BroadcastOverlay({ state }: BroadcastOverlayProps) {
   useEffect(() => {
     const newAnnouncements: Announcement[] = [];
 
-    // Kill events
     const killEvents = state.combatEvents.filter(e => e.type === 'kill' && !seenKills.current.has(e.id));
     for (const evt of killEvents) {
       seenKills.current.add(evt.id);
@@ -33,33 +33,30 @@ export function BroadcastOverlay({ state }: BroadcastOverlayProps) {
         firstBloodDone.current = true;
         newAnnouncements.push({
           id: `fb-${evt.id}`, text: 'FIRST BLOOD',
-          subtext: evt.message.split('!')[0], color: '#ff4444', duration: 2500,
+          subtext: evt.message.split('!')[0], color: '#ff4444', duration: 3000, size: 'large',
         });
         continue;
       }
     }
 
-    // Double kill
     if (killEvents.length >= 2) {
       const positions = killEvents.map(e => `${e.attackerPos.x},${e.attackerPos.z}`);
       if (new Set(positions).size === 1) {
         newAnnouncements.push({
           id: `dk-${Date.now()}`, text: 'DOUBLE KILL',
-          subtext: 'Devastating efficiency', color: '#ff8800', duration: 2500,
+          subtext: 'Devastating efficiency', color: '#ff8800', duration: 3000, size: 'large',
         });
       }
     }
 
-    // Zone closing
     if (state.shrinkLevel > lastShrink.current) {
       lastShrink.current = state.shrinkLevel;
       newAnnouncements.push({
         id: `zone-${state.shrinkLevel}`, text: 'ZONE CLOSING',
-        subtext: `Danger level ${state.shrinkLevel}`, color: '#ff2222', duration: 3000,
+        subtext: `Danger level ${state.shrinkLevel}`, color: '#ff2222', duration: 3500,
       });
     }
 
-    // Team eliminated
     const teamCounts: Record<Team, number> = { blue: 0, red: 0, green: 0, yellow: 0 };
     for (const u of state.units) {
       if (u.isAlive) teamCounts[u.team]++;
@@ -69,27 +66,25 @@ export function BroadcastOverlay({ state }: BroadcastOverlayProps) {
         newAnnouncements.push({
           id: `elim-${team}-${Date.now()}`, text: 'TEAM ELIMINATED',
           subtext: `${team.toUpperCase()} has been wiped out`,
-          color: TEAM_COLORS[team], duration: 3000,
+          color: TEAM_COLORS[team], duration: 3500, size: 'large',
         });
       }
-      // Last stand
       if (teamCounts[team] === 1 && lastTeamCounts.current[team] > 1) {
         const survivor = state.units.find(u => u.team === team && u.isAlive);
         newAnnouncements.push({
           id: `ls-${team}-${Date.now()}`, text: 'LAST STAND',
           subtext: `${survivor?.name || team.toUpperCase()} fights alone`,
-          color: TEAM_COLORS[team], duration: 3000,
+          color: TEAM_COLORS[team], duration: 3500,
         });
       }
     }
     lastTeamCounts.current = teamCounts;
 
-    // Round marker
     if (state.turn > lastTurn.current && state.turn % 3 === 0) {
       const alive = state.units.filter(u => u.isAlive).length;
       newAnnouncements.push({
         id: `round-${state.turn}`, text: `ROUND ${state.turn}`,
-        subtext: `${alive} combatants remain`, color: '#6688cc', duration: 2000,
+        subtext: `${alive} combatants remain`, color: '#6688cc', duration: 2500,
       });
     }
     lastTurn.current = state.turn;
@@ -99,7 +94,6 @@ export function BroadcastOverlay({ state }: BroadcastOverlayProps) {
     }
   }, [state.combatEvents, state.shrinkLevel, state.units, state.turn]);
 
-  // Process queue
   useEffect(() => {
     if (current || queue.length === 0) return;
     const next = queue[0];
@@ -111,64 +105,54 @@ export function BroadcastOverlay({ state }: BroadcastOverlayProps) {
 
   if (!current) return null;
 
+  const isLarge = current.size === 'large';
+
   return (
     <div className="absolute inset-0 z-25 pointer-events-none flex items-center justify-center">
-      {/* Subtle radial flash */}
-      <div
-        className="absolute inset-0 animate-flash-overlay"
-        style={{ background: `radial-gradient(ellipse at center, ${current.color}10 0%, transparent 50%)` }}
-      />
+      <div className="absolute inset-0"
+        style={{ background: `radial-gradient(ellipse at center, ${current.color}08 0%, transparent 50%)`, animation: 'flash-overlay 1.2s ease-out forwards' }} />
 
-      {/* Announcement */}
-      <div className="animate-broadcast-in flex flex-col items-center gap-1">
-        <div className="flex items-center gap-6 w-full">
-          <div className="flex-1 h-px" style={{ background: `linear-gradient(to right, transparent, ${current.color}40)` }} />
-          <div className="w-1 h-1 rotate-45" style={{ backgroundColor: current.color, opacity: 0.6 }} />
-          <div className="flex-1 h-px" style={{ background: `linear-gradient(to left, transparent, ${current.color}40)` }} />
+      <div className="flex flex-col items-center gap-2" style={{ animation: 'broadcast-in 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+        <div className="flex items-center gap-8 w-full">
+          <div className="flex-1 h-px" style={{ background: `linear-gradient(to right, transparent, ${current.color}35)` }} />
+          <div className="w-1.5 h-1.5 rotate-45" style={{ backgroundColor: current.color, opacity: 0.5 }} />
+          <div className="flex-1 h-px" style={{ background: `linear-gradient(to left, transparent, ${current.color}35)` }} />
         </div>
 
-        <h2
-          className="text-[28px] font-black tracking-[0.4em] leading-none"
+        <h2 className={`font-black leading-none font-display ${isLarge ? 'text-4xl tracking-[0.5em]' : 'text-3xl tracking-[0.4em]'}`}
           style={{
             color: current.color,
-            textShadow: `0 0 30px ${current.color}66, 0 2px 8px rgba(0,0,0,0.8)`,
-            fontFamily: "'Share Tech Mono', monospace",
-          }}
-        >
+            textShadow: `0 0 40px ${current.color}55, 0 2px 10px rgba(0,0,0,0.8)`,
+          }}>
           {current.text}
         </h2>
 
         {current.subtext && (
-          <p className="text-[9px] tracking-[0.15em] text-foreground/60 mt-0.5" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+          <p className="text-sm tracking-[0.15em] text-foreground/50 mt-1"
+            style={{ textShadow: '0 1px 6px rgba(0,0,0,0.8)' }}>
             {current.subtext}
           </p>
         )}
 
-        <div className="flex items-center gap-6 w-full mt-0.5">
-          <div className="flex-1 h-px" style={{ background: `linear-gradient(to right, transparent, ${current.color}25)` }} />
-          <div className="w-1 h-1 rotate-45" style={{ backgroundColor: current.color, opacity: 0.4 }} />
-          <div className="flex-1 h-px" style={{ background: `linear-gradient(to left, transparent, ${current.color}25)` }} />
+        <div className="flex items-center gap-8 w-full mt-1">
+          <div className="flex-1 h-px" style={{ background: `linear-gradient(to right, transparent, ${current.color}20)` }} />
+          <div className="w-1.5 h-1.5 rotate-45" style={{ backgroundColor: current.color, opacity: 0.3 }} />
+          <div className="flex-1 h-px" style={{ background: `linear-gradient(to left, transparent, ${current.color}20)` }} />
         </div>
       </div>
 
       <style>{`
         @keyframes broadcast-in {
-          0% { opacity: 0; transform: scale(1.2); filter: blur(6px); }
-          12% { opacity: 1; transform: scale(1); filter: blur(0); }
+          0% { opacity: 0; transform: scale(1.15); filter: blur(8px); }
+          10% { opacity: 1; transform: scale(1); filter: blur(0); }
           80% { opacity: 1; }
-          100% { opacity: 0; transform: scale(0.97); filter: blur(3px); }
-        }
-        .animate-broadcast-in {
-          animation: broadcast-in var(--duration, 2.5s) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          100% { opacity: 0; transform: scale(0.98); filter: blur(4px); }
         }
         @keyframes flash-overlay {
           0% { opacity: 0; }
-          8% { opacity: 1; }
-          40% { opacity: 0.4; }
+          6% { opacity: 1; }
+          35% { opacity: 0.3; }
           100% { opacity: 0; }
-        }
-        .animate-flash-overlay {
-          animation: flash-overlay 1.2s ease-out forwards;
         }
       `}</style>
     </div>

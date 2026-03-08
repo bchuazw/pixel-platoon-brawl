@@ -367,7 +367,8 @@ export function getVisibleEnemies(unit: Unit, allUnits: Unit[]): Unit[] {
 
 // ── State Init ──
 export function createInitialState(): GameState {
-  const grid = createGrid();
+  const spawnPoints = generateSpawnPoints(globalRand);
+  const grid = createGrid(spawnPoints);
 
   const soldierNames = ['Marco', 'Ralf', 'Knox', 'Hawk', 'Blaze', 'Steel', 'Rex', 'Ace'];
   const medicNames = ['Mercy', 'Patch', 'Doc', 'Vita', 'Sage', 'Pulse', 'Angel', 'Fern'];
@@ -385,32 +386,20 @@ export function createInitialState(): GameState {
   let soldierIdx = 0;
   let medicIdx = 0;
 
-  const cornerSpawns: Record<Team, Position[]> = {
-    blue: [
-      { x: 1 + Math.floor(globalRand() * 2), z: 1 + Math.floor(globalRand() * 2) },
-      { x: 2 + Math.floor(globalRand() * 2), z: 2 + Math.floor(globalRand() * 2) },
-    ],
-    red: [
-      { x: 17 + Math.floor(globalRand() * 2), z: 17 + Math.floor(globalRand() * 2) },
-      { x: 16 + Math.floor(globalRand() * 2), z: 16 + Math.floor(globalRand() * 2) },
-    ],
-    green: [
-      { x: 17 + Math.floor(globalRand() * 2), z: 1 + Math.floor(globalRand() * 2) },
-      { x: 16 + Math.floor(globalRand() * 2), z: 2 + Math.floor(globalRand() * 2) },
-    ],
-    yellow: [
-      { x: 1 + Math.floor(globalRand() * 2), z: 17 + Math.floor(globalRand() * 2) },
-      { x: 2 + Math.floor(globalRand() * 2), z: 16 + Math.floor(globalRand() * 2) },
-    ],
-  };
-
   const teams: Team[] = ['blue', 'red', 'green', 'yellow'];
   const units: Unit[] = [];
 
-  for (const team of teams) {
-    const spawns = cornerSpawns[team];
-    units.push(createUnit(`${team}-soldier`, shuffledSoldiers[soldierIdx++], 'soldier', team, spawns[0]));
-    units.push(createUnit(`${team}-medic`, shuffledMedics[medicIdx++], 'medic', team, spawns[1]));
+  for (let i = 0; i < teams.length; i++) {
+    const team = teams[i];
+    const spawn = spawnPoints[i];
+    // Soldier at spawn, medic adjacent
+    const medicOffset = [{ x: 1, z: 0 }, { x: 0, z: 1 }, { x: 1, z: 1 }, { x: -1, z: 0 }][i];
+    const medicPos = {
+      x: Math.max(0, Math.min(GRID_SIZE - 1, spawn.x + medicOffset.x)),
+      z: Math.max(0, Math.min(GRID_SIZE - 1, spawn.z + medicOffset.z)),
+    };
+    units.push(createUnit(`${team}-soldier`, shuffledSoldiers[soldierIdx++], 'soldier', team, { ...spawn }));
+    units.push(createUnit(`${team}-medic`, shuffledMedics[medicIdx++], 'medic', team, medicPos));
   }
 
   const occupied = new Set<string>();

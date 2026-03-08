@@ -246,14 +246,13 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <OrbitControls
           ref={orbitRef}
           target={[CENTER.x, 0, CENTER.z]}
-          enableRotate
-          enablePan
-          enableZoom
+          enableRotate={false}
+          enablePan={true}
+          enableZoom={true}
           minDistance={10}
           maxDistance={40}
           maxPolarAngle={Math.PI / 2.3}
           minPolarAngle={Math.PI / 6}
-          rotateSpeed={0.3}
           panSpeed={0.5}
           zoomSpeed={0.6}
           enableDamping

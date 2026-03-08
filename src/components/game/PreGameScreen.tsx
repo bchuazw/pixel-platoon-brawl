@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { startAmbientAudio, stopAmbientAudio } from '@/game/ambientAudio';
 import { GameState, Unit, TEAM_COLORS, Team } from '@/game/types';
 import { Play, Swords, Heart, Shield, Crosshair } from 'lucide-react';

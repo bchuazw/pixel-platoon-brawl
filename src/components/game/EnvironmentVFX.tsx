@@ -5,7 +5,7 @@ import * as THREE from 'three';
 
 // ── Rain Particles ──
 export function RainParticles() {
-  const count = 800;
+  const count = 300;
   const ref = useRef<THREE.Points>(null);
 
   const [positions, velocities] = useMemo(() => {

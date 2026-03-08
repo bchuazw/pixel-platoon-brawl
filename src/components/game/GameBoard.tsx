@@ -264,13 +264,9 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         {/* Fog */}
         <fog attach="fog" args={['#0a101e', 35, 80]} />
 
-        {/* Atmospheric particles */}
+        {/* Atmospheric particles - reduced */}
         <DustParticles />
         <EmberParticles />
-        <LightShafts />
-        <GroundFog />
-        <RainParticles />
-        <RainPuddles />
         <ScreenShake events={state.combatEvents} />
 
         {/* ── Post-processing pipeline ── */}

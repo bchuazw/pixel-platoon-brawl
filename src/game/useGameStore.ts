@@ -853,7 +853,16 @@ export function useGameStore() {
 
   const clearMovePath = useCallback(() => {
     setState(prev => ({ ...prev, movePath: null, movingUnitId: null }));
-  }, []);
+    // If auto-playing and there's a pending combat unit, trigger combat now
+    if (autoPlayRef.current && pendingCombatUnitRef.current) {
+      // Small delay to let animation settle, then run combat
+      setTimeout(() => {
+        if (autoPlayRef.current) {
+          runSingleUnitStep();
+        }
+      }, 300);
+    }
+  }, [runSingleUnitStep]);
 
   const handleAirdropLanded = useCallback((airdrop: AirdropData) => {
     setState(prev => {

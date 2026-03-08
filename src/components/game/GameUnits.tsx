@@ -40,7 +40,9 @@ function getMat(color: string, metalness = 0.1, roughness = 0.7, emissive = '#00
 }
 
 // ── XCOM-style chunky soldier body ──
-function SoldierBody({ teamColor, isMedic }: { teamColor: string; isMedic: boolean }) {
+const BEARDED_UNITS = new Set(['blue-soldier', 'yellow-soldier', 'red-medic', 'yellow-medic']);
+
+function SoldierBody({ teamColor, isMedic, unitId }: { teamColor: string; isMedic: boolean; unitId?: string }) {
   const armorColor = useMemo(() => {
     const c = new THREE.Color(teamColor);
     return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.25).getHexString();

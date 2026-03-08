@@ -949,23 +949,26 @@ export function getAliveTeams(units: Unit[]): Team[] {
 
 // ══════════════════════════════════════════════
 // ── AI: Per-unit step (called once per unit) ──
+// phase: 'move' = movement + loot only, 'combat' = attack/abilities only
 // ══════════════════════════════════════════════
 export function runAiUnitStep(
   unitId: string,
-  state: GameState
-): { state: GameState; events: CombatEvent[] } {
+  state: GameState,
+  phase: 'move' | 'combat' = 'combat'
+): { state: GameState; events: CombatEvent[]; didMove: boolean } {
   const newState = {
     ...state,
     units: state.units.map(u => ({ ...u, weapon: { ...u.weapon } })),
     grid: state.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null }))),
   };
   const allEvents: CombatEvent[] = [];
+  let didMove = false;
 
   const unit = newState.units.find(u => u.id === unitId);
-  if (!unit || !unit.isAlive) return { state: newState, events: allEvents };
+  if (!unit || !unit.isAlive) return { state: newState, events: allEvents, didMove };
 
   const allEnemies = newState.units.filter(u => u.isAlive && u.team !== unit.team);
-  if (allEnemies.length === 0) return { state: newState, events: allEvents };
+  if (allEnemies.length === 0) return { state: newState, events: allEvents, didMove };
 
   const visibleEnemies = getVisibleEnemies(unit, newState.units);
   const allies = newState.units.filter(u => u.isAlive && u.team === unit.team && u.id !== unit.id);
@@ -984,6 +987,7 @@ export function runAiUnitStep(
     const path = findPath(unit.position, bestTile, newState);
     unit.position = bestTile;
     unit.ap -= AP_MOVE_COST;
+    didMove = true;
 
     // Set move path for animation
     newState.movePath = path;
@@ -1000,37 +1004,153 @@ export function runAiUnitStep(
     }
   };
 
-  // ── Use killstreak if holding one and enemies are visible ──
-  if (unit.killstreak && visibleEnemies.length > 0) {
-    // Use airstrike/EMP when 2+ enemies visible, UAV/supply always
-    const shouldUse = unit.killstreak === 'uav' || unit.killstreak === 'supply_drop'
-      || (unit.killstreak === 'airstrike' && visibleEnemies.some(e => getManhattanDistance(unit.position, e.position) <= 3))
-      || (unit.killstreak === 'emp' && visibleEnemies.length >= 2);
-    if (shouldUse) {
-      const ksEvents = activateKillstreak(unit, newState.units, newState.grid);
-      allEvents.push(...ksEvents);
-      newState.log = [...newState.log, ...ksEvents.map(e => e.message)];
+  // ══ MOVE PHASE: only movement, loot pickup, killstreak activation ══
+  if (phase === 'move') {
+    // ── Use killstreak if holding one and enemies are visible ──
+    if (unit.killstreak && visibleEnemies.length > 0) {
+      const shouldUse = unit.killstreak === 'uav' || unit.killstreak === 'supply_drop'
+        || (unit.killstreak === 'airstrike' && visibleEnemies.some(e => getManhattanDistance(unit.position, e.position) <= 3))
+        || (unit.killstreak === 'emp' && visibleEnemies.length >= 2);
+      if (shouldUse) {
+        const ksEvents = activateKillstreak(unit, newState.units, newState.grid);
+        allEvents.push(...ksEvents);
+        newState.log = [...newState.log, ...ksEvents.map(e => e.message)];
+      }
     }
+
+    // ── Currently outside zone? FLEE TO SAFETY ──
+    const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);
+    if (currentlyOutsideZone && unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+      const movable = getMovableTiles(unit, newState);
+      if (movable.length > 0) {
+        const center = { x: Math.floor(GRID_SIZE / 2), z: Math.floor(GRID_SIZE / 2) };
+        let bestTile = movable[0];
+        let bestScore = -Infinity;
+        for (const t of movable) {
+          let score = 0;
+          if (isInZone(t.x, t.z, newState.shrinkLevel)) score += 200;
+          score -= getManhattanDistance(t, center);
+          if (score > bestScore) { bestTile = t; bestScore = score; }
+        }
+        moveToTile(bestTile);
+      }
+      updateAllUnitsCover(newState.units, newState.grid);
+      return { state: newState, events: allEvents, didMove };
+    }
+
+    // ═══ MEDIC MOVE ═══
+    if (unit.unitClass === 'medic') {
+      // Heal first (instant, before movement)
+      const firstAid = unit.abilities.find(a => a.id === 'first_aid');
+      if (firstAid && unit.ap >= firstAid.apCost && (!unit.cooldowns['first_aid'] || unit.cooldowns['first_aid'] <= 0)) {
+        let healTarget: Unit | null = null;
+        if (unit.hp < unit.maxHp * 0.5) healTarget = unit;
+        if (!healTarget) {
+          const injuredAlly = allies.find(a =>
+            a.hp < a.maxHp * 0.6 && getManhattanDistance(unit.position, a.position) <= firstAid.range
+          );
+          if (injuredAlly) healTarget = injuredAlly;
+        }
+        if (healTarget) {
+          const healAmt = 35;
+          healTarget.hp = Math.min(healTarget.maxHp, healTarget.hp + healAmt);
+          unit.ap -= firstAid.apCost;
+          unit.cooldowns['first_aid'] = firstAid.cooldown;
+          const isSelf = healTarget.id === unit.id;
+          allEvents.push({
+            id: makeEventId(), type: 'heal',
+            attackerPos: { ...unit.position }, targetPos: { ...healTarget.position },
+            value: healAmt,
+            message: isSelf
+              ? `💊 ${unit.name} uses FIRST AID on self (+${healAmt} HP)!`
+              : `💊 ${unit.name} uses FIRST AID on ${healTarget.name} (+${healAmt} HP)!`,
+            timestamp: Date.now(),
+          });
+          newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
+        }
+      }
+
+      // Medic movement
+      if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+        const movable = getMovableTiles(unit, newState);
+        if (movable.length > 0) {
+          let bestTile = movable[0];
+          let bestScore = -Infinity;
+          const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
+          const stayNearTarget = injuredAlly || allies[0];
+
+          for (const t of movable) {
+            let score = getZonePenalty(t, newState.shrinkLevel);
+            if (stayNearTarget) {
+              const distToAlly = getManhattanDistance(t, stayNearTarget.position);
+              score += -Math.abs(distToAlly - 2) * 5;
+            }
+            if (closest) {
+              const distToEnemy = getManhattanDistance(t, closest.position);
+              if (distToEnemy <= 2) score -= 15;
+            }
+            for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+              const nx = t.x + dx, nz = t.z + dz;
+              if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                score += newState.grid[nx][nz].coverValue * 4;
+              }
+            }
+            score += newState.grid[t.x][t.z].elevation * 3;
+            const tileData = newState.grid[t.x][t.z];
+            if (tileData.loot) score += 12;
+            if (score > bestScore) { bestTile = t; bestScore = score; }
+          }
+          moveToTile(bestTile);
+        }
+      }
+    } else {
+      // ═══ SOLDIER MOVE ═══
+      if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+        const movable = getMovableTiles(unit, newState);
+        if (movable.length > 0) {
+          let bestTile = movable[0];
+          let bestScore = -Infinity;
+
+          for (const t of movable) {
+            let score = getZonePenalty(t, newState.shrinkLevel);
+            if (closest) {
+              const dist = getManhattanDistance(t, closest.position);
+              const idealDist = unit.attackRange;
+              score += -Math.abs(dist - idealDist) * 3;
+              if (unit.weapon.id === 'shotgun') score += dist <= 2 ? 10 : -dist * 2;
+              if (unit.weapon.id === 'sniper_rifle' && dist < 3) score -= 15;
+            } else {
+              const distToCenter = getManhattanDistance(t, { x: Math.floor(GRID_SIZE / 2), z: Math.floor(GRID_SIZE / 2) });
+              score += -distToCenter;
+            }
+            const tileData = newState.grid[t.x][t.z];
+            if (tileData.loot) { score += 15; if (tileData.loot.type === 'weapon') score += 12; }
+            score += newState.grid[t.x][t.z].elevation * 4;
+            if (unit.weapon.id === 'sniper_rifle') score += newState.grid[t.x][t.z].elevation * 8;
+            for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+              const nx = t.x + dx, nz = t.z + dz;
+              if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                score += newState.grid[nx][nz].coverValue * 3;
+              }
+            }
+            if (score > bestScore) { bestTile = t; bestScore = score; }
+          }
+          moveToTile(bestTile);
+        }
+      }
+    }
+
+    updateAllUnitsCover(newState.units, newState.grid);
+    return { state: newState, events: allEvents, didMove };
   }
 
-  // ── Currently outside zone? FLEE TO SAFETY FIRST ──
-  const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);
+  // ══ COMBAT PHASE: attacks, abilities, overwatch ══
+  // (phase === 'combat' — the unit has already moved)
 
-  if (currentlyOutsideZone && unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
-    const movable = getMovableTiles(unit, newState);
-    if (movable.length > 0) {
-      const center = { x: Math.floor(GRID_SIZE / 2), z: Math.floor(GRID_SIZE / 2) };
-      let bestTile = movable[0];
-      let bestScore = -Infinity;
-      for (const t of movable) {
-        let score = 0;
-        if (isInZone(t.x, t.z, newState.shrinkLevel)) score += 200;
-        score -= getManhattanDistance(t, center);
-        if (score > bestScore) { bestTile = t; bestScore = score; }
-      }
-      moveToTile(bestTile);
-    }
-    // After fleeing, still try to attack
+  // ── Zone attack after flee (unit already moved in move phase) ──
+  const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);
+  if (currentlyOutsideZone) {
+    // Still try to attack while outside zone
     if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
       const visAfterFlee = getVisibleEnemies(unit, newState.units);
       const inRange = visAfterFlee.filter(e => getManhattanDistance(unit.position, e.position) <= unit.attackRange);
@@ -1044,77 +1164,11 @@ export function runAiUnitStep(
       }
     }
     updateAllUnitsCover(newState.units, newState.grid);
-    return { state: newState, events: allEvents };
+    return { state: newState, events: allEvents, didMove };
   }
 
-  // ═══ MEDIC AI ═══
+  // ═══ MEDIC COMBAT ═══
   if (unit.unitClass === 'medic') {
-    // Heal first
-    const firstAid = unit.abilities.find(a => a.id === 'first_aid');
-    if (firstAid && unit.ap >= firstAid.apCost && (!unit.cooldowns['first_aid'] || unit.cooldowns['first_aid'] <= 0)) {
-      let healTarget: Unit | null = null;
-      if (unit.hp < unit.maxHp * 0.5) healTarget = unit;
-      if (!healTarget) {
-        const injuredAlly = allies.find(a =>
-          a.hp < a.maxHp * 0.6 && getManhattanDistance(unit.position, a.position) <= firstAid.range
-        );
-        if (injuredAlly) healTarget = injuredAlly;
-      }
-      if (healTarget) {
-        const healAmt = 35;
-        healTarget.hp = Math.min(healTarget.maxHp, healTarget.hp + healAmt);
-        unit.ap -= firstAid.apCost;
-        unit.cooldowns['first_aid'] = firstAid.cooldown;
-        const isSelf = healTarget.id === unit.id;
-        allEvents.push({
-          id: makeEventId(), type: 'heal',
-          attackerPos: { ...unit.position }, targetPos: { ...healTarget.position },
-          value: healAmt,
-          message: isSelf
-            ? `💊 ${unit.name} uses FIRST AID on self (+${healAmt} HP)!`
-            : `💊 ${unit.name} uses FIRST AID on ${healTarget.name} (+${healAmt} HP)!`,
-          timestamp: Date.now(),
-        });
-        newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
-      }
-    }
-
-    // Move
-    if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
-      const movable = getMovableTiles(unit, newState);
-      if (movable.length > 0) {
-        let bestTile = movable[0];
-        let bestScore = -Infinity;
-        const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
-        const stayNearTarget = injuredAlly || allies[0];
-
-        for (const t of movable) {
-          let score = getZonePenalty(t, newState.shrinkLevel);
-          if (stayNearTarget) {
-            const distToAlly = getManhattanDistance(t, stayNearTarget.position);
-            score += -Math.abs(distToAlly - 2) * 5;
-          }
-          if (closest) {
-            const distToEnemy = getManhattanDistance(t, closest.position);
-            if (distToEnemy <= 2) score -= 15;
-          }
-          for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-            const nx = t.x + dx, nz = t.z + dz;
-            if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
-              score += newState.grid[nx][nz].coverValue * 4;
-            }
-          }
-          // Prefer higher ground
-          score += newState.grid[t.x][t.z].elevation * 3;
-          const tileData = newState.grid[t.x][t.z];
-          if (tileData.loot) score += 12;
-          if (score > bestScore) { bestTile = t; bestScore = score; }
-        }
-
-        moveToTile(bestTile);
-      }
-    }
-
     // Attack
     if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
       const visibleAfterMove = getVisibleEnemies(unit, newState.units);
@@ -1148,53 +1202,7 @@ export function runAiUnitStep(
       }
     }
   } else {
-    // ═══ SOLDIER AI ═══
-    // Move
-    if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
-      const movable = getMovableTiles(unit, newState);
-      if (movable.length > 0) {
-        let bestTile = movable[0];
-        let bestScore = -Infinity;
-
-        for (const t of movable) {
-          let score = getZonePenalty(t, newState.shrinkLevel);
-
-          if (closest) {
-            const dist = getManhattanDistance(t, closest.position);
-            const idealDist = unit.attackRange;
-            score += -Math.abs(dist - idealDist) * 3;
-            if (unit.weapon.id === 'shotgun') score += dist <= 2 ? 10 : -dist * 2;
-            if (unit.weapon.id === 'sniper_rifle' && dist < 3) score -= 15;
-          } else {
-            const distToCenter = getManhattanDistance(t, { x: Math.floor(GRID_SIZE / 2), z: Math.floor(GRID_SIZE / 2) });
-            score += -distToCenter;
-          }
-
-          const tileData = newState.grid[t.x][t.z];
-          if (tileData.loot) {
-            score += 15;
-            if (tileData.loot.type === 'weapon') score += 12;
-          }
-
-          // Prefer higher ground for snipers
-          score += newState.grid[t.x][t.z].elevation * 4;
-          if (unit.weapon.id === 'sniper_rifle') score += newState.grid[t.x][t.z].elevation * 8;
-
-          for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-            const nx = t.x + dx, nz = t.z + dz;
-            if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
-              score += newState.grid[nx][nz].coverValue * 3;
-            }
-          }
-
-          if (score > bestScore) { bestTile = t; bestScore = score; }
-        }
-
-        moveToTile(bestTile);
-      }
-    }
-
-    // Attack
+    // ═══ SOLDIER COMBAT ═══
     const visibleAfterMove = getVisibleEnemies(unit, newState.units);
 
     if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
@@ -1261,7 +1269,7 @@ export function runAiUnitStep(
   }
 
   updateAllUnitsCover(newState.units, newState.grid);
-  return { state: newState, events: allEvents };
+  return { state: newState, events: allEvents, didMove };
 }
 
 // Legacy wrapper (still used by manual endTurn)
@@ -1276,9 +1284,12 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
   let currentState = state;
   const allEvents: CombatEvent[] = [];
   for (const unit of sorted) {
-    const result = runAiUnitStep(unit.id, currentState);
-    currentState = result.state;
-    allEvents.push(...result.events);
+    const moveResult = runAiUnitStep(unit.id, currentState, 'move');
+    currentState = moveResult.state;
+    allEvents.push(...moveResult.events);
+    const combatResult = runAiUnitStep(unit.id, currentState, 'combat');
+    currentState = combatResult.state;
+    allEvents.push(...combatResult.events);
   }
   return { state: currentState, events: allEvents };
 }

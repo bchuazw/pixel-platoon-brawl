@@ -21,6 +21,7 @@ export function useGameStore() {
   // Track which unit is currently acting in the auto-play sequence
   const unitQueueRef = useRef<string[]>([]);
   const currentTeamRef = useRef<Team>('blue');
+  const pendingCombatUnitRef = useRef<string | null>(null); // unit awaiting combat after move
 
   // Earn sponsor points over time
   useEffect(() => {
@@ -194,6 +195,57 @@ export function useGameStore() {
         };
       }
 
+      // ── If there's a pending combat phase for a unit that just moved ──
+      if (pendingCombatUnitRef.current) {
+        const combatUnitId = pendingCombatUnitRef.current;
+        pendingCombatUnitRef.current = null;
+
+        const result = runAiUnitStep(combatUnitId, prev, 'combat');
+        let newState = result.state;
+        const allEvents = [...result.events];
+
+        // Clear move path since walk animation is done
+        newState = { ...newState, movePath: null, movingUnitId: null };
+
+        // ── KILL CAM: detect kill events ──
+        const killEvent = allEvents.find(e => e.type === 'kill');
+        let killCam: KillCamData | null = null;
+        if (killEvent) {
+          const killer = prev.units.find(u => u.id === combatUnitId);
+          const victim = prev.units.find(u =>
+            u.position.x === killEvent.targetPos.x && u.position.z === killEvent.targetPos.z && u.id !== combatUnitId
+          );
+          killCam = {
+            targetPos: killEvent.targetPos, attackerPos: killEvent.attackerPos,
+            victimName: victim?.name || 'Unknown', killerName: killer?.name || 'Unknown',
+            timestamp: Date.now(),
+          };
+        }
+
+        const nextInQueue = unitQueueRef.current[0] || null;
+        newState = { ...newState, selectedUnitId: nextInQueue, killCam };
+
+        // Check game over
+        const alive = getAliveTeams(newState.units);
+        if (alive.length <= 1) {
+          stopBgMusic();
+          unitQueueRef.current = [];
+          return {
+            ...newState,
+            log: [...newState.log, `🏆 ${alive[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
+            phase: 'game_over' as const, selectedUnitId: null,
+            movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+            combatEvents: [...prev.combatEvents, ...allEvents], activeAbility: null,
+            autoPlay: false,
+          };
+        }
+
+        return {
+          ...newState,
+          combatEvents: [...prev.combatEvents, ...allEvents],
+        };
+      }
+
       // Pop next unit from queue
       const nextUnitId = unitQueueRef.current.shift()!;
       const unit = prev.units.find(u => u.id === nextUnitId);
@@ -203,32 +255,40 @@ export function useGameStore() {
         return { ...prev, selectedUnitId: unitQueueRef.current[0] || null };
       }
 
-      // Run this single unit's AI
-      const result = runAiUnitStep(nextUnitId, prev);
+      // ── PHASE 1: Movement only ──
+      const result = runAiUnitStep(nextUnitId, prev, 'move');
       let newState = result.state;
       const allEvents = [...result.events];
 
-      // ── KILL CAM: detect kill events ──
-      const killEvent = allEvents.find(e => e.type === 'kill');
-      let killCam: KillCamData | null = null;
-      if (killEvent) {
-        const killer = prev.units.find(u => u.id === nextUnitId);
-        // Find victim by position match
-        const victim = prev.units.find(u =>
-          u.position.x === killEvent.targetPos.x && u.position.z === killEvent.targetPos.z && u.id !== nextUnitId
-        );
-        killCam = {
-          targetPos: killEvent.targetPos,
-          attackerPos: killEvent.attackerPos,
-          victimName: victim?.name || 'Unknown',
-          killerName: killer?.name || 'Unknown',
-          timestamp: Date.now(),
-        };
-      }
+      newState = { ...newState, selectedUnitId: nextUnitId, killCam: null };
 
-      // Highlight the next unit that will act
-      const nextInQueue = unitQueueRef.current[0] || null;
-      newState = { ...newState, selectedUnitId: nextInQueue, killCam };
+      if (result.didMove) {
+        // Unit moved — schedule combat for next tick after walk animation
+        pendingCombatUnitRef.current = nextUnitId;
+      } else {
+        // No movement — run combat immediately
+        const combatResult = runAiUnitStep(nextUnitId, newState, 'combat');
+        newState = combatResult.state;
+        allEvents.push(...combatResult.events);
+
+        // KILL CAM
+        const killEvent = combatResult.events.find(e => e.type === 'kill');
+        let killCam: KillCamData | null = null;
+        if (killEvent) {
+          const killer = prev.units.find(u => u.id === nextUnitId);
+          const victim = prev.units.find(u =>
+            u.position.x === killEvent.targetPos.x && u.position.z === killEvent.targetPos.z && u.id !== nextUnitId
+          );
+          killCam = {
+            targetPos: killEvent.targetPos, attackerPos: killEvent.attackerPos,
+            victimName: victim?.name || 'Unknown', killerName: killer?.name || 'Unknown',
+            timestamp: Date.now(),
+          };
+        }
+
+        const nextInQueue = unitQueueRef.current[0] || null;
+        newState = { ...newState, selectedUnitId: nextInQueue, killCam };
+      }
 
       // Check for game over
       const alive = getAliveTeams(newState.units);
@@ -334,13 +394,13 @@ export function useGameStore() {
   useEffect(() => {
     autoPlayRef.current = state.autoPlay;
     if (state.autoPlay && state.phase !== 'game_over' && state.phase !== 'pre_game') {
+      const hasPendingCombat = pendingCombatUnitRef.current !== null;
       const hasQueue = unitQueueRef.current.length > 0;
       const isKillCam = state.killCam !== null;
-      // 3s pause for killcam, normal delays otherwise
-      const delay = isKillCam ? 3000 : hasQueue ? 1400 : 600;
+      // Delays: killcam 3s, pending combat 1.2s (wait for walk anim), normal unit 1.4s, team switch 0.6s
+      const delay = isKillCam ? 3000 : hasPendingCombat ? 1200 : hasQueue ? 1400 : 600;
       autoPlayTimerRef.current = setTimeout(() => {
         if (autoPlayRef.current) {
-          // Clear killcam before next step
           if (isKillCam) {
             setState(prev => ({ ...prev, killCam: null }));
           }

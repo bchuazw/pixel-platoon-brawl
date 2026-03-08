@@ -149,7 +149,7 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
 
   return (
     <div className="absolute inset-0 z-30 pointer-events-auto overflow-y-auto" onClick={handleClick}>
-      <div className="absolute inset-0 bg-background/85 backdrop-blur-md" />
+      <div className="fixed inset-0 bg-background/95 backdrop-blur-md z-[-1]" />
       
       <div className="absolute inset-0 pointer-events-none"
         style={{

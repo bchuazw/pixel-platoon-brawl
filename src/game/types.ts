@@ -89,7 +89,8 @@ export interface Unit {
   xp: number;
   abilities: Ability[];
   cooldowns: Record<string, number>;
-  isOnOverwatch: boolean;
+  isOnOverwatch: boolean; // legacy, kept for compat but unused
+  isHunkered: boolean;
   isSuppressed: boolean;
   coverType: 'none' | 'half' | 'full';
   kills: number;

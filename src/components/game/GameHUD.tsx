@@ -202,7 +202,7 @@ function Minimap({ state }: { state: GameState }) {
   );
 }
 
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, sponsorPoints, onUnitInspect }: GameHUDProps) {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

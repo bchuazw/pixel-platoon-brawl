@@ -524,47 +524,55 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
           const outOfZone = state.shrinkLevel > 0 && !isInZone(x, z, state.shrinkLevel);
           const colors = TERRAIN_COLORS[tile.type] || TERRAIN_COLORS.grass;
 
-          // Base tile
-          ctx.fillStyle = outOfZone ? '#2a1515' : colors.base;
-          ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-
-          // Pixel art detail — checkerboard pattern
-          if ((x + z) % 2 === 0) {
-            ctx.fillStyle = outOfZone ? '#331a1a' : colors.shade;
+          // Base tile with subtle variation using noise
+          const n = tileNoise(x, z, 0);
+          if (outOfZone) {
+            ctx.fillStyle = n > 0.5 ? '#2a1515' : '#241212';
             ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-          }
+          } else {
+            // Main fill
+            ctx.fillStyle = (x + z) % 2 === 0 ? colors.base : colors.shade;
+            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
 
-          // Highlight edge (top-left pixel art bevel)
-          if (!outOfZone) {
-            ctx.fillStyle = colors.highlight + '40';
+            // Natural noise patches — break up the grid
+            if (n > 0.55) {
+              ctx.fillStyle = colors.detail + '60';
+              ctx.fillRect(px + n * 4, pz + n * 6, TILE_SIZE * 0.5, TILE_SIZE * 0.4);
+            }
+            if (n < 0.3) {
+              ctx.fillStyle = colors.highlight + '30';
+              ctx.fillRect(px + 2, pz + 2, TILE_SIZE * 0.6, TILE_SIZE * 0.5);
+            }
+
+            // Bevel — subtle top-left highlight, bottom-right shadow
+            ctx.fillStyle = colors.highlight + '28';
             ctx.fillRect(px, pz, TILE_SIZE, 1);
             ctx.fillRect(px, pz, 1, TILE_SIZE);
+            ctx.fillStyle = '#00000018';
+            ctx.fillRect(px, pz + TILE_SIZE - 1, TILE_SIZE, 1);
+            ctx.fillRect(px + TILE_SIZE - 1, pz, 1, TILE_SIZE);
+
+            // Elevation shading
+            if (tile.elevation > 0.6) {
+              ctx.fillStyle = 'rgba(255,255,255,0.07)';
+              ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
+            } else if (tile.elevation < 0.3) {
+              ctx.fillStyle = 'rgba(0,0,0,0.1)';
+              ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
+            }
+
+            // Natural terrain detail (tufts, pebbles, ripples)
+            drawTerrainDetail(ctx, tile.type, px, pz, TILE_SIZE, tile.variant, tile.elevation);
           }
 
-          // Grid line
-          ctx.strokeStyle = outOfZone ? '#1a0808' : '#00000030';
+          // Grid line — very subtle
+          ctx.strokeStyle = outOfZone ? '#1a080808' : '#00000018';
           ctx.lineWidth = 0.5;
           ctx.strokeRect(px + 0.25, pz + 0.25, TILE_SIZE - 0.5, TILE_SIZE - 0.5);
 
-          // Elevation shading
-          if (tile.elevation > 0.6) {
-            ctx.fillStyle = 'rgba(255,255,255,0.06)';
-            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-          } else if (tile.elevation < 0.3) {
-            ctx.fillStyle = 'rgba(0,0,0,0.08)';
-            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-          }
-
-          // Props
+          // Props — drawn as pixel art shapes
           if (tile.prop) {
-            const glyph = PROP_GLYPHS[tile.prop];
-            if (glyph) {
-              ctx.fillStyle = glyph.color;
-              ctx.font = `bold ${TILE_SIZE * 0.55}px monospace`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(glyph.char, px + TILE_SIZE / 2, pz + TILE_SIZE / 2);
-            }
+            drawProp(ctx, tile.prop, px, pz, TILE_SIZE, tile.variant);
           }
 
           // Smoke

@@ -1,9 +1,10 @@
-import { GameState, Unit, TEAM_COLORS, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, GRID_SIZE, VISION_RANGE } from '@/game/types';
+import { GameState, Unit, TEAM_COLORS, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, GRID_SIZE, VISION_RANGE, Team } from '@/game/types';
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { Play, Pause, RotateCcw, Swords, Shield, Heart, Crosshair, Eye, Home, Trophy } from 'lucide-react';
 import { isInZone, getManhattanDistance } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import bgTactical from '@/assets/bg-tactical.png';
+import { BettingPanel } from './BettingPanel';
 
 interface GameHUDProps {
   state: GameState;

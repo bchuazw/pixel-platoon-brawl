@@ -1103,6 +1103,21 @@ export function getAliveTeams(units: Unit[]): Team[] {
 // phase: 'move' = movement + loot only, 'combat' = attack/abilities only
 // ══════════════════════════════════════════════
 
+// Find nearest loot tile for scouting/looting AI
+function findNearestLoot(pos: Position, grid: TileData[][]): Position | null {
+  let nearest: Position | null = null;
+  let nearestDist = Infinity;
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let z = 0; z < GRID_SIZE; z++) {
+      if (grid[x][z].loot) {
+        const d = Math.abs(pos.x - x) + Math.abs(pos.z - z);
+        if (d < nearestDist) { nearestDist = d; nearest = { x, z }; }
+      }
+    }
+  }
+  return nearest;
+}
+
 // Score a position for tactical value (used for lookahead)
 function scoreTacticalPosition(pos: Position, unit: Unit, enemies: Unit[], state: GameState): number {
   let score = getZonePenalty(pos, state.shrinkLevel);

@@ -11,6 +11,7 @@ const Index = () => {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
+    handleAirdropLanded,
   } = useGameStore();
 
   const handleTileClick = useCallback((pos: Position) => {

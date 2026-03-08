@@ -11,9 +11,9 @@ interface GameBoard2DProps {
 }
 
 // ── Isometric constants ──
-const TILE_W = 48;  // diamond width
-const TILE_H = 24;  // diamond height
-const ELEV_SCALE = 12; // pixels per elevation unit
+const TILE_W = 52;  // diamond width — slightly larger for readability
+const TILE_H = 26;  // diamond height
+const ELEV_SCALE = 10; // pixels per elevation unit
 const UNIT_H = 28;  // unit sprite height
 
 // ── Isometric transform: grid → screen ──
@@ -32,14 +32,14 @@ function fromIso(sx: number, sy: number): { gx: number; gz: number } {
 }
 
 // ── Tile color palette — rich & warm FFT-inspired ──
-const TILE_PALETTE: Record<string, { top: string; left: string; right: string; detail: string }> = {
-  grass:  { top: '#5a9648', left: '#3a6830', right: '#4a8038', detail: '#6aaa55' },
-  dirt:   { top: '#a08858', left: '#786840', right: '#8a7848', detail: '#b09868' },
-  stone:  { top: '#8a8a92', left: '#606068', right: '#707078', detail: '#9a9aa2' },
-  water:  { top: '#3878b8', left: '#285898', right: '#3068a8', detail: '#4890d0' },
-  sand:   { top: '#d8b868', left: '#b09048', right: '#c0a058', detail: '#e8c878' },
-  wall:   { top: '#686870', left: '#484850', right: '#585860', detail: '#787880' },
-  trench: { top: '#6a5840', left: '#4a3c28', right: '#5a4830', detail: '#7a6850' },
+const TILE_PALETTE: Record<string, { top: string; left: string; right: string }> = {
+  grass:  { top: '#5d9e4a', left: '#3d6e30', right: '#4d8e3a' },
+  dirt:   { top: '#9a8458', left: '#7a6840', right: '#8a7448' },
+  stone:  { top: '#8a8a90', left: '#626268', right: '#727278' },
+  water:  { top: '#3a7ab8', left: '#2a5a98', right: '#306aa8' },
+  sand:   { top: '#d4b468', left: '#b09448', right: '#c0a458' },
+  wall:   { top: '#686870', left: '#4a4a52', right: '#5a5a62' },
+  trench: { top: '#6a5840', left: '#4a3c28', right: '#5a4830' },
 };
 
 // ── Noise for tile variation ──
@@ -52,29 +52,41 @@ function tileNoise(x: number, z: number, seed: number): number {
 function drawIsoTile(
   ctx: CanvasRenderingContext2D,
   sx: number, sy: number,
-  colors: { top: string; left: string; right: string; detail: string },
+  colors: { top: string; left: string; right: string },
   elevation: number,
   outOfZone: boolean,
   highlight?: string,
+  tileType?: string,
+  noiseVal?: number,
 ) {
   const hw = TILE_W / 2;
   const hh = TILE_H / 2;
-  const sideH = Math.max(elevation * ELEV_SCALE, 4); // minimum side height for depth
+  const sideH = Math.max(elevation * ELEV_SCALE, 3);
 
   if (outOfZone) {
-    // Dead zone — desaturated red
-    drawDiamond(ctx, sx, sy, hw, hh, '#3a1818');
-    drawLeftFace(ctx, sx, sy, hw, hh, sideH, '#2a1010');
-    drawRightFace(ctx, sx, sy, hw, hh, sideH, '#221010');
+    drawDiamond(ctx, sx, sy, hw, hh, '#2a1212');
+    drawLeftFace(ctx, sx, sy, hw, hh, sideH, '#1a0a0a');
+    drawRightFace(ctx, sx, sy, hw, hh, sideH, '#200e0e');
     return;
   }
 
-  // Side faces (drawn first, behind top)
+  // Side faces
   drawLeftFace(ctx, sx, sy, hw, hh, sideH, colors.left);
   drawRightFace(ctx, sx, sy, hw, hh, sideH, colors.right);
 
-  // Top face (diamond)
+  // Top face
   drawDiamond(ctx, sx, sy, hw, hh, colors.top);
+
+  // Subtle noise variation on top face (not decoration — just color variation)
+  if (noiseVal !== undefined && tileType === 'grass') {
+    if (noiseVal > 0.7) {
+      drawDiamond(ctx, sx, sy, hw, hh, 'rgba(80,140,60,0.12)');
+    } else if (noiseVal < 0.25) {
+      drawDiamond(ctx, sx, sy, hw, hh, 'rgba(40,60,20,0.08)');
+    }
+  } else if (noiseVal !== undefined && tileType === 'dirt' && noiseVal > 0.75) {
+    drawDiamond(ctx, sx, sy, hw, hh, 'rgba(60,50,30,0.08)');
+  }
 
   // Highlight overlay
   if (highlight) {
@@ -115,150 +127,112 @@ function drawRightFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, hw
   ctx.fill();
 }
 
-// ── Draw isometric prop on tile ──
+// ── Draw isometric prop on tile — simplified, cleaner shapes ──
 function drawIsoProp(ctx: CanvasRenderingContext2D, prop: string, sx: number, sy: number) {
+  ctx.save();
   switch (prop) {
     case 'tree': {
-      // Trunk
-      ctx.fillStyle = '#5a4020';
-      ctx.fillRect(sx - 2, sy - 18, 4, 18);
-      // Canopy layers
-      ctx.fillStyle = '#2a6a1a';
-      drawTriangle(ctx, sx, sy - 30, 14, 16);
-      ctx.fillStyle = '#3a8a28';
-      drawTriangle(ctx, sx, sy - 22, 12, 12);
-      ctx.fillStyle = '#4a9a38';
-      drawTriangle(ctx, sx, sy - 16, 8, 8);
+      ctx.fillStyle = '#4a3418';
+      ctx.fillRect(sx - 2, sy - 16, 4, 16);
+      ctx.fillStyle = '#2e7a20';
+      ctx.beginPath(); ctx.arc(sx, sy - 22, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a9a2c';
+      ctx.beginPath(); ctx.arc(sx - 2, sy - 25, 7, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'rock': {
-      ctx.fillStyle = '#707070';
+      ctx.fillStyle = '#6a6a6e';
       ctx.beginPath();
-      ctx.moveTo(sx - 8, sy);
-      ctx.lineTo(sx - 5, sy - 10);
-      ctx.lineTo(sx + 3, sy - 12);
-      ctx.lineTo(sx + 9, sy - 4);
-      ctx.lineTo(sx + 6, sy + 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#888';
-      ctx.fillRect(sx - 4, sy - 9, 5, 2);
+      ctx.moveTo(sx - 7, sy); ctx.lineTo(sx - 4, sy - 9); ctx.lineTo(sx + 4, sy - 10);
+      ctx.lineTo(sx + 7, sy - 3); ctx.lineTo(sx + 5, sy + 1); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#7e7e82';
+      ctx.fillRect(sx - 3, sy - 8, 4, 2);
       break;
     }
     case 'crate': {
-      // 3D box
-      ctx.fillStyle = '#b08030';
-      ctx.fillRect(sx - 7, sy - 14, 14, 14);
-      ctx.fillStyle = '#c89848';
-      ctx.fillRect(sx - 7, sy - 14, 14, 3); // top
-      ctx.fillStyle = '#906820';
-      ctx.fillRect(sx - 1, sy - 14, 2, 14); // plank
-      ctx.fillRect(sx - 7, sy - 7, 14, 2);
+      ctx.fillStyle = '#a07028';
+      ctx.fillRect(sx - 6, sy - 12, 12, 12);
+      ctx.fillStyle = '#b88838';
+      ctx.fillRect(sx - 6, sy - 12, 12, 2);
+      ctx.fillStyle = '#885818';
+      ctx.fillRect(sx - 1, sy - 12, 2, 12);
       break;
     }
     case 'sandbag': {
-      ctx.fillStyle = '#a89868';
-      ctx.beginPath();
-      ctx.ellipse(sx - 4, sy - 3, 7, 4, -0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(sx + 4, sy - 3, 7, 4, 0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#b8a878';
-      ctx.beginPath();
-      ctx.ellipse(sx, sy - 8, 6, 4, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = '#a09060';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 4, 10, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b0a070';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 7, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'bush': {
       ctx.fillStyle = '#2a6820';
       ctx.beginPath(); ctx.arc(sx, sy - 5, 8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#3a8830';
-      ctx.beginPath(); ctx.arc(sx - 3, sy - 8, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#4a9840';
-      ctx.beginPath(); ctx.arc(sx + 3, sy - 7, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a8430';
+      ctx.beginPath(); ctx.arc(sx - 2, sy - 7, 5, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'barrel': {
-      ctx.fillStyle = '#6a4828';
-      ctx.fillRect(sx - 5, sy - 12, 10, 12);
-      ctx.fillStyle = '#8a6040';
-      ctx.beginPath(); ctx.ellipse(sx, sy - 12, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#555';
-      ctx.fillRect(sx - 5, sy - 9, 10, 2);
-      ctx.fillRect(sx - 5, sy - 4, 10, 2);
+      ctx.fillStyle = '#5a4020';
+      ctx.fillRect(sx - 5, sy - 11, 10, 11);
+      ctx.fillStyle = '#725030';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 11, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#444';
+      ctx.fillRect(sx - 5, sy - 8, 10, 1.5);
       break;
     }
     case 'ruins': {
-      ctx.fillStyle = '#686868';
-      ctx.fillRect(sx - 8, sy - 16, 6, 16);
-      ctx.fillRect(sx + 2, sy - 10, 6, 10);
-      ctx.fillStyle = '#585858';
-      ctx.fillRect(sx - 4, sy - 4, 8, 4);
-      ctx.fillStyle = '#787878';
-      ctx.fillRect(sx - 8, sy - 16, 6, 2);
+      ctx.fillStyle = '#606060';
+      ctx.fillRect(sx - 7, sy - 14, 5, 14);
+      ctx.fillRect(sx + 2, sy - 9, 5, 9);
+      ctx.fillStyle = '#707070';
+      ctx.fillRect(sx - 7, sy - 14, 5, 2);
       break;
     }
     case 'wire': {
-      ctx.strokeStyle = '#aaa';
+      ctx.strokeStyle = '#999';
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(sx - 10, sy - 4);
-      for (let i = 0; i < 5; i++) {
-        ctx.lineTo(sx - 10 + (i + 0.5) * 4, sy - 4 + (i % 2 === 0 ? -3 : 3));
-      }
-      ctx.lineTo(sx + 10, sy - 3);
-      ctx.stroke();
-      ctx.fillStyle = '#777';
-      ctx.fillRect(sx - 9, sy - 8, 2, 8);
-      ctx.fillRect(sx + 8, sy - 7, 2, 7);
+      ctx.beginPath(); ctx.moveTo(sx - 8, sy - 3);
+      for (let i = 0; i < 4; i++) ctx.lineTo(sx - 8 + (i + 0.5) * 4, sy - 3 + (i % 2 === 0 ? -2 : 2));
+      ctx.lineTo(sx + 8, sy - 2); ctx.stroke();
       break;
     }
     case 'jersey_barrier': {
-      ctx.fillStyle = '#a0a0a0';
-      ctx.fillRect(sx - 10, sy - 6, 20, 6);
-      ctx.fillStyle = '#b0b0b0';
-      ctx.fillRect(sx - 10, sy - 6, 20, 2);
-      ctx.fillStyle = '#e0a020';
-      ctx.fillRect(sx - 8, sy - 3, 16, 2);
+      ctx.fillStyle = '#9a9a9a';
+      ctx.fillRect(sx - 9, sy - 5, 18, 5);
+      ctx.fillStyle = '#aaa';
+      ctx.fillRect(sx - 9, sy - 5, 18, 1.5);
       break;
     }
     case 'burnt_vehicle': {
-      ctx.fillStyle = '#3a3a3a';
-      ctx.fillRect(sx - 12, sy - 8, 24, 8);
-      ctx.fillStyle = '#2a2a2a';
-      ctx.fillRect(sx - 8, sy - 14, 14, 7);
-      ctx.fillStyle = '#222';
-      ctx.beginPath(); ctx.arc(sx - 8, sy, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(sx + 8, sy, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#333';
+      ctx.fillRect(sx - 10, sy - 7, 20, 7);
+      ctx.fillStyle = '#282828';
+      ctx.fillRect(sx - 7, sy - 12, 12, 6);
       break;
     }
     case 'foxhole': {
       ctx.fillStyle = '#4a3828';
-      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#3a2818';
-      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 6, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#362818';
+      ctx.beginPath(); ctx.ellipse(sx, sy - 2, 5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
       break;
     }
     case 'hesco': {
-      ctx.fillStyle = '#8a8a60';
-      ctx.fillRect(sx - 8, sy - 10, 7, 10);
-      ctx.fillRect(sx + 1, sy - 10, 7, 10);
-      ctx.strokeStyle = '#6a6a48';
-      ctx.lineWidth = 0.8;
-      ctx.strokeRect(sx - 8, sy - 10, 7, 10);
-      ctx.strokeRect(sx + 1, sy - 10, 7, 10);
+      ctx.fillStyle = '#7a7a58';
+      ctx.fillRect(sx - 7, sy - 9, 6, 9);
+      ctx.fillRect(sx + 1, sy - 9, 6, 9);
       break;
     }
     case 'tank_trap': {
-      ctx.strokeStyle = '#666';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(sx - 8, sy + 2); ctx.lineTo(sx + 8, sy - 10); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(sx + 8, sy + 2); ctx.lineTo(sx - 8, sy - 10); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(sx, sy - 14); ctx.lineTo(sx, sy + 4); ctx.stroke();
+      ctx.strokeStyle = '#606060';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sx - 6, sy + 1); ctx.lineTo(sx + 6, sy - 9); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx + 6, sy + 1); ctx.lineTo(sx - 6, sy - 9); ctx.stroke();
       break;
     }
   }
+  ctx.restore();
 }
 
 function drawTriangle(ctx: CanvasRenderingContext2D, cx: number, cy: number, w: number, h: number) {
@@ -420,28 +394,7 @@ function darken(hex: string, amount: number): string {
   return `rgb(${Math.max(0, Math.min(255, Math.floor(r * f)))},${Math.max(0, Math.min(255, Math.floor(g * f)))},${Math.max(0, Math.min(255, Math.floor(b * f)))})`;
 }
 
-// ── Terrain detail decorations ──
-function drawTileDecor(ctx: CanvasRenderingContext2D, type: string, sx: number, sy: number, variant: number) {
-  const n = tileNoise(sx, sy, 42);
-  if (type === 'grass') {
-    ctx.fillStyle = '#6aaa55';
-    if (n > 0.5) { ctx.fillRect(sx - 8, sy - 3, 2, 3); ctx.fillRect(sx - 6, sy - 4, 2, 4); }
-    if (n > 0.7) { ctx.fillRect(sx + 5, sy - 2, 2, 3); }
-    if (n < 0.3) {
-      ctx.fillStyle = '#c8b040';
-      ctx.fillRect(sx + 3 + n * 4, sy - 2, 2, 2); // flower
-    }
-  } else if (type === 'dirt') {
-    ctx.fillStyle = '#786040';
-    if (n > 0.4) ctx.fillRect(sx - 4, sy - 1, 3, 2);
-    if (n > 0.6) ctx.fillRect(sx + 3, sy + 1, 2, 2);
-  } else if (type === 'water') {
-    const shimmer = Math.sin(variant * 0.01 + sx * 0.1) * 0.5 + 0.5;
-    ctx.fillStyle = `rgba(120,200,255,${shimmer * 0.2})`;
-    ctx.fillRect(sx - 6, sy - 1, 8, 1);
-    ctx.fillRect(sx + 2, sy + 1, 6, 1);
-  }
-}
+// ── Terrain detail removed — noise variation is now baked into drawIsoTile ──
 
 // ── Unit animation state ──
 interface UnitAnim {
@@ -671,31 +624,28 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
         if (abilitySet.has(key)) highlight = 'rgba(68,204,68,0.25)';
 
         // Draw tile
-        drawIsoTile(ctx, sx, sy, colors, tile.elevation, outOfZone, highlight);
+        const noiseVal = tileNoise(x, z, 7);
+        drawIsoTile(ctx, sx, sy, colors, tile.elevation, outOfZone, highlight, tile.type, noiseVal);
 
-        // Tile edge outline
-        ctx.strokeStyle = outOfZone ? '#1a0808' : 'rgba(0,0,0,0.15)';
-        ctx.lineWidth = 0.5;
-        const hw = TILE_W / 2, hh = TILE_H / 2;
-        ctx.beginPath();
-        ctx.moveTo(sx, sy - hh); ctx.lineTo(sx + hw, sy); ctx.lineTo(sx, sy + hh); ctx.lineTo(sx - hw, sy); ctx.closePath();
-        ctx.stroke();
-
-        // Terrain decorations
-        if (!outOfZone && !tile.prop) {
-          drawTileDecor(ctx, tile.type, sx, sy, tile.variant);
+        // Subtle tile edge — only on elevation changes for depth, not every tile
+        if (tile.elevation > 0) {
+          ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+          ctx.lineWidth = 0.5;
+          const hw = TILE_W / 2, hh = TILE_H / 2;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - hh); ctx.lineTo(sx + hw, sy); ctx.lineTo(sx, sy + hh); ctx.lineTo(sx - hw, sy); ctx.closePath();
+          ctx.stroke();
         }
 
         // Smoke
         if (tile.hasSmoke) {
-          ctx.fillStyle = 'rgba(180,200,220,0.3)';
-          drawDiamond(ctx, sx, sy, hw, hh, 'rgba(180,200,220,0.3)');
+          drawDiamond(ctx, sx, sy, TILE_W / 2, TILE_H / 2, 'rgba(180,200,220,0.3)');
         }
 
         // Loot glow
         if (tile.loot) {
           const lootPulse = 0.4 + Math.sin(timestamp * 0.004 + x + z) * 0.3;
-          drawDiamond(ctx, sx, sy, hw * 0.5, hh * 0.5, `rgba(255,204,68,${lootPulse})`);
+          drawDiamond(ctx, sx, sy, TILE_W * 0.25, TILE_H * 0.25, `rgba(255,204,68,${lootPulse})`);
           ctx.fillStyle = '#ffcc44';
           ctx.font = 'bold 10px monospace';
           ctx.textAlign = 'center';

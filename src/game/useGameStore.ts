@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST,
 } from './types';
@@ -10,13 +10,14 @@ import {
 
 export function useGameStore() {
   const [state, setState] = useState<GameState>(createInitialState);
+  const autoPlayRef = useRef(false);
+  const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addEvents = useCallback((events: CombatEvent[]) => {
     setState(prev => ({
       ...prev,
       combatEvents: [...prev.combatEvents, ...events],
     }));
-    // Auto-clear old events
     setTimeout(() => {
       setState(prev => ({
         ...prev,
@@ -25,8 +26,152 @@ export function useGameStore() {
     }, 3000);
   }, []);
 
+  const runFullTurn = useCallback(() => {
+    setState(prev => {
+      if (prev.phase === 'game_over' || prev.phase === 'pre_game') return prev;
+
+      const aliveTeams = getAliveTeams(prev.units);
+      if (aliveTeams.length <= 1) return prev;
+
+      let newState = { ...prev, units: prev.units.map(u => ({ ...u })) };
+
+      // Run current team AI
+      const currentTeamUnits = newState.units.filter(u => u.team === newState.currentTeam && u.isAlive);
+      // Reset current team AP
+      newState.units = newState.units.map(u => {
+        if (u.team === newState.currentTeam) {
+          const newCooldowns: Record<string, number> = {};
+          for (const [k, v] of Object.entries(u.cooldowns)) {
+            if (v > 0) newCooldowns[k] = v - 1;
+          }
+          return { ...u, ap: u.maxAp, isSuppressed: false, isOnOverwatch: false, cooldowns: newCooldowns };
+        }
+        return u;
+      });
+
+      const aiResult = runAiTurn(newState);
+      newState = aiResult.state;
+      const allEvents = [...aiResult.events];
+
+      const alive = getAliveTeams(newState.units);
+      if (alive.length <= 1) {
+        return {
+          ...newState,
+          log: [...newState.log, `🏆 ${alive[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
+          phase: 'game_over' as const, selectedUnitId: null,
+          movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+          combatEvents: [...prev.combatEvents, ...allEvents], activeAbility: null,
+          autoPlay: false,
+        };
+      }
+
+      // Advance to next team
+      const nextTeam = getNextTeam(newState.currentTeam, newState.units);
+      if (!nextTeam) return newState;
+
+      // Check if we completed a full round (back to first alive team)
+      const teamOrder = ['blue', 'red', 'green', 'yellow'] as const;
+      const firstAliveTeam = teamOrder.find(t => newState.units.some(u => u.team === t && u.isAlive));
+      const isNewRound = nextTeam === firstAliveTeam;
+
+      let { turn, shrinkLevel, zoneTimer } = newState;
+      const log = [...newState.log];
+
+      if (isNewRound) {
+        turn++;
+        zoneTimer--;
+        if (zoneTimer <= 0 && shrinkLevel < 4) {
+          shrinkLevel++;
+          zoneTimer = 4;
+          log.push(`═══════════════════════════`);
+          log.push(`⚠ DANGER ZONE LEVEL ${shrinkLevel}! The ring closes in!`);
+
+          newState.units = newState.units.map(u => {
+            if (u.isAlive && !isInZone(u.position.x, u.position.z, shrinkLevel)) {
+              const dmg = 15 * shrinkLevel;
+              const newHp = Math.max(0, u.hp - dmg);
+              log.push(`☠ ${u.name} takes ${dmg} zone damage!`);
+              allEvents.push({
+                id: `evt-${Date.now()}-${u.id}`, type: 'damage',
+                attackerPos: u.position, targetPos: u.position, value: dmg,
+                message: `☠ Zone damage!`, timestamp: Date.now(),
+              });
+              return { ...u, hp: newHp, isAlive: newHp > 0 };
+            }
+            return u;
+          });
+        }
+
+        // Clear smoke every 2 turns
+        let grid = newState.grid;
+        if (turn % 2 === 0) {
+          grid = grid.map(row => row.map(t => ({ ...t, hasSmoke: false })));
+        }
+        newState.grid = grid;
+
+        log.push(`═══════════════════════════`);
+        log.push(`» TURN ${turn} — ${nextTeam.toUpperCase()} TEAM'S MOVE`);
+        log.push(`» ${newState.units.filter(u => u.isAlive).length} combatants remaining`);
+      }
+
+      const alive2 = getAliveTeams(newState.units);
+      if (alive2.length <= 1) {
+        return {
+          ...newState,
+          log: [...log, `🏆 ${alive2[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
+          phase: 'game_over' as const, selectedUnitId: null,
+          movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+          combatEvents: [...prev.combatEvents, ...allEvents], activeAbility: null,
+          turn, shrinkLevel, zoneTimer, autoPlay: false,
+        };
+      }
+
+      return {
+        ...newState,
+        currentTeam: nextTeam,
+        turn, shrinkLevel, zoneTimer,
+        phase: 'select' as const,
+        selectedUnitId: null,
+        movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+        activeAbility: null,
+        log,
+        combatEvents: [...prev.combatEvents, ...allEvents],
+        attackPreview: null, hoveredTile: null,
+      };
+    });
+  }, []);
+
+  // Auto-play loop
+  useEffect(() => {
+    autoPlayRef.current = state.autoPlay;
+    if (state.autoPlay && state.phase !== 'game_over' && state.phase !== 'pre_game') {
+      autoPlayTimerRef.current = setTimeout(() => {
+        if (autoPlayRef.current) {
+          runFullTurn();
+        }
+      }, 1200);
+    }
+    return () => {
+      if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
+    };
+  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, runFullTurn]);
+
+  const startAutoPlay = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      phase: 'select',
+      autoPlay: true,
+      log: [...prev.log, '» AUTO-BATTLE ENGAGED! All teams controlled by AI.'],
+    }));
+  }, []);
+
+  const stopAutoPlay = useCallback(() => {
+    setState(prev => ({ ...prev, autoPlay: false }));
+  }, []);
+
   const selectUnit = useCallback((unitId: string) => {
     setState(prev => {
+      if (prev.autoPlay) return prev;
       const unit = prev.units.find(u => u.id === unitId);
       if (!unit || !unit.isAlive || unit.team !== prev.currentTeam) return prev;
       if (unit.ap <= 0) return prev;
@@ -57,15 +202,11 @@ export function useGameStore() {
         return u;
       });
 
-      // Check overwatch
       const movedUnit = units.find(u => u.id === prev.selectedUnitId)!;
       const owEvents = checkOverwatch(movedUnit, { ...prev, units });
 
       const unit = units.find(u => u.id === prev.selectedUnitId)!;
       const attackable = unit.ap >= AP_ATTACK_COST && unit.isAlive ? getAttackableTiles(unit, { ...prev, units }) : [];
-
-      const newLog = [...prev.log, ...owEvents.map(e => e.message)];
-      const newEvents = [...prev.combatEvents, ...owEvents];
 
       return {
         ...prev,
@@ -74,8 +215,8 @@ export function useGameStore() {
         movableTiles: [],
         attackableTiles: attackable,
         selectedUnitId: unit.isAlive && (attackable.length > 0 || unit.ap > 0) ? prev.selectedUnitId : null,
-        log: newLog,
-        combatEvents: newEvents,
+        log: [...prev.log, ...owEvents.map(e => e.message)],
+        combatEvents: [...prev.combatEvents, ...owEvents],
       };
     });
   }, []);
@@ -99,16 +240,15 @@ export function useGameStore() {
         return {
           ...prev, units, log: [...log, `🏆 ${aliveTeams[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
           phase: 'game_over', selectedUnitId: null, movableTiles: [], attackableTiles: [],
-          abilityTargetTiles: [], combatEvents: events, attackPreview: null,
+          abilityTargetTiles: [], combatEvents: events, attackPreview: null, autoPlay: false,
         };
       }
 
-      // Check if unit still has AP
       const canStillAct = attacker.ap > 0 && attacker.isAlive;
 
       return {
         ...prev, units, log,
-        phase: canStillAct ? 'select' : 'select',
+        phase: 'select',
         selectedUnitId: canStillAct ? prev.selectedUnitId : null,
         movableTiles: [],
         attackableTiles: canStillAct ? getAttackableTiles(attacker, { ...prev, units }) : [],
@@ -127,18 +267,16 @@ export function useGameStore() {
 
       const tiles = getAbilityTargetTiles(unit, abilityId, prev);
       if (abilityId === 'overwatch' && tiles.length > 0) {
-        // Instant activation
         const units = prev.units.map(u => {
           if (u.id === prev.selectedUnitId) {
-            const newCooldowns = { ...u.cooldowns };
-            return { ...u, isOnOverwatch: true, ap: u.ap - 1, cooldowns: newCooldowns };
+            return { ...u, isOnOverwatch: true, ap: u.ap - 1, cooldowns: { ...u.cooldowns } };
           }
           return u;
         });
         const evt: CombatEvent = {
           id: `evt-${Date.now()}`, type: 'overwatch',
           attackerPos: unit.position, targetPos: unit.position,
-          message: `👁 ${unit.name} goes on OVERWATCH — will fire on enemies that move in range`,
+          message: `👁 ${unit.name} goes on OVERWATCH`,
           timestamp: Date.now(),
         };
         return {
@@ -213,7 +351,7 @@ export function useGameStore() {
           const target = units.find(u => u.isAlive && u.position.x === pos.x && u.position.z === pos.z && u.team !== unit.team);
           if (target) {
             target.isSuppressed = true;
-            log.push(`🔫 ${unit.name} SUPPRESSES ${target.name}! Movement blocked, accuracy halved.`);
+            log.push(`🔫 ${unit.name} SUPPRESSES ${target.name}!`);
             events.push({
               id: `evt-${Date.now()}`, type: 'ability',
               attackerPos: unit.position, targetPos: target.position,
@@ -260,7 +398,7 @@ export function useGameStore() {
           ...prev, units, log: [...log, `🏆 ${aliveTeams[0]?.toUpperCase()} TEAM WINS!`],
           phase: 'game_over', selectedUnitId: null,
           movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
-          combatEvents: [...prev.combatEvents, ...events], activeAbility: null,
+          combatEvents: [...prev.combatEvents, ...events], activeAbility: null, autoPlay: false,
         };
       }
 
@@ -297,7 +435,6 @@ export function useGameStore() {
         ...prev,
         units: prev.units.map(u => {
           if (u.team === prev.currentTeam) {
-            // Reset AP, reduce cooldowns, clear overwatch
             const newCooldowns: Record<string, number> = {};
             for (const [k, v] of Object.entries(u.cooldowns)) {
               if (v > 0) newCooldowns[k] = v - 1;
@@ -314,7 +451,6 @@ export function useGameStore() {
 
       while (nextTeam && nextTeam !== 'blue') {
         newState.currentTeam = nextTeam;
-        // Reset AI team AP
         newState.units = newState.units.map(u => {
           if (u.team === nextTeam) {
             const newCooldowns: Record<string, number> = {};
@@ -337,7 +473,7 @@ export function useGameStore() {
             log: [...newState.log, `🏆 ${alive[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
             phase: 'game_over', selectedUnitId: null,
             movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
-            combatEvents: [...prev.combatEvents, ...allAiEvents], activeAbility: null,
+            combatEvents: [...prev.combatEvents, ...allAiEvents], activeAbility: null, autoPlay: false,
           };
         }
 
@@ -346,7 +482,6 @@ export function useGameStore() {
 
       if (!nextTeam) return newState;
 
-      // New turn for blue
       const newTurn = newState.turn + 1;
       let { shrinkLevel, zoneTimer } = newState;
       const log = [...newState.log];
@@ -374,7 +509,6 @@ export function useGameStore() {
         });
       }
 
-      // Reset blue team
       newState.units = newState.units.map(u => {
         if (u.team === 'blue') {
           const newCooldowns: Record<string, number> = {};
@@ -386,7 +520,6 @@ export function useGameStore() {
         return u;
       });
 
-      // Clear smoke every 2 turns
       let grid = newState.grid;
       if (newTurn % 2 === 0) {
         grid = grid.map(row => row.map(t => ({ ...t, hasSmoke: false })));
@@ -430,5 +563,6 @@ export function useGameStore() {
   return {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, addEvents,
+    startAutoPlay, stopAutoPlay, runFullTurn,
   };
 }

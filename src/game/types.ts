@@ -55,12 +55,12 @@ export interface TileData {
   type: TileType;
   prop: PropType;
   isBlocked: boolean;
-  coverValue: 0 | 1 | 2; // 0=none, 1=half, 2=full
+  coverValue: 0 | 1 | 2;
   variant: number;
   hasSmoke: boolean;
 }
 
-export type GamePhase = 'select' | 'move' | 'attack' | 'ability' | 'enemy_turn' | 'game_over';
+export type GamePhase = 'select' | 'move' | 'attack' | 'ability' | 'enemy_turn' | 'game_over' | 'pre_game';
 
 export interface CombatEvent {
   id: string;
@@ -97,6 +97,7 @@ export interface GameState {
   combatEvents: CombatEvent[];
   attackPreview: AttackPreview | null;
   hoveredTile: Position | null;
+  autoPlay: boolean;
 }
 
 export const GRID_SIZE = 20;

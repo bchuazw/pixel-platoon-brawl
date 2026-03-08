@@ -96,6 +96,9 @@ export interface Unit {
   weapon: Weapon;
   visionRange: number;
   armor: number;
+  killstreak: KillstreakId | null;
+  uavTurnsLeft: number;
+  empTurnsLeft: number;
 }
 
 export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand';

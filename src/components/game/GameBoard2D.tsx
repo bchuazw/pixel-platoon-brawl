@@ -89,6 +89,7 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
 
   // Animation state
   const unitAnims = useRef<Record<string, UnitAnim>>({});
+  const dustParticles = useRef<DustParticle[]>([]);
   const floatingTexts = useRef<FloatingText[]>([]);
   const lastEventCount = useRef(0);
   const animFrameId = useRef(0);

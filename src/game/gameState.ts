@@ -1347,7 +1347,7 @@ export function runAiUnitStep(
       }
     }
 
-    // Flee zone
+    // Flee zone — ONE move per step
     const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);
     if (currentlyOutsideZone && unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
       const movable = getMovableTiles(unit, newState);
@@ -1362,21 +1362,6 @@ export function runAiUnitStep(
           if (score > bestScore) { bestTile = t; bestScore = score; }
         }
         moveToTile(bestTile);
-        // If still outside zone and has AP, move again
-        if (unit.ap >= AP_MOVE_COST && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel)) {
-          const movable2 = getMovableTiles(unit, newState);
-          if (movable2.length > 0) {
-            let bestTile2 = movable2[0];
-            let bestScore2 = -Infinity;
-            for (const t of movable2) {
-              let score = 0;
-              if (isInZone(t.x, t.z, newState.shrinkLevel)) score += 200;
-              score -= getManhattanDistance(t, center);
-              if (score > bestScore2) { bestTile2 = t; bestScore2 = score; }
-            }
-            moveToTile(bestTile2);
-          }
-        }
       }
       updateAllUnitsCover(newState.units, newState.grid);
       return { state: newState, events: allEvents, didMove };
@@ -1414,38 +1399,36 @@ export function runAiUnitStep(
         }
       }
 
-      // Medic movement — use remaining AP for movement
-      while (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+      // Medic movement — ONE move per step (to sync with walk animation)
+      if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
         const movable = getMovableTiles(unit, newState);
-        if (movable.length === 0) break;
+        if (movable.length > 0) {
+          const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
+          let bestTile = unit.position;
+          let bestScore = currentScore;
 
-        const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
-        let bestTile = unit.position;
-        let bestScore = currentScore;
+          const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
+          const stayNearTarget = injuredAlly || allies[0];
 
-        const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
-        const stayNearTarget = injuredAlly || allies[0];
-
-        for (const t of movable) {
-          let score = evaluateWithLookahead(t, unit, allEnemies, newState);
-          if (stayNearTarget) {
-            const distToAlly = getManhattanDistance(t, stayNearTarget.position);
-            score += -Math.abs(distToAlly - 2) * 5;
+          for (const t of movable) {
+            let score = evaluateWithLookahead(t, unit, allEnemies, newState);
+            if (stayNearTarget) {
+              const distToAlly = getManhattanDistance(t, stayNearTarget.position);
+              score += -Math.abs(distToAlly - 2) * 5;
+            }
+            if (closest) {
+              const distToEnemy = getManhattanDistance(t, closest.position);
+              if (distToEnemy <= 2) score -= 15;
+            }
+            if (score > bestScore) { bestTile = t; bestScore = score; }
           }
-          if (closest) {
-            const distToEnemy = getManhattanDistance(t, closest.position);
-            if (distToEnemy <= 2) score -= 15;
+
+          if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
+            if (bestScore > currentScore + 3) {
+              moveToTile(bestTile);
+            }
           }
-          if (score > bestScore) { bestTile = t; bestScore = score; }
         }
-
-        if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
-          if (bestScore > currentScore + 3) {
-            moveToTile(bestTile);
-            continue; // Try to spend another AP on movement
-          }
-        }
-        break; // Not worth moving further
       }
     } else {
       // SOLDIER MOVE — can spend 1 or 2 AP on movement
@@ -1486,42 +1469,33 @@ export function runAiUnitStep(
             }
           }
         } else if (visibleEnemies.length === 0) {
-          // No enemies visible — can spend both AP on movement for scouting/looting
-          let movesRemaining = 2; // max 2 move actions
-          while (movesRemaining > 0 && unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
-            movesRemaining--;
+          // No enemies visible — ONE move per step for scouting/looting
+          if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
             const movable = getMovableTiles(unit, newState);
-            if (movable.length === 0) break;
+            if (movable.length > 0) {
+              let bestTile = unit.position;
+              let bestScore = -Infinity;
+              const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
 
-            let bestTile = unit.position;
-            let bestScore = -Infinity;
-            const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
-
-            for (const t of movable) {
-              let score = evaluateWithLookahead(t, unit, allEnemies, newState);
-              const nearestLoot = findNearestLoot(t, newState.grid);
-              if (nearestLoot) {
-                score += Math.max(0, 20 - getManhattanDistance(t, nearestLoot) * 3);
+              for (const t of movable) {
+                let score = evaluateWithLookahead(t, unit, allEnemies, newState);
+                const nearestLoot = findNearestLoot(t, newState.grid);
+                if (nearestLoot) {
+                  score += Math.max(0, 20 - getManhattanDistance(t, nearestLoot) * 3);
+                }
+                const centerDist = getManhattanDistance(t, { x: Math.floor(GRID_SIZE/2), z: Math.floor(GRID_SIZE/2) });
+                score += Math.max(0, 10 - centerDist);
+                if (score > bestScore) { bestTile = t; bestScore = score; }
               }
-              const centerDist = getManhattanDistance(t, { x: Math.floor(GRID_SIZE/2), z: Math.floor(GRID_SIZE/2) });
-              score += Math.max(0, 10 - centerDist);
-              if (score > bestScore) { bestTile = t; bestScore = score; }
-            }
 
-            if ((bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) && bestScore > currentScore) {
-              // Check path for mid-movement target detection
-              const stopTile = findBestStopAlongPath(unit.position, bestTile);
-              if (stopTile) {
-                moveToTile(stopTile);
-                break; // Found enemy, stop moving — save AP for combat
+              if ((bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) && bestScore > currentScore) {
+                const stopTile = findBestStopAlongPath(unit.position, bestTile);
+                if (stopTile) {
+                  moveToTile(stopTile);
+                } else {
+                  moveToTile(bestTile);
+                }
               }
-              moveToTile(bestTile);
-              
-              // After moving, re-check for visible enemies
-              const newVisible = getVisibleEnemies(unit, newState.units);
-              if (newVisible.length > 0) break; // Found enemies, save remaining AP
-            } else {
-              break;
             }
           }
         } else {

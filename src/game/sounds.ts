@@ -1,5 +1,7 @@
-// Sound effects using Web Audio API
+// Sound effects + background music using Web Audio API
 let audioCtx: AudioContext | null = null;
+let bgMusicGain: GainNode | null = null;
+let bgMusicPlaying = false;
 
 function getAudioCtx(): AudioContext {
   if (!audioCtx) audioCtx = new AudioContext();
@@ -101,4 +103,92 @@ export function playAbility() {
 export function playMove() {
   playNoise(0.06, 200, 'sine', 0.03);
   setTimeout(() => playNoise(0.06, 250, 'sine', 0.03), 100);
+}
+
+export function playPickup() {
+  playNoise(0.1, 800, 'sine', 0.08);
+  setTimeout(() => playNoise(0.1, 1200, 'sine', 0.08), 60);
+  setTimeout(() => playNoise(0.15, 1600, 'sine', 0.06), 120);
+}
+
+// ── Background Music (procedural ambient battlefield) ──
+let bgInterval: ReturnType<typeof setInterval> | null = null;
+
+function playBgNote(freq: number, duration: number, vol: number, type: OscillatorType = 'sine') {
+  try {
+    const ctx = getAudioCtx();
+    if (!bgMusicGain) {
+      bgMusicGain = ctx.createGain();
+      bgMusicGain.gain.value = 0.04;
+      bgMusicGain.connect(ctx.destination);
+    }
+    const osc = ctx.createOscillator();
+    const noteGain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    noteGain.gain.setValueAtTime(vol, ctx.currentTime);
+    noteGain.gain.setValueAtTime(vol, ctx.currentTime + duration * 0.7);
+    noteGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(noteGain);
+    noteGain.connect(bgMusicGain);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  } catch { /* ignore */ }
+}
+
+// Dark minor key ambient - battlefield atmosphere
+const BG_NOTES = [
+  // Am drone pattern
+  { freq: 110, dur: 4, vol: 0.3, type: 'sine' as OscillatorType },
+  { freq: 82.4, dur: 4, vol: 0.25, type: 'sine' as OscillatorType },
+  { freq: 130.8, dur: 3, vol: 0.15, type: 'triangle' as OscillatorType },
+  { freq: 164.8, dur: 3, vol: 0.12, type: 'triangle' as OscillatorType },
+  { freq: 98, dur: 4, vol: 0.2, type: 'sine' as OscillatorType },
+  { freq: 146.8, dur: 3.5, vol: 0.15, type: 'triangle' as OscillatorType },
+  { freq: 73.4, dur: 5, vol: 0.25, type: 'sine' as OscillatorType },
+  { freq: 123.5, dur: 3, vol: 0.18, type: 'sine' as OscillatorType },
+];
+
+let bgNoteIdx = 0;
+
+export function startBgMusic() {
+  if (bgMusicPlaying) return;
+  bgMusicPlaying = true;
+  
+  const playNextNote = () => {
+    if (!bgMusicPlaying) return;
+    const note = BG_NOTES[bgNoteIdx % BG_NOTES.length];
+    playBgNote(note.freq, note.dur, note.vol, note.type);
+    
+    // Occasional distant rumble
+    if (Math.random() < 0.3) {
+      setTimeout(() => {
+        if (bgMusicPlaying) {
+          playBgNote(40 + Math.random() * 30, 2, 0.08, 'sawtooth');
+        }
+      }, 1000 + Math.random() * 2000);
+    }
+    
+    // Occasional high ambient whistle
+    if (Math.random() < 0.2) {
+      setTimeout(() => {
+        if (bgMusicPlaying) {
+          playBgNote(800 + Math.random() * 400, 1.5, 0.02, 'sine');
+        }
+      }, 500 + Math.random() * 1500);
+    }
+    
+    bgNoteIdx++;
+  };
+
+  playNextNote();
+  bgInterval = setInterval(playNextNote, 3000 + Math.random() * 1000);
+}
+
+export function stopBgMusic() {
+  bgMusicPlaying = false;
+  if (bgInterval) {
+    clearInterval(bgInterval);
+    bgInterval = null;
+  }
 }

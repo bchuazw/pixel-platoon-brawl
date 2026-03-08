@@ -444,7 +444,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
             </Text>
             <Text fontSize={0.06} color="#999999" anchorX="center" anchorY="middle" position={[0, -0.11, 0]}
               outlineWidth={0.015} outlineColor="#000000" font={undefined}>
-              {unit.unitClass.toUpperCase()} Lv{unit.level}
+              {unit.weapon.name} {unit.weapon.ammo !== -1 ? `[${unit.weapon.ammo}]` : ''}
             </Text>
           </Billboard>
         )}

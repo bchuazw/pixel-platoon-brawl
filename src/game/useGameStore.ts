@@ -850,10 +850,29 @@ export function useGameStore() {
     setState(prev => ({ ...prev, movePath: null, movingUnitId: null }));
   }, []);
 
+  const handleAirdropLanded = useCallback((airdrop: AirdropData) => {
+    setState(prev => {
+      const grid = prev.grid.map(row => row.map(t => ({ ...t })));
+      const tile = grid[airdrop.targetPos.x]?.[airdrop.targetPos.z];
+      if (tile && !tile.loot) {
+        tile.loot = airdrop.loot;
+      }
+      const airdrops = prev.airdrops.map(a =>
+        a.id === airdrop.id ? { ...a, phase: 'landed' as const } : a
+      );
+      return {
+        ...prev,
+        grid,
+        airdrops,
+        log: [...prev.log, `📦 Supply crate landed at (${airdrop.targetPos.x}, ${airdrop.targetPos.z})! Contains: ${airdrop.loot.name}`],
+      };
+    });
+  }, []);
+
   return {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
-    placeBet, betTeam, betAmount, collectBetPayout,
+    placeBet, betTeam, betAmount, collectBetPayout, handleAirdropLanded,
   };
 }

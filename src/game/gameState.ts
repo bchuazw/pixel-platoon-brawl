@@ -872,6 +872,19 @@ export function runAiUnitStep(
     }
   };
 
+  // ── Use killstreak if holding one and enemies are visible ──
+  if (unit.killstreak && visibleEnemies.length > 0) {
+    // Use airstrike/EMP when 2+ enemies visible, UAV/supply always
+    const shouldUse = unit.killstreak === 'uav' || unit.killstreak === 'supply_drop'
+      || (unit.killstreak === 'airstrike' && visibleEnemies.some(e => getManhattanDistance(unit.position, e.position) <= 3))
+      || (unit.killstreak === 'emp' && visibleEnemies.length >= 2);
+    if (shouldUse) {
+      const ksEvents = activateKillstreak(unit, newState.units, newState.grid);
+      allEvents.push(...ksEvents);
+      newState.log = [...newState.log, ...ksEvents.map(e => e.message)];
+    }
+  }
+
   // ── Currently outside zone? FLEE TO SAFETY FIRST ──
   const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);
 

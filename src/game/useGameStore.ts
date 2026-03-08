@@ -6,6 +6,7 @@ import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
   performAttack, getNextTeam, getAliveTeams, runAiTurn, runAiUnitStep, isInZone,
   checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot, findPath,
+  activateKillstreak, tickKillstreakEffects,
 } from './gameState';
 import { startBgMusic, stopBgMusic, playPickup, playHeal, playMove } from './sounds';
 import { SponsorAction } from '@/components/game/CharacterPanel';
@@ -273,6 +274,9 @@ export function useGameStore() {
           log.push(`» ROUND ${turn}`);
           log.push(`» ${newState.units.filter(u => u.isAlive).length} combatants remaining`);
         }
+
+        // Tick killstreak effects at start of each new round
+        tickKillstreakEffects(nextTeam, newState.units);
 
         const alive2 = getAliveTeams(newState.units);
         if (alive2.length <= 1) {

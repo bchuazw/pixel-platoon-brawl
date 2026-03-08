@@ -3,6 +3,7 @@ import {
   CLASS_STATS, CLASS_ABILITIES, TileType, PropType, CombatEvent,
   AP_MOVE_COST, AP_ATTACK_COST, AttackPreview, AbilityId,
   WEAPONS, WeaponId, LootItem, LootType, Weapon, VISION_RANGE,
+  KillstreakId,
 } from './types';
 
 // ── Random ──
@@ -64,22 +65,30 @@ function getTerrainElevation(x: number, z: number, seed: number, flatZones?: Pos
 // ── Loot Generation ──
 function generateLootItem(rand: () => number): LootItem {
   const roll = rand();
-  if (roll < 0.18) {
+  if (roll < 0.14) {
     return { type: 'weapon', weaponId: 'rifle', value: 0, icon: '🔫', name: 'Assault Rifle' };
-  } else if (roll < 0.30) {
+  } else if (roll < 0.24) {
     return { type: 'weapon', weaponId: 'shotgun', value: 0, icon: '💥', name: 'Shotgun' };
-  } else if (roll < 0.40) {
+  } else if (roll < 0.32) {
     return { type: 'weapon', weaponId: 'sniper_rifle', value: 0, icon: '🎯', name: 'Sniper Rifle' };
-  } else if (roll < 0.46) {
+  } else if (roll < 0.37) {
     return { type: 'weapon', weaponId: 'rocket_launcher', value: 0, icon: '🚀', name: 'Rocket Launcher' };
-  } else if (roll < 0.56) {
+  } else if (roll < 0.45) {
     return { type: 'weapon', weaponId: 'smg', value: 0, icon: '⚡', name: 'SMG' };
-  } else if (roll < 0.72) {
+  } else if (roll < 0.58) {
     return { type: 'medkit', value: 40, icon: '❤️', name: 'Medkit' };
-  } else if (roll < 0.88) {
+  } else if (roll < 0.70) {
     return { type: 'armor', value: 8, icon: '🛡️', name: 'Armor Vest' };
-  } else {
+  } else if (roll < 0.80) {
     return { type: 'ammo', value: 0, icon: '📦', name: 'Ammo Crate' };
+  } else if (roll < 0.86) {
+    return { type: 'killstreak', killstreakId: 'uav', value: 0, icon: '📡', name: 'UAV' };
+  } else if (roll < 0.92) {
+    return { type: 'killstreak', killstreakId: 'supply_drop', value: 0, icon: '📦', name: 'Supply Drop' };
+  } else if (roll < 0.96) {
+    return { type: 'killstreak', killstreakId: 'airstrike', value: 0, icon: '✈️', name: 'Airstrike' };
+  } else {
+    return { type: 'killstreak', killstreakId: 'emp', value: 0, icon: '⚡', name: 'EMP Blast' };
   }
 }
 
@@ -300,6 +309,9 @@ function createUnit(id: string, name: string, unitClass: UnitClass, team: Team, 
     weapon: pistol,
     visionRange: VISION_RANGE,
     armor: 0,
+    killstreak: null,
+    uavTurnsLeft: 0,
+    empTurnsLeft: 0,
   };
 }
 
@@ -344,12 +356,113 @@ export function pickupLoot(unit: Unit, tile: TileData): { picked: boolean; messa
       }
       break;
     }
+    case 'killstreak': {
+      if (loot.killstreakId && !unit.killstreak) {
+        unit.killstreak = loot.killstreakId;
+        tile.loot = null;
+        return { picked: true, message: `🎖️ ${unit.name} picks up ${loot.name}! Ready to activate.` };
+      } else if (loot.killstreakId && unit.killstreak) {
+        // Already holding one — swap it
+        unit.killstreak = loot.killstreakId;
+        tile.loot = null;
+        return { picked: true, message: `🎖️ ${unit.name} swaps killstreak for ${loot.name}!` };
+      }
+      break;
+    }
   }
   tile.loot = null;
   return { picked: true, message: `📦 ${unit.name} picks up ${loot.name}!` };
 }
 
-// ── Fog of War ──
+// ── Killstreak Activation ──
+export function activateKillstreak(unit: Unit, allUnits: Unit[], grid: TileData[][]): CombatEvent[] {
+  if (!unit.killstreak) return [];
+  const events: CombatEvent[] = [];
+  const ks = unit.killstreak;
+  unit.killstreak = null;
+
+  switch (ks) {
+    case 'uav': {
+      // Boost vision for entire team for 3 turns
+      for (const u of allUnits) {
+        if (u.isAlive && u.team === unit.team) {
+          u.uavTurnsLeft = 3;
+          u.visionRange = VISION_RANGE + 4;
+        }
+      }
+      events.push({ id: makeEventId(), type: 'ability', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `📡 ${unit.name} calls in UAV! Team vision boosted for 3 turns!`, timestamp: Date.now() });
+      break;
+    }
+    case 'supply_drop': {
+      // Full heal, refill ammo, +1 AP
+      unit.hp = unit.maxHp;
+      if (unit.weapon.ammo !== -1) unit.weapon.ammo = unit.weapon.maxAmmo;
+      unit.ap = Math.min(unit.ap + 1, unit.maxAp + 1);
+      events.push({ id: makeEventId(), type: 'ability', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `📦 ${unit.name} calls in Supply Drop! Full heal + ammo + AP!`, timestamp: Date.now() });
+      break;
+    }
+    case 'airstrike': {
+      // Deal 30 damage to all enemies within 3 tiles of unit
+      const radius = 3;
+      for (const enemy of allUnits) {
+        if (!enemy.isAlive || enemy.team === unit.team) continue;
+        if (getManhattanDistance(unit.position, enemy.position) <= radius) {
+          const dmg = 25 + Math.floor(Math.random() * 15);
+          enemy.hp -= dmg;
+          if (enemy.hp <= 0) { enemy.hp = 0; enemy.isAlive = false; unit.kills++; }
+          events.push({
+            id: makeEventId(),
+            type: enemy.isAlive ? 'damage' : 'kill',
+            attackerPos: { ...unit.position }, targetPos: { ...enemy.position },
+            value: dmg,
+            message: enemy.isAlive
+              ? `✈️ Airstrike hits ${enemy.name} for ${dmg} damage!`
+              : `✈️💀 Airstrike kills ${enemy.name}!`,
+            timestamp: Date.now(),
+          });
+        }
+      }
+      if (events.length === 0) {
+        events.push({ id: makeEventId(), type: 'ability', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `✈️ ${unit.name} calls Airstrike but no enemies in range!`, timestamp: Date.now() });
+      }
+      break;
+    }
+    case 'emp': {
+      // Suppress all enemies for 2 turns, disable overwatch
+      for (const enemy of allUnits) {
+        if (!enemy.isAlive || enemy.team === unit.team) continue;
+        enemy.isSuppressed = true;
+        enemy.isOnOverwatch = false;
+        enemy.empTurnsLeft = 2;
+      }
+      events.push({ id: makeEventId(), type: 'ability', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `⚡ ${unit.name} activates EMP Blast! All enemies suppressed!`, timestamp: Date.now() });
+      break;
+    }
+  }
+
+  return events;
+}
+
+// ── Turn-based Killstreak Tick (call at start of team's turn) ──
+export function tickKillstreakEffects(team: Team, units: Unit[]) {
+  for (const u of units) {
+    if (!u.isAlive) continue;
+    // UAV countdown
+    if (u.team === team && u.uavTurnsLeft > 0) {
+      u.uavTurnsLeft--;
+      if (u.uavTurnsLeft <= 0) {
+        u.visionRange = VISION_RANGE;
+      }
+    }
+    // EMP countdown
+    if (u.team !== team && u.empTurnsLeft > 0) {
+      u.empTurnsLeft--;
+      if (u.empTurnsLeft <= 0) {
+        u.isSuppressed = false;
+      }
+    }
+  }
+}
 export function canUnitSee(unit: Unit, targetPos: Position): boolean {
   return getManhattanDistance(unit.position, targetPos) <= unit.visionRange;
 }
@@ -758,6 +871,19 @@ export function runAiUnitStep(
       }
     }
   };
+
+  // ── Use killstreak if holding one and enemies are visible ──
+  if (unit.killstreak && visibleEnemies.length > 0) {
+    // Use airstrike/EMP when 2+ enemies visible, UAV/supply always
+    const shouldUse = unit.killstreak === 'uav' || unit.killstreak === 'supply_drop'
+      || (unit.killstreak === 'airstrike' && visibleEnemies.some(e => getManhattanDistance(unit.position, e.position) <= 3))
+      || (unit.killstreak === 'emp' && visibleEnemies.length >= 2);
+    if (shouldUse) {
+      const ksEvents = activateKillstreak(unit, newState.units, newState.grid);
+      allEvents.push(...ksEvents);
+      newState.log = [...newState.log, ...ksEvents.map(e => e.message)];
+    }
+  }
 
   // ── Currently outside zone? FLEE TO SAFETY FIRST ──
   const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);

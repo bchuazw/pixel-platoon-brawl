@@ -4,6 +4,7 @@ import { Play, Pause, RotateCcw, Heart, Shield, Crosshair, Home, Target, Skull }
 import { isInZone } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import { PreGameScreen } from './PreGameScreen';
+import { TacticalMinimap } from './TacticalMinimap';
 
 import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
 import portraitSoldierRed from '@/assets/portrait-soldier-red.png';

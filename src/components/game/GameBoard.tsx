@@ -293,24 +293,29 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <ZoneBorder shrinkLevel={state.shrinkLevel} />
 
         <OrbitControls
+          ref={orbitRef}
           target={[CENTER.x, 0, CENTER.z]}
-          enableRotate={false}
+          enableRotate={true}
           enablePan={true}
           enableZoom={true}
-          minDistance={8}
-          maxDistance={40}
-          maxPolarAngle={Math.PI / 2.3}
-          minPolarAngle={Math.PI / 8}
-          panSpeed={1.2}
+          minDistance={10}
+          maxDistance={45}
+          maxPolarAngle={Math.PI / 2.5}
+          minPolarAngle={Math.PI / 6}
+          rotateSpeed={0.5}
+          panSpeed={0.8}
+          zoomSpeed={0.8}
+          enableDamping={true}
+          dampingFactor={0.08}
           screenSpacePanning={false}
           mouseButtons={{
             LEFT: THREE.MOUSE.PAN,
             MIDDLE: THREE.MOUSE.DOLLY,
-            RIGHT: THREE.MOUSE.PAN,
+            RIGHT: THREE.MOUSE.ROTATE,
           }}
           touches={{
             ONE: THREE.TOUCH.PAN,
-            TWO: THREE.TOUCH.DOLLY_PAN,
+            TWO: THREE.TOUCH.DOLLY_ROTATE,
           }}
         />
       </Canvas>

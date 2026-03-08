@@ -601,7 +601,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
   return (
     <group
       ref={rootRef}
-      position={[unit.position.x, 0.01, unit.position.z]}
+      position={[unit.position.x, getUnitBaseY(grid, unit.position.x, unit.position.z), unit.position.z]}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <group ref={bodyRef}>

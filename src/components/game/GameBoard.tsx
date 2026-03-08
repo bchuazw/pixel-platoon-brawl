@@ -196,12 +196,12 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <color attach="background" args={['#0c1a12']} />
         <Stars radius={80} depth={40} count={800} factor={2} saturation={0.1} fade speed={0.5} />
 
-        <ambientLight intensity={0.35} color="#8899aa" />
-        <directionalLight position={[15, 25, 15]} intensity={0.7} castShadow color="#ffd8a0"
+        <ambientLight intensity={0.55} color="#99aabb" />
+        <directionalLight position={[15, 25, 15]} intensity={0.9} castShadow color="#ffe0b0"
           shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-        <directionalLight position={[-10, 15, -10]} intensity={0.12} color="#6688cc" />
-        <hemisphereLight intensity={0.3} color="#556677" groundColor="#1a2a12" />
-        <fog attach="fog" args={['#0c1a12', 25, 65]} />
+        <directionalLight position={[-10, 15, -10]} intensity={0.2} color="#7799dd" />
+        <hemisphereLight intensity={0.45} color="#778899" groundColor="#2a3a22" />
+        <fog attach="fog" args={['#1a2a1e', 30, 70]} />
 
         <DustParticles />
 

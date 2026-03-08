@@ -57,6 +57,7 @@ function SoldierBody({ teamColor, isMedic, unitId }: { teamColor: string; isMedi
   const skinMat = useMemo(() => getMat('#c8a882', 0, 0.85), []);
   const bootMat = useMemo(() => getMat('#1e1a14', 0.1, 0.7), []);
   const gearMat = useMemo(() => getMat('#2e2e28', 0.15, 0.6), []);
+  const beardMat = useMemo(() => getMat('#5a3a1a', 0, 0.9), []);
   const helmetMat = useMemo(() => getMat(armorColor, 0.25, 0.45), [armorColor]);
   const visorMat = useMemo(() => getMat('#0a0a0a', 0.8, 0.15), []);
 

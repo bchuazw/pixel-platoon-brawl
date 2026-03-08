@@ -662,7 +662,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       ))}
 
       {/* Victory screen */}
-      {isGameOver && <VictoryScreen state={state} onRestart={onRestart} onMainMenu={onMainMenu} />}
+      {isGameOver && <VictoryScreen state={state} onRestart={onRestart} onMainMenu={onMainMenu} betTeam={betTeam} betAmount={betAmount} collectBetPayout={collectBetPayout} />}
     </div>
   );
 }

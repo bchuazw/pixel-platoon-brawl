@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team, KillCamData,
+  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team, KillCamData, AirdropData,
 } from './types';
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
   performAttack, getNextTeam, getAliveTeams, runAiTurn, runAiUnitStep, isInZone,
   checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot, findPath,
-  activateKillstreak, tickKillstreakEffects, applyExplosionDamage,
+  activateKillstreak, tickKillstreakEffects, applyExplosionDamage, generateAirdrops,
 } from './gameState';
 import { startBgMusic, stopBgMusic, playPickup, playHeal, playMove } from './sounds';
 import { SponsorAction } from '@/components/game/CharacterPanel';

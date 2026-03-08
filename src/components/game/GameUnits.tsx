@@ -291,19 +291,57 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       if (rightLegRef.current) rightLegRef.current.rotation.set(0, 0, 0);
     };
 
-    // ── DEATH ──
-    if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 3)) {
+    // ── DEATH with physics-based ragdoll ──
+    if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 5)) {
       deathTimer.current += delta;
       const dt = deathTimer.current;
 
-      // Ragdoll collapse
-      bodyRef.current.rotation.x = Math.min(Math.PI / 2, dt * 2.5);
-      bodyRef.current.position.y = -Math.min(0.3, dt * 0.2);
+      // Phase 1: Initial knockback (0-0.3s)
+      if (dt < 0.3) {
+        const knockT = dt / 0.3;
+        bodyRef.current.rotation.x = knockT * -0.3; // stagger back
+        bodyRef.current.position.y = knockT * 0.05; // slight lift
+        bodyRef.current.position.z = -knockT * 0.1; // push back
+      }
+      // Phase 2: Collapse with gravity (0.3-1.2s)
+      else if (dt < 1.2) {
+        const fallT = (dt - 0.3) / 0.9;
+        const eased = fallT * fallT; // gravity acceleration
+        bodyRef.current.rotation.x = -0.3 + eased * (Math.PI / 2 + 0.3); // fall forward
+        bodyRef.current.position.y = 0.05 - eased * 0.35; // drop down
+        bodyRef.current.position.z = -0.1 + eased * 0.15;
 
-      if (leftArmRef.current) leftArmRef.current.rotation.z = -Math.min(Math.PI / 3, dt * 3);
-      if (rightArmRef.current) rightArmRef.current.rotation.z = Math.min(Math.PI / 3, dt * 3);
-      if (leftLegRef.current) leftLegRef.current.rotation.x = -Math.min(0.3, dt);
-      if (rightLegRef.current) rightLegRef.current.rotation.x = Math.min(0.2, dt * 0.8);
+        // Arms flail outward
+        if (leftArmRef.current) {
+          leftArmRef.current.rotation.z = -eased * (Math.PI / 2.5);
+          leftArmRef.current.rotation.x = Math.sin(dt * 12) * (1 - eased) * 0.5;
+        }
+        if (rightArmRef.current) {
+          rightArmRef.current.rotation.z = eased * (Math.PI / 2.5);
+          rightArmRef.current.rotation.x = Math.sin(dt * 10 + 1) * (1 - eased) * 0.5;
+        }
+        // Legs buckle
+        if (leftLegRef.current) {
+          leftLegRef.current.rotation.x = -eased * 0.6;
+          leftLegRef.current.rotation.z = eased * 0.15;
+        }
+        if (rightLegRef.current) {
+          rightLegRef.current.rotation.x = eased * 0.3;
+          rightLegRef.current.rotation.z = -eased * 0.1;
+        }
+      }
+      // Phase 3: Settle on ground with bounce (1.2s+)
+      else {
+        bodyRef.current.rotation.x = Math.PI / 2;
+        const settleT = dt - 1.2;
+        const bounce = Math.exp(-settleT * 4) * Math.sin(settleT * 8) * 0.03;
+        bodyRef.current.position.y = -0.3 + bounce;
+
+        if (leftArmRef.current) leftArmRef.current.rotation.z = -Math.PI / 2.5;
+        if (rightArmRef.current) rightArmRef.current.rotation.z = Math.PI / 2.5;
+        if (leftLegRef.current) { leftLegRef.current.rotation.x = -0.6; leftLegRef.current.rotation.z = 0.15; }
+        if (rightLegRef.current) { rightLegRef.current.rotation.x = 0.3; rightLegRef.current.rotation.z = -0.1; }
+      }
 
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       return;
@@ -555,7 +593,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
 
   const bootColor = '#2a2218';
 
-  if (!unit.isAlive && deathTimer.current >= 3) return null;
+  if (!unit.isAlive && deathTimer.current >= 5) return null;
 
   const hpPercent = unit.hp / unit.maxHp;
   const apDots = [];

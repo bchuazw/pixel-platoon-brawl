@@ -625,10 +625,10 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       )}
 
       {/* Status icons */}
-      {unit.isOnOverwatch && (
+      {unit.isHunkered && (
         <Billboard position={[-0.22, 0.72, 0]}>
-          <Text fontSize={0.09} color="#44aaff" anchorX="center" anchorY="middle" font={undefined}
-            outlineWidth={0.012} outlineColor="#000000">👁</Text>
+          <Text fontSize={0.09} color="#ffaa00" anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.012} outlineColor="#000000">🛡</Text>
         </Billboard>
       )}
       {unit.isSuppressed && (

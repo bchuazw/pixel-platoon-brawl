@@ -56,6 +56,7 @@ interface GameBoardProps {
   onTileHover: (pos: Position | null) => void;
   onMoveComplete?: () => void;
   onAirdropLanded?: (airdrop: AirdropData) => void;
+  inspectedUnitId?: string | null;
 }
 
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);

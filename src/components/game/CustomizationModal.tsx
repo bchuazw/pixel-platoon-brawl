@@ -509,6 +509,7 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
                 teamColor={teamColor}
                 isMedic={unit.unitClass === 'medic'}
                 customization={localCustom}
+                hasBeard={BEARDED_UNITS.has(unit.id)}
               />
             </Suspense>
             <OrbitControls

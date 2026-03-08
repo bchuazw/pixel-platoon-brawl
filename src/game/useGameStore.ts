@@ -202,6 +202,14 @@ export function useGameStore() {
         const combatUnitId = pendingCombatUnitRef.current;
         pendingCombatUnitRef.current = null;
 
+        // Check if the unit is still alive before running combat
+        const combatUnit = prev.units.find(u => u.id === combatUnitId);
+        if (!combatUnit || !combatUnit.isAlive) {
+          // Unit died during move (e.g. zone damage), skip combat
+          const nextInQueue = unitQueueRef.current[0] || null;
+          return { ...prev, movePath: null, movingUnitId: null, selectedUnitId: nextInQueue };
+        }
+
         const result = runAiUnitStep(combatUnitId, prev, 'combat');
         let newState = result.state;
         const allEvents = [...result.events];
@@ -245,6 +253,42 @@ export function useGameStore() {
         return {
           ...newState,
           combatEvents: [...prev.combatEvents, ...allEvents],
+        };
+      }
+
+      // Clean dead units from queue before popping
+      while (unitQueueRef.current.length > 0) {
+        const peekId = unitQueueRef.current[0];
+        const peekUnit = prev.units.find(u => u.id === peekId);
+        if (peekUnit && peekUnit.isAlive) break;
+        unitQueueRef.current.shift(); // Remove dead unit
+      }
+
+      // If queue is now empty after cleaning, fall through to team switch
+      if (unitQueueRef.current.length === 0) {
+        // Force team switch - handled below in the queue-empty block
+        // Need to re-enter the function logic for empty queue
+        const nextTeam = getNextTeam(prev.currentTeam, prev.units);
+        if (!nextTeam) {
+          // No alive teams - shouldn't happen, but handle gracefully
+          stopBgMusic();
+          unitQueueRef.current = [];
+          const alive = getAliveTeams(prev.units);
+          return {
+            ...prev,
+            log: [...prev.log, `🏆 ${alive[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
+            phase: 'game_over' as const, selectedUnitId: null,
+            movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+            activeAbility: null, autoPlay: false,
+          };
+        }
+        return {
+          ...prev,
+          currentTeam: nextTeam,
+          phase: 'select' as const,
+          selectedUnitId: null,
+          movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+          activeAbility: null, attackPreview: null, hoveredTile: null,
         };
       }
 

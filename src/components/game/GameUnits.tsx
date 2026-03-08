@@ -410,11 +410,23 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       // ── Idle animation ──
       groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       const bounce = Math.sin(t * 2.5 + unit.position.x * 1.5) * 0.04;
-      innerRef.current.position.y = bounce;
       innerRef.current.position.x = 0;
       innerRef.current.rotation.x = 0;
       innerRef.current.rotation.z = Math.sin(t * 1.5) * 0.02;
-      innerRef.current.scale.set(1, 1, 1);
+
+      // Crouch behind cover
+      if (unit.coverType === 'full') {
+        // Deep crouch behind full cover
+        innerRef.current.position.y = bounce - 0.2;
+        innerRef.current.scale.set(0.95, 0.7, 1);
+      } else if (unit.coverType === 'half') {
+        // Slight crouch behind half cover
+        innerRef.current.position.y = bounce - 0.1;
+        innerRef.current.scale.set(0.98, 0.85, 1);
+      } else {
+        innerRef.current.position.y = bounce;
+        innerRef.current.scale.set(1, 1, 1);
+      }
 
       if (unit.isSuppressed) {
         innerRef.current.position.x = Math.sin(t * 15) * 0.03;

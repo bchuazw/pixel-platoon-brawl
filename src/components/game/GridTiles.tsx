@@ -311,9 +311,11 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Sandbag wall — waist-high cover (~0.4)
-    case 'sandbag':
+    case 'sandbag': {
+      const sbColor1 = h > 0.5 ? '#c0a060' : '#b89858';
+      const sbColor2 = h > 0.3 ? '#c8a868' : '#baa058';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Bottom row */}
           <mesh position={[-0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color="#c0a060" roughness={1} /></mesh>
           <mesh position={[0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color="#b89858" roughness={1} /></mesh>

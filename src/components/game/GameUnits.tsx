@@ -12,7 +12,7 @@ function getUnitBaseY(grid: TileData[][], x: number, z: number): number {
   if (!tile) return 0.15;
   const tileY = getTileY(tile.elevation);
   const isTrench = tile.type === 'trench';
-  const height = tile.type === 'water' ? 0.08 : isTrench ? 0.08 : 0.15 + tile.elevation * 0.12;
+  const height = tile.type === 'water' ? 0.06 : isTrench ? 0.06 : 0.18 + tile.elevation * 0.1;
   return tileY + height / 2;
 }
 
@@ -27,154 +27,136 @@ interface GameUnitsProps {
   onMoveComplete?: () => void;
 }
 
-type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing' | 'crouching';
+type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';
 
-// ── Material cache for performance ──
+// ── Material cache ──
 const materialCache = new Map<string, THREE.MeshStandardMaterial>();
-function getMaterial(color: string, opts?: { metalness?: number; roughness?: number; emissive?: string; emissiveIntensity?: number }) {
-  const key = `${color}-${opts?.metalness}-${opts?.roughness}-${opts?.emissive}`;
+function getMat(color: string, metalness = 0.1, roughness = 0.7, emissive = '#000000', emissiveIntensity = 0): THREE.MeshStandardMaterial {
+  const key = `${color}-${metalness}-${roughness}-${emissive}-${emissiveIntensity}`;
   if (materialCache.has(key)) return materialCache.get(key)!;
-  const mat = new THREE.MeshStandardMaterial({
-    color,
-    metalness: opts?.metalness ?? 0.1,
-    roughness: opts?.roughness ?? 0.7,
-    emissive: opts?.emissive || '#000000',
-    emissiveIntensity: opts?.emissiveIntensity ?? 0,
-  });
+  const mat = new THREE.MeshStandardMaterial({ color, metalness, roughness, emissive, emissiveIntensity });
   materialCache.set(key, mat);
   return mat;
 }
 
-// ── 3D Soldier Body Parts ──
-function SoldierBody({ teamColor, unitClass, isMedic }: { teamColor: string; unitClass: string; isMedic: boolean }) {
-  // Color palette based on team
-  const bodyColor = useMemo(() => {
-    const c = new THREE.Color(teamColor);
-    return '#' + c.clone().lerp(new THREE.Color('#333333'), 0.4).getHexString();
-  }, [teamColor]);
-
+// ── XCOM-style chunky soldier body ──
+function SoldierBody({ teamColor, isMedic }: { teamColor: string; isMedic: boolean }) {
   const armorColor = useMemo(() => {
     const c = new THREE.Color(teamColor);
-    return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.3).getHexString();
+    return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.25).getHexString();
+  }, [teamColor]);
+  const darkArmor = useMemo(() => {
+    const c = new THREE.Color(teamColor);
+    return '#' + c.clone().lerp(new THREE.Color('#111111'), 0.5).getHexString();
   }, [teamColor]);
 
-  const skinColor = '#c8a882';
-  const bootColor = '#2a2218';
-  const gearColor = '#3a3a30';
-
-  const torsoMat = useMemo(() => getMaterial(armorColor, { metalness: 0.15, roughness: 0.6 }), [armorColor]);
-  const limbMat = useMemo(() => getMaterial(bodyColor, { metalness: 0.05, roughness: 0.8 }), [bodyColor]);
-  const skinMat = useMemo(() => getMaterial(skinColor, { metalness: 0, roughness: 0.9 }), []);
-  const bootMat = useMemo(() => getMaterial(bootColor, { metalness: 0.1, roughness: 0.7 }), []);
-  const gearMat = useMemo(() => getMaterial(gearColor, { metalness: 0.2, roughness: 0.5 }), []);
-  const helmetMat = useMemo(() => getMaterial(armorColor, { metalness: 0.3, roughness: 0.4 }), [armorColor]);
+  const torsoMat = useMemo(() => getMat(armorColor, 0.15, 0.55), [armorColor]);
+  const darkMat = useMemo(() => getMat(darkArmor, 0.1, 0.7), [darkArmor]);
+  const skinMat = useMemo(() => getMat('#c8a882', 0, 0.85), []);
+  const bootMat = useMemo(() => getMat('#1e1a14', 0.1, 0.7), []);
+  const gearMat = useMemo(() => getMat('#2e2e28', 0.15, 0.6), []);
+  const helmetMat = useMemo(() => getMat(armorColor, 0.25, 0.45), [armorColor]);
+  const visorMat = useMemo(() => getMat('#0a0a0a', 0.8, 0.15), []);
 
   return (
     <>
-      {/* ── TORSO ── */}
-      <mesh position={[0, 0.42, 0]} castShadow material={torsoMat}>
-        <boxGeometry args={[0.22, 0.22, 0.12]} />
+      {/* ── TORSO (chunky) ── */}
+      <mesh position={[0, 0.44, 0]} castShadow material={torsoMat}>
+        <boxGeometry args={[0.28, 0.24, 0.16]} />
       </mesh>
-      {/* Chest plate / vest */}
-      <mesh position={[0, 0.44, 0.035]} material={gearMat}>
-        <boxGeometry args={[0.2, 0.18, 0.04]} />
+      {/* Chest plate */}
+      <mesh position={[0, 0.46, 0.045]} material={gearMat}>
+        <boxGeometry args={[0.26, 0.2, 0.04]} />
       </mesh>
       {/* Belt */}
-      <mesh position={[0, 0.31, 0]} material={bootMat}>
-        <boxGeometry args={[0.21, 0.03, 0.12]} />
+      <mesh position={[0, 0.32, 0]} material={bootMat}>
+        <boxGeometry args={[0.27, 0.03, 0.15]} />
+      </mesh>
+      {/* Team color stripe on chest */}
+      <mesh position={[0, 0.48, 0.066]}>
+        <boxGeometry args={[0.08, 0.08, 0.002]} />
+        <meshStandardMaterial color={teamColor} emissive={teamColor} emissiveIntensity={0.3} />
       </mesh>
 
-      {/* ── HEAD ── */}
-      <group position={[0, 0.6, 0]}>
-        {/* Neck */}
+      {/* ── HEAD (bigger, chunkier) ── */}
+      <group position={[0, 0.64, 0]}>
         <mesh position={[0, -0.04, 0]} material={skinMat}>
-          <cylinderGeometry args={[0.035, 0.04, 0.05, 8]} />
+          <cylinderGeometry args={[0.04, 0.045, 0.05, 6]} />
         </mesh>
-        {/* Head */}
         <mesh position={[0, 0.04, 0]} castShadow material={skinMat}>
-          <boxGeometry args={[0.1, 0.1, 0.1]} />
+          <boxGeometry args={[0.12, 0.12, 0.11]} />
         </mesh>
-        {/* Helmet */}
-        <mesh position={[0, 0.08, 0]} castShadow material={helmetMat}>
-          <sphereGeometry args={[0.07, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
+        {/* Helmet — bigger, more tactical */}
+        <mesh position={[0, 0.09, 0]} castShadow material={helmetMat}>
+          <sphereGeometry args={[0.085, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
         </mesh>
-        {/* Helmet rim */}
-        <mesh position={[0, 0.055, 0]} material={helmetMat}>
-          <cylinderGeometry args={[0.072, 0.072, 0.015, 12]} />
+        <mesh position={[0, 0.06, 0]} material={helmetMat}>
+          <cylinderGeometry args={[0.088, 0.088, 0.018, 8]} />
         </mesh>
-        {/* Goggles/visor */}
-        <mesh position={[0, 0.05, 0.05]} material={useMemo(() => getMaterial('#111111', { metalness: 0.8, roughness: 0.2 }), [])}>
-          <boxGeometry args={[0.08, 0.02, 0.02]} />
+        {/* Visor */}
+        <mesh position={[0, 0.05, 0.055]} material={visorMat}>
+          <boxGeometry args={[0.1, 0.025, 0.02]} />
         </mesh>
       </group>
 
       {/* ── BACKPACK ── */}
-      <mesh position={[0, 0.42, -0.1]} material={gearMat} castShadow>
-        <boxGeometry args={[0.14, 0.16, 0.06]} />
+      <mesh position={[0, 0.44, -0.12]} material={gearMat} castShadow>
+        <boxGeometry args={[0.18, 0.18, 0.08]} />
       </mesh>
-      {/* Pouch */}
-      <mesh position={[0.06, 0.34, -0.1]} material={gearMat}>
-        <boxGeometry args={[0.04, 0.06, 0.04]} />
+
+      {/* ── SHOULDER PADS (team colored) ── */}
+      <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
+        <boxGeometry args={[0.06, 0.07, 0.12]} />
+      </mesh>
+      <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
+        <boxGeometry args={[0.06, 0.07, 0.12]} />
       </mesh>
 
       {/* ── Medic cross ── */}
       {isMedic && (
         <>
-          <mesh position={[0, 0.46, 0.058]}>
-            <boxGeometry args={[0.06, 0.02, 0.005]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} />
+          <mesh position={[0, 0.48, 0.069]}>
+            <boxGeometry args={[0.06, 0.02, 0.002]} />
+            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
           </mesh>
-          <mesh position={[0, 0.46, 0.058]}>
-            <boxGeometry args={[0.02, 0.06, 0.005]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} />
+          <mesh position={[0, 0.48, 0.069]}>
+            <boxGeometry args={[0.02, 0.06, 0.002]} />
+            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
           </mesh>
         </>
       )}
-
-      {/* ── Shoulder pads ── */}
-      <mesh position={[-0.14, 0.5, 0]} material={helmetMat}>
-        <boxGeometry args={[0.05, 0.06, 0.1]} />
-      </mesh>
-      <mesh position={[0.14, 0.5, 0]} material={helmetMat}>
-        <boxGeometry args={[0.05, 0.06, 0.1]} />
-      </mesh>
     </>
   );
 }
 
 function Weapon({ unitClass }: { unitClass: string }) {
-  const metalMat = useMemo(() => getMaterial('#2a2a2a', { metalness: 0.7, roughness: 0.3 }), []);
-  const woodMat = useMemo(() => getMaterial('#4a3520', { metalness: 0, roughness: 0.8 }), []);
+  const metalMat = useMemo(() => getMat('#2a2a2a', 0.7, 0.3), []);
+  const woodMat = useMemo(() => getMat('#3a2818', 0, 0.8), []);
 
   return (
     <group position={[0.08, 0, 0.12]}>
-      {/* Gun body */}
       <mesh material={metalMat}>
-        <boxGeometry args={[0.03, 0.04, 0.25]} />
+        <boxGeometry args={[0.035, 0.045, 0.28]} />
       </mesh>
-      {/* Barrel */}
-      <mesh position={[0, 0.005, 0.18]} material={metalMat}>
-        <cylinderGeometry args={[0.008, 0.008, 0.12, 6]} />
+      <mesh position={[0, 0.005, 0.2]} material={metalMat}>
+        <cylinderGeometry args={[0.01, 0.01, 0.14, 5]} />
       </mesh>
-      {/* Stock */}
-      <mesh position={[0, -0.005, -0.14]} material={woodMat}>
-        <boxGeometry args={[0.025, 0.05, 0.08]} />
+      <mesh position={[0, -0.005, -0.15]} material={woodMat}>
+        <boxGeometry args={[0.028, 0.055, 0.08]} />
       </mesh>
-      {/* Magazine */}
       <mesh position={[0, -0.04, 0.02]} material={metalMat}>
-        <boxGeometry args={[0.02, 0.05, 0.03]} />
+        <boxGeometry args={[0.022, 0.05, 0.03]} />
       </mesh>
-      {/* Scope (soldier only) */}
       {unitClass === 'soldier' && (
-        <mesh position={[0, 0.03, 0.04]} material={metalMat}>
-          <cylinderGeometry args={[0.01, 0.012, 0.06, 6]} />
+        <mesh position={[0, 0.035, 0.04]} material={metalMat}>
+          <cylinderGeometry args={[0.012, 0.014, 0.06, 5]} />
         </mesh>
       )}
     </group>
   );
 }
 
-// ── Main 3D Soldier Character ──
+// ── Main 3D Soldier ──
 function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving, grid, onMoveComplete }: {
   unit: Unit; isSelected: boolean; onClick: () => void; combatEvents: CombatEvent[];
   movePath: Position[] | null; isMoving: boolean; grid: TileData[][]; onMoveComplete?: () => void;
@@ -191,17 +173,14 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
   const color = TEAM_COLORS[unit.team];
   const isMedic = unit.unitClass === 'medic';
 
-  // Animation state
   const animState = useRef<AnimState>('idle');
   const animTimer = useRef(0);
-  const prevHp = useRef(unit.hp);
   const prevAlive = useRef(unit.isAlive);
   const deathTimer = useRef(0);
-  const targetDir = useRef(new THREE.Vector2(1, 0));
-  const flashIntensity = useRef(0);
   const facingAngle = useRef(0);
+  const flashIntensity = useRef(0);
+  const prevHp = useRef(unit.hp);
 
-  // Path walking
   const pathRef = useRef<Position[] | null>(null);
   const pathIndex = useRef(0);
   const walkProgress = useRef(1);
@@ -220,28 +199,22 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       moveCompleted.current = false;
       animState.current = 'walking';
       animTimer.current = 0;
-
-      const fromElev = grid[prevPos.current.x]?.[prevPos.current.z]?.elevation || 0;
       walkFrom.current.set(prevPos.current.x, getUnitBaseY(grid, prevPos.current.x, prevPos.current.z), prevPos.current.z);
-
       const firstTarget = movePath[0];
       walkTo.current.set(firstTarget.x, getUnitBaseY(grid, firstTarget.x, firstTarget.z), firstTarget.z);
-
       playMove();
     }
   }, [movePath, isMoving]);
 
-  // Detect combat
+  // Combat detection
   useEffect(() => {
     const recent = combatEvents.filter(e => Date.now() - e.timestamp < 300);
     for (const e of recent) {
       if (e.attackerPos.x === unit.position.x && e.attackerPos.z === unit.position.z &&
           (e.type === 'damage' || e.type === 'crit' || e.type === 'kill' || e.type === 'miss')) {
-        targetDir.current.set(
-          e.targetPos.x - e.attackerPos.x,
-          e.targetPos.z - e.attackerPos.z
-        ).normalize();
-        facingAngle.current = Math.atan2(targetDir.current.x, targetDir.current.y);
+        const dx = e.targetPos.x - e.attackerPos.x;
+        const dz = e.targetPos.z - e.attackerPos.z;
+        facingAngle.current = Math.atan2(dx, dz);
         animState.current = 'aiming';
         animTimer.current = 0;
       }
@@ -267,15 +240,13 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     prevAlive.current = unit.isAlive;
   }, [unit.isAlive]);
 
-  // HP change flash
+  // HP flash
   useEffect(() => {
-    if (unit.hp < prevHp.current && unit.isAlive) {
-      flashIntensity.current = 1;
-    }
+    if (unit.hp < prevHp.current && unit.isAlive) flashIntensity.current = 1;
     prevHp.current = unit.hp;
   }, [unit.hp, unit.isAlive]);
 
-  // Update prevPos
+  // Pos sync
   useEffect(() => {
     if (!pathRef.current || pathRef.current.length === 0) {
       prevPos.current = { x: unit.position.x, z: unit.position.z };
@@ -284,92 +255,59 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
 
   const WALK_SPEED = 4.0;
 
+  const resetLimbs = () => {
+    if (leftArmRef.current) leftArmRef.current.rotation.set(0, 0, 0);
+    if (rightArmRef.current) rightArmRef.current.rotation.set(0, 0, 0);
+    if (leftLegRef.current) leftLegRef.current.rotation.set(0, 0, 0);
+    if (rightLegRef.current) rightLegRef.current.rotation.set(0, 0, 0);
+  };
+
   useFrame(({ clock }, delta) => {
     if (!rootRef.current || !bodyRef.current) return;
     const t = clock.getElapsedTime();
     animTimer.current += delta;
-
     const unitBaseY = getUnitBaseY(grid, unit.position.x, unit.position.z);
 
-    // Reset limb rotations each frame
-    const resetLimbs = () => {
-      if (leftArmRef.current) leftArmRef.current.rotation.set(0, 0, 0);
-      if (rightArmRef.current) rightArmRef.current.rotation.set(0, 0, 0);
-      if (leftLegRef.current) leftLegRef.current.rotation.set(0, 0, 0);
-      if (rightLegRef.current) rightLegRef.current.rotation.set(0, 0, 0);
-    };
-
-    // ── DEATH with physics-based ragdoll ──
+    // ── DEATH ──
     if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 5)) {
       deathTimer.current += delta;
       const dt = deathTimer.current;
-
-      // Phase 1: Initial knockback (0-0.3s)
       if (dt < 0.3) {
-        const knockT = dt / 0.3;
-        bodyRef.current.rotation.x = knockT * -0.3; // stagger back
-        bodyRef.current.position.y = knockT * 0.05; // slight lift
-        bodyRef.current.position.z = -knockT * 0.1; // push back
-      }
-      // Phase 2: Collapse with gravity (0.3-1.2s)
-      else if (dt < 1.2) {
-        const fallT = (dt - 0.3) / 0.9;
-        const eased = fallT * fallT; // gravity acceleration
-        bodyRef.current.rotation.x = -0.3 + eased * (Math.PI / 2 + 0.3); // fall forward
-        bodyRef.current.position.y = 0.05 - eased * 0.35; // drop down
-        bodyRef.current.position.z = -0.1 + eased * 0.15;
-
-        // Arms flail outward
-        if (leftArmRef.current) {
-          leftArmRef.current.rotation.z = -eased * (Math.PI / 2.5);
-          leftArmRef.current.rotation.x = Math.sin(dt * 12) * (1 - eased) * 0.5;
-        }
-        if (rightArmRef.current) {
-          rightArmRef.current.rotation.z = eased * (Math.PI / 2.5);
-          rightArmRef.current.rotation.x = Math.sin(dt * 10 + 1) * (1 - eased) * 0.5;
-        }
-        // Legs buckle
-        if (leftLegRef.current) {
-          leftLegRef.current.rotation.x = -eased * 0.6;
-          leftLegRef.current.rotation.z = eased * 0.15;
-        }
-        if (rightLegRef.current) {
-          rightLegRef.current.rotation.x = eased * 0.3;
-          rightLegRef.current.rotation.z = -eased * 0.1;
-        }
-      }
-      // Phase 3: Settle on ground with bounce (1.2s+)
-      else {
+        const k = dt / 0.3;
+        bodyRef.current.rotation.x = k * -0.3;
+        bodyRef.current.position.y = k * 0.05;
+      } else if (dt < 1.2) {
+        const f = (dt - 0.3) / 0.9;
+        const e = f * f;
+        bodyRef.current.rotation.x = -0.3 + e * (Math.PI / 2 + 0.3);
+        bodyRef.current.position.y = 0.05 - e * 0.35;
+        if (leftArmRef.current) leftArmRef.current.rotation.z = -e * (Math.PI / 2.5);
+        if (rightArmRef.current) rightArmRef.current.rotation.z = e * (Math.PI / 2.5);
+        if (leftLegRef.current) leftLegRef.current.rotation.x = -e * 0.6;
+        if (rightLegRef.current) rightLegRef.current.rotation.x = e * 0.3;
+      } else {
         bodyRef.current.rotation.x = Math.PI / 2;
-        const settleT = dt - 1.2;
-        const bounce = Math.exp(-settleT * 4) * Math.sin(settleT * 8) * 0.03;
-        bodyRef.current.position.y = -0.3 + bounce;
-
+        const s = dt - 1.2;
+        bodyRef.current.position.y = -0.3 + Math.exp(-s * 4) * Math.sin(s * 8) * 0.03;
         if (leftArmRef.current) leftArmRef.current.rotation.z = -Math.PI / 2.5;
         if (rightArmRef.current) rightArmRef.current.rotation.z = Math.PI / 2.5;
-        if (leftLegRef.current) { leftLegRef.current.rotation.x = -0.6; leftLegRef.current.rotation.z = 0.15; }
-        if (rightLegRef.current) { rightLegRef.current.rotation.x = 0.3; rightLegRef.current.rotation.z = -0.1; }
       }
-
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       return;
     }
-
     if (!unit.isAlive) return;
 
     // ── WALKING ──
     if (animState.current === 'walking' && pathRef.current && pathRef.current.length > 0) {
       walkProgress.current += delta * WALK_SPEED;
-
       if (walkProgress.current >= 1) {
         currentVisualPos.current.copy(walkTo.current);
         pathIndex.current++;
-
         if (pathIndex.current < pathRef.current.length) {
           walkProgress.current = 0;
           walkFrom.current.copy(walkTo.current);
-          const nextTarget = pathRef.current[pathIndex.current];
-          walkTo.current.set(nextTarget.x, getUnitBaseY(grid, nextTarget.x, nextTarget.z), nextTarget.z);
+          const next = pathRef.current[pathIndex.current];
+          walkTo.current.set(next.x, getUnitBaseY(grid, next.x, next.z), next.z);
         } else {
           animState.current = 'idle';
           pathRef.current = null;
@@ -378,235 +316,127 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
           resetLimbs();
           bodyRef.current.rotation.set(0, 0, 0);
           bodyRef.current.position.set(0, 0, 0);
-
-          if (!moveCompleted.current && onMoveComplete) {
-            moveCompleted.current = true;
-            onMoveComplete();
-          }
+          if (!moveCompleted.current && onMoveComplete) { moveCompleted.current = true; onMoveComplete(); }
         }
       }
-
       if (animState.current === 'walking') {
         const p = Math.min(1, walkProgress.current);
         currentVisualPos.current.lerpVectors(walkFrom.current, walkTo.current, p);
-
-        // Face walk direction
         const dx = walkTo.current.x - walkFrom.current.x;
         const dz = walkTo.current.z - walkFrom.current.z;
-        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
-          facingAngle.current = Math.atan2(dx, dz);
-        }
-
-        // Walking animation cycle
-        const walkCycle = t * 8;
-        const legSwing = Math.sin(walkCycle) * 0.6;
-        const armSwing = Math.sin(walkCycle) * 0.4;
-        const bodyBob = Math.abs(Math.sin(walkCycle)) * 0.03;
-        const bodySway = Math.sin(walkCycle * 0.5) * 0.03;
-
-        if (leftLegRef.current) leftLegRef.current.rotation.x = legSwing;
-        if (rightLegRef.current) rightLegRef.current.rotation.x = -legSwing;
-        if (leftArmRef.current) leftArmRef.current.rotation.x = -armSwing;
-        if (rightArmRef.current) rightArmRef.current.rotation.x = armSwing;
-
-        bodyRef.current.position.y = bodyBob;
-        bodyRef.current.rotation.z = bodySway;
-        bodyRef.current.rotation.x = 0.05; // Lean forward
-
-        rootRef.current.position.set(
-          currentVisualPos.current.x,
-          currentVisualPos.current.y + bodyBob,
-          currentVisualPos.current.z
-        );
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) facingAngle.current = Math.atan2(dx, dz);
+        const wc = t * 8;
+        const leg = Math.sin(wc) * 0.5;
+        const arm = Math.sin(wc) * 0.35;
+        const bob = Math.abs(Math.sin(wc)) * 0.025;
+        if (leftLegRef.current) leftLegRef.current.rotation.x = leg;
+        if (rightLegRef.current) rightLegRef.current.rotation.x = -leg;
+        if (leftArmRef.current) leftArmRef.current.rotation.x = -arm;
+        if (rightArmRef.current) rightArmRef.current.rotation.x = arm;
+        bodyRef.current.position.y = bob;
+        bodyRef.current.rotation.x = 0.04;
+        rootRef.current.position.set(currentVisualPos.current.x, currentVisualPos.current.y + bob, currentVisualPos.current.z);
       }
     } else if (animState.current === 'aiming') {
-      // ── AIMING ──
-      const aimT = Math.min(1, animTimer.current / 0.4);
+      const aimT = Math.min(1, animTimer.current / 0.35);
       resetLimbs();
-
-      // Raise weapon arm
-      if (rightArmRef.current) {
-        rightArmRef.current.rotation.x = -Math.PI / 2.5 * aimT;
-        rightArmRef.current.rotation.z = 0.1 * aimT;
-      }
-      if (leftArmRef.current) {
-        leftArmRef.current.rotation.x = -Math.PI / 3 * aimT;
-      }
-      // Slight crouch
+      if (rightArmRef.current) { rightArmRef.current.rotation.x = -Math.PI / 2.5 * aimT; rightArmRef.current.rotation.z = 0.1 * aimT; }
+      if (leftArmRef.current) leftArmRef.current.rotation.x = -Math.PI / 3 * aimT;
       bodyRef.current.rotation.x = 0.05 * aimT;
       bodyRef.current.position.y = -0.02 * aimT;
-
-      if (aimT >= 1) {
-        animState.current = 'shooting';
-        animTimer.current = 0;
-      }
+      if (aimT >= 1) { animState.current = 'shooting'; animTimer.current = 0; }
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
-
     } else if (animState.current === 'shooting') {
-      // ── SHOOTING ──
-      const shootT = Math.min(1, animTimer.current / 0.2);
-
-      // Recoil
-      const recoil = Math.sin(shootT * Math.PI) * 0.08;
+      const st = Math.min(1, animTimer.current / 0.2);
+      const recoil = Math.sin(st * Math.PI) * 0.08;
       bodyRef.current.rotation.x = 0.05 - recoil;
       bodyRef.current.position.z = -recoil * 0.3;
-
-      if (rightArmRef.current) {
-        rightArmRef.current.rotation.x = -Math.PI / 2.5 + recoil * 2;
-      }
-
-      flashIntensity.current = Math.max(0, 1 - shootT);
-
-      if (shootT >= 1) {
-        animState.current = 'recoil';
-        animTimer.current = 0;
-      }
+      if (rightArmRef.current) rightArmRef.current.rotation.x = -Math.PI / 2.5 + recoil * 2;
+      flashIntensity.current = Math.max(0, 1 - st);
+      if (st >= 1) { animState.current = 'recoil'; animTimer.current = 0; }
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
-
     } else if (animState.current === 'recoil') {
-      // ── RECOIL RECOVERY ──
-      const recoilT = Math.min(1, animTimer.current / 0.4);
-      const ease = 1 - Math.pow(1 - recoilT, 2);
-
+      const rt = Math.min(1, animTimer.current / 0.4);
+      const ease = 1 - Math.pow(1 - rt, 2);
       bodyRef.current.rotation.x = THREE.MathUtils.lerp(bodyRef.current.rotation.x, 0, ease);
       bodyRef.current.position.y = THREE.MathUtils.lerp(bodyRef.current.position.y, 0, ease);
       bodyRef.current.position.z = THREE.MathUtils.lerp(bodyRef.current.position.z, 0, ease);
-
-      if (rightArmRef.current) {
-        rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, ease);
-      }
-      if (leftArmRef.current) {
-        leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, 0, ease);
-      }
-
-      if (recoilT >= 1) {
-        animState.current = 'idle';
-        resetLimbs();
-        bodyRef.current.rotation.set(0, 0, 0);
-        bodyRef.current.position.set(0, 0, 0);
-      }
+      if (rightArmRef.current) rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, ease);
+      if (leftArmRef.current) leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, 0, ease);
+      if (rt >= 1) { animState.current = 'idle'; resetLimbs(); bodyRef.current.rotation.set(0, 0, 0); bodyRef.current.position.set(0, 0, 0); }
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
-
     } else if (animState.current === 'hit') {
-      // ── HIT REACTION ──
-      const hitT = Math.min(1, animTimer.current / 0.5);
-
-      const knockback = Math.sin(hitT * Math.PI) * 0.1;
-      bodyRef.current.rotation.x = -knockback * 2;
-      bodyRef.current.rotation.z = Math.sin(hitT * Math.PI * 6) * 0.08 * (1 - hitT);
-      bodyRef.current.position.y = -knockback * 0.3;
-
-      if (leftArmRef.current) leftArmRef.current.rotation.z = -knockback * 3;
-      if (rightArmRef.current) rightArmRef.current.rotation.z = knockback * 3;
-
-      flashIntensity.current = Math.max(0, Math.sin(hitT * Math.PI * 3));
-
-      if (hitT >= 1) {
-        animState.current = 'idle';
-        resetLimbs();
-        bodyRef.current.rotation.set(0, 0, 0);
-        bodyRef.current.position.set(0, 0, 0);
-        flashIntensity.current = 0;
-      }
+      const ht = Math.min(1, animTimer.current / 0.5);
+      const kb = Math.sin(ht * Math.PI) * 0.1;
+      bodyRef.current.rotation.x = -kb * 2;
+      bodyRef.current.rotation.z = Math.sin(ht * Math.PI * 5) * 0.06 * (1 - ht);
+      bodyRef.current.position.y = -kb * 0.3;
+      if (leftArmRef.current) leftArmRef.current.rotation.z = -kb * 2.5;
+      if (rightArmRef.current) rightArmRef.current.rotation.z = kb * 2.5;
+      flashIntensity.current = Math.max(0, Math.sin(ht * Math.PI * 3));
+      if (ht >= 1) { animState.current = 'idle'; resetLimbs(); bodyRef.current.rotation.set(0, 0, 0); bodyRef.current.position.set(0, 0, 0); flashIntensity.current = 0; }
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
-
     } else if (animState.current === 'healing') {
-      // ── HEALING ──
       const healT = Math.min(1, animTimer.current / 0.8);
-
-      // Kneeling pose
-      if (leftLegRef.current) leftLegRef.current.rotation.x = -0.5 * Math.min(1, healT * 3);
-      if (rightLegRef.current) rightLegRef.current.rotation.x = 0.3 * Math.min(1, healT * 3);
-      bodyRef.current.position.y = -0.08 * Math.min(1, healT * 3);
-
-      // Arms forward (applying medicine)
-      if (leftArmRef.current) leftArmRef.current.rotation.x = -0.8 * Math.min(1, healT * 2);
-      if (rightArmRef.current) rightArmRef.current.rotation.x = -0.6 * Math.min(1, healT * 2);
-
-      if (healT >= 1) {
-        animState.current = 'idle';
-        resetLimbs();
-        bodyRef.current.rotation.set(0, 0, 0);
-        bodyRef.current.position.set(0, 0, 0);
-      }
+      if (leftLegRef.current) leftLegRef.current.rotation.x = -0.4 * Math.min(1, healT * 3);
+      if (rightLegRef.current) rightLegRef.current.rotation.x = 0.25 * Math.min(1, healT * 3);
+      bodyRef.current.position.y = -0.06 * Math.min(1, healT * 3);
+      if (leftArmRef.current) leftArmRef.current.rotation.x = -0.7 * Math.min(1, healT * 2);
+      if (rightArmRef.current) rightArmRef.current.rotation.x = -0.5 * Math.min(1, healT * 2);
+      if (healT >= 1) { animState.current = 'idle'; resetLimbs(); bodyRef.current.rotation.set(0, 0, 0); bodyRef.current.position.set(0, 0, 0); }
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
-
     } else {
       // ── IDLE ──
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
-
-      // Breathing animation
-      const breathe = Math.sin(t * 1.8 + unit.position.x * 2) * 0.008;
-      const weightShift = Math.sin(t * 0.7 + unit.position.z) * 0.015;
-
+      const breathe = Math.sin(t * 1.8 + unit.position.x * 2) * 0.006;
+      const sway = Math.sin(t * 0.7 + unit.position.z) * 0.01;
       bodyRef.current.position.y = breathe;
-      bodyRef.current.rotation.z = weightShift;
+      bodyRef.current.rotation.z = sway;
       bodyRef.current.rotation.x = 0;
-
-      // Subtle idle arm sway
-      if (leftArmRef.current) leftArmRef.current.rotation.x = Math.sin(t * 1.2) * 0.03;
-      if (rightArmRef.current) rightArmRef.current.rotation.x = Math.sin(t * 1.2 + 1) * 0.03;
+      if (leftArmRef.current) leftArmRef.current.rotation.x = Math.sin(t * 1.2) * 0.02;
+      if (rightArmRef.current) rightArmRef.current.rotation.x = Math.sin(t * 1.2 + 1) * 0.02;
       if (leftLegRef.current) leftLegRef.current.rotation.x = 0;
       if (rightLegRef.current) rightLegRef.current.rotation.x = 0;
 
       // Cover crouch
       if (unit.coverType === 'full') {
-        bodyRef.current.position.y = -0.1;
-        if (leftLegRef.current) leftLegRef.current.rotation.x = -0.4;
-        if (rightLegRef.current) rightLegRef.current.rotation.x = -0.3;
+        bodyRef.current.position.y = -0.08;
+        if (leftLegRef.current) leftLegRef.current.rotation.x = -0.35;
+        if (rightLegRef.current) rightLegRef.current.rotation.x = -0.25;
       } else if (unit.coverType === 'half') {
-        bodyRef.current.position.y = -0.05;
-        if (leftLegRef.current) leftLegRef.current.rotation.x = -0.2;
+        bodyRef.current.position.y = -0.04;
+        if (leftLegRef.current) leftLegRef.current.rotation.x = -0.15;
       }
 
-      // Suppressed shaking
       if (unit.isSuppressed) {
-        bodyRef.current.rotation.z += Math.sin(t * 20) * 0.02;
-        bodyRef.current.rotation.x += Math.sin(t * 15) * 0.01;
+        bodyRef.current.rotation.z += Math.sin(t * 20) * 0.015;
       }
-
-      // Overwatch stance - weapon raised
       if (unit.isOnOverwatch) {
         if (rightArmRef.current) rightArmRef.current.rotation.x = -Math.PI / 4;
         if (leftArmRef.current) leftArmRef.current.rotation.x = -Math.PI / 5;
-        bodyRef.current.rotation.x = 0.05;
+        bodyRef.current.rotation.x = 0.04;
       }
     }
 
     // Face direction
-    bodyRef.current.rotation.y = THREE.MathUtils.lerp(
-      bodyRef.current.rotation.y || 0,
-      facingAngle.current,
-      0.1
-    );
+    bodyRef.current.rotation.y = THREE.MathUtils.lerp(bodyRef.current.rotation.y || 0, facingAngle.current, 0.1);
 
-    // Selection ring
+    // Selection ring pulse
     if (isSelected && ringRef.current) {
-      const scale = 1 + Math.sin(t * 4) * 0.1;
+      const scale = 1 + Math.sin(t * 4) * 0.08;
       ringRef.current.scale.set(scale, 1, scale);
     }
-
-    // Flash on hit (change emissive on all children)
-    if (flashIntensity.current > 0) {
-      flashIntensity.current = Math.max(0, flashIntensity.current - delta * 4);
-    }
+    if (flashIntensity.current > 0) flashIntensity.current = Math.max(0, flashIntensity.current - delta * 4);
   });
 
-  // Arm materials (must be before early return)
   const limbColor = useMemo(() => {
     const c = new THREE.Color(color);
-    return '#' + c.clone().lerp(new THREE.Color('#333333'), 0.4).getHexString();
+    return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.45).getHexString();
   }, [color]);
-
-  const bootColor = '#2a2218';
 
   if (!unit.isAlive && deathTimer.current >= 5) return null;
 
   const hpPercent = unit.hp / unit.maxHp;
-  const apDots = [];
-  for (let i = 0; i < unit.maxAp; i++) {
-    apDots.push(i < unit.ap);
-  }
 
   return (
     <group
@@ -615,207 +445,156 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <group ref={bodyRef}>
-        {/* Main body */}
-        <SoldierBody teamColor={color} unitClass={unit.unitClass} isMedic={isMedic} />
+        <SoldierBody teamColor={color} isMedic={isMedic} />
 
         {/* ── LEFT ARM ── */}
-        <group ref={leftArmRef} position={[-0.16, 0.46, 0]}>
-          {/* Upper arm */}
+        <group ref={leftArmRef} position={[-0.19, 0.48, 0]}>
           <mesh position={[0, -0.06, 0]} castShadow>
-            <boxGeometry args={[0.06, 0.12, 0.06]} />
+            <boxGeometry args={[0.07, 0.13, 0.07]} />
             <meshStandardMaterial color={limbColor} roughness={0.7} />
           </mesh>
-          {/* Forearm */}
-          <mesh position={[0, -0.15, 0.02]}>
-            <boxGeometry args={[0.05, 0.1, 0.05]} />
+          <mesh position={[0, -0.16, 0.02]}>
+            <boxGeometry args={[0.06, 0.1, 0.06]} />
             <meshStandardMaterial color={limbColor} roughness={0.7} />
           </mesh>
-          {/* Glove */}
-          <mesh position={[0, -0.2, 0.03]}>
-            <boxGeometry args={[0.04, 0.04, 0.04]} />
+          <mesh position={[0, -0.22, 0.03]}>
+            <boxGeometry args={[0.045, 0.045, 0.045]} />
             <meshStandardMaterial color="#1a1a14" roughness={0.6} />
           </mesh>
         </group>
 
         {/* ── RIGHT ARM ── */}
-        <group ref={rightArmRef} position={[0.16, 0.46, 0]}>
-          {/* Upper arm */}
+        <group ref={rightArmRef} position={[0.19, 0.48, 0]}>
           <mesh position={[0, -0.06, 0]} castShadow>
-            <boxGeometry args={[0.06, 0.12, 0.06]} />
+            <boxGeometry args={[0.07, 0.13, 0.07]} />
             <meshStandardMaterial color={limbColor} roughness={0.7} />
           </mesh>
-          {/* Forearm */}
-          <mesh position={[0, -0.15, 0.02]}>
-            <boxGeometry args={[0.05, 0.1, 0.05]} />
+          <mesh position={[0, -0.16, 0.02]}>
+            <boxGeometry args={[0.06, 0.1, 0.06]} />
             <meshStandardMaterial color={limbColor} roughness={0.7} />
           </mesh>
-          {/* Glove */}
-          <mesh position={[0, -0.2, 0.03]}>
-            <boxGeometry args={[0.04, 0.04, 0.04]} />
+          <mesh position={[0, -0.22, 0.03]}>
+            <boxGeometry args={[0.045, 0.045, 0.045]} />
             <meshStandardMaterial color="#1a1a14" roughness={0.6} />
           </mesh>
-          {/* Weapon attached to right arm */}
           <group ref={weaponGroupRef} position={[0, -0.12, 0.05]}>
             <Weapon unitClass={unit.unitClass} />
           </group>
         </group>
 
         {/* ── LEFT LEG ── */}
-        <group ref={leftLegRef} position={[-0.06, 0.28, 0]}>
-          {/* Thigh */}
+        <group ref={leftLegRef} position={[-0.07, 0.3, 0]}>
           <mesh position={[0, -0.08, 0]} castShadow>
-            <boxGeometry args={[0.07, 0.14, 0.07]} />
+            <boxGeometry args={[0.08, 0.15, 0.08]} />
             <meshStandardMaterial color={limbColor} roughness={0.7} />
           </mesh>
-          {/* Shin */}
           <mesh position={[0, -0.2, 0]}>
-            <boxGeometry args={[0.065, 0.12, 0.065]} />
+            <boxGeometry args={[0.075, 0.12, 0.075]} />
             <meshStandardMaterial color={limbColor} roughness={0.7} />
           </mesh>
-          {/* Boot */}
           <mesh position={[0, -0.28, 0.015]}>
-            <boxGeometry args={[0.07, 0.05, 0.09]} />
-            <meshStandardMaterial color={bootColor} roughness={0.6} metalness={0.1} />
+            <boxGeometry args={[0.08, 0.05, 0.1]} />
+            <meshStandardMaterial color="#1e1a14" roughness={0.6} metalness={0.1} />
           </mesh>
         </group>
 
         {/* ── RIGHT LEG ── */}
-        <group ref={rightLegRef} position={[0.06, 0.28, 0]}>
-          {/* Thigh */}
+        <group ref={rightLegRef} position={[0.07, 0.3, 0]}>
           <mesh position={[0, -0.08, 0]} castShadow>
-            <boxGeometry args={[0.07, 0.14, 0.07]} />
+            <boxGeometry args={[0.08, 0.15, 0.08]} />
             <meshStandardMaterial color={limbColor} roughness={0.7} />
           </mesh>
-          {/* Shin */}
           <mesh position={[0, -0.2, 0]}>
-            <boxGeometry args={[0.065, 0.12, 0.065]} />
+            <boxGeometry args={[0.075, 0.12, 0.075]} />
             <meshStandardMaterial color={limbColor} roughness={0.7} />
           </mesh>
-          {/* Boot */}
           <mesh position={[0, -0.28, 0.015]}>
-            <boxGeometry args={[0.07, 0.05, 0.09]} />
-            <meshStandardMaterial color={bootColor} roughness={0.6} metalness={0.1} />
+            <boxGeometry args={[0.08, 0.05, 0.1]} />
+            <meshStandardMaterial color="#1e1a14" roughness={0.6} metalness={0.1} />
           </mesh>
         </group>
 
-        {/* ── Muzzle flash ── */}
+        {/* Muzzle flash */}
         {animState.current === 'shooting' && (
-          <pointLight
-            position={[0.24, 0.34, 0.35]}
-            color="#ffaa00"
-            intensity={5}
-            distance={4}
-          />
+          <pointLight position={[0.26, 0.36, 0.38]} color="#ffaa00" intensity={4} distance={3} />
         )}
 
-        {/* ── Healing particles ── */}
-        {animState.current === 'healing' && (
-          <>
-            {[0, 1, 2, 3, 4, 5].map(i => (
-              <mesh key={i} position={[
-                Math.sin(Date.now() * 0.003 + i * 1.2) * 0.2,
-                0.2 + ((Date.now() * 0.002 + i * 0.5) % 1) * 0.5,
-                Math.cos(Date.now() * 0.003 + i * 1.2) * 0.2
-              ]}>
-                <sphereGeometry args={[0.015, 4, 4]} />
-                <meshBasicMaterial color="#44ff88" transparent opacity={0.6} />
-              </mesh>
-            ))}
-          </>
-        )}
-
-        {/* ── Ground shadow ── */}
-        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[0.2, 12]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.35} />
+        {/* Ground shadow */}
+        <mesh position={[0, 0.003, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[0.22, 10]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.3} />
         </mesh>
       </group>
 
       {/* ── HP Bar ── */}
       {unit.isAlive && (
-        <Billboard position={[0, 0.85, 0]}>
+        <Billboard position={[0, 0.9, 0]}>
           <mesh position={[0, 0, -0.001]}>
-            <planeGeometry args={[0.5, 0.05]} />
-            <meshBasicMaterial color="#111111" transparent opacity={0.8} />
+            <planeGeometry args={[0.45, 0.045]} />
+            <meshBasicMaterial color="#111111" transparent opacity={0.85} />
           </mesh>
-          <mesh position={[(hpPercent - 1) * 0.235, 0, 0]}>
-            <planeGeometry args={[0.47 * hpPercent, 0.035]} />
+          <mesh position={[(hpPercent - 1) * 0.21, 0, 0]}>
+            <planeGeometry args={[0.42 * hpPercent, 0.03]} />
             <meshBasicMaterial color={hpPercent > 0.5 ? '#44cc44' : hpPercent > 0.25 ? '#cccc44' : '#cc4444'} />
           </mesh>
         </Billboard>
       )}
 
-      {/* ── AP Dots ── */}
-      {unit.isAlive && (
-        <Billboard position={[0, 0.78, 0]}>
-          {apDots.map((filled, i) => (
-            <mesh key={i} position={[-0.06 * (apDots.length - 1) / 2 + i * 0.06, 0, 0]}>
-              <circleGeometry args={[0.018, 6]} />
-              <meshBasicMaterial color={filled ? '#ffcc00' : '#333333'} />
-            </mesh>
-          ))}
-        </Billboard>
-      )}
-
       {/* ── Name ── */}
       {unit.isAlive && (
-        <Billboard position={[0, 0.95, 0]}>
-          <Text fontSize={0.08} color={color} anchorX="center" anchorY="middle" font={undefined}
-            outlineWidth={0.015} outlineColor="#000000">
+        <Billboard position={[0, 1.0, 0]}>
+          <Text fontSize={0.075} color={color} anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.014} outlineColor="#000000">
             {unit.name}
           </Text>
-          <Text fontSize={0.045} color="#999999" anchorX="center" anchorY="middle" position={[0, -0.09, 0]}
-            outlineWidth={0.01} outlineColor="#000000" font={undefined}>
+          <Text fontSize={0.04} color="#888888" anchorX="center" anchorY="middle" position={[0, -0.085, 0]}
+            outlineWidth={0.008} outlineColor="#000000" font={undefined}>
             {unit.unitClass.toUpperCase()} • {unit.weapon.name}
           </Text>
         </Billboard>
       )}
 
-      {/* ── Status icons ── */}
+      {/* Status icons */}
       {unit.isOnOverwatch && (
-        <Billboard position={[-0.25, 0.7, 0]}>
-          <Text fontSize={0.1} color="#44aaff" anchorX="center" anchorY="middle" font={undefined}
-            outlineWidth={0.015} outlineColor="#000000">
-            👁
-          </Text>
+        <Billboard position={[-0.22, 0.72, 0]}>
+          <Text fontSize={0.09} color="#44aaff" anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.012} outlineColor="#000000">👁</Text>
         </Billboard>
       )}
       {unit.isSuppressed && (
-        <Billboard position={[0.25, 0.7, 0]}>
-          <Text fontSize={0.1} color="#ff4444" anchorX="center" anchorY="middle" font={undefined}
-            outlineWidth={0.015} outlineColor="#000000">
-            ⛔
-          </Text>
+        <Billboard position={[0.22, 0.72, 0]}>
+          <Text fontSize={0.09} color="#ff4444" anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.012} outlineColor="#000000">⛔</Text>
         </Billboard>
       )}
 
-      {/* ── Selection ring ── */}
+      {/* Selection ring */}
       {isSelected && (
-        <mesh ref={ringRef} position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.3, 0.38, 24]} />
-          <meshBasicMaterial color={color} transparent opacity={0.7} />
+        <mesh ref={ringRef} position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.32, 0.4, 20]} />
+          <meshBasicMaterial color={color} transparent opacity={0.65} />
         </mesh>
       )}
 
-      {/* ── Team dot ── */}
-      <mesh position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.05, 8]} />
+      {/* Team dot */}
+      <mesh position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.05, 6]} />
         <meshBasicMaterial color={color} />
       </mesh>
 
-      {/* ── Fog of war vision ring ── */}
+      {/* Vision ring */}
       {unit.isAlive && (
-        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[unit.visionRange - 0.06, unit.visionRange + 0.06, 24]} />
-          <meshBasicMaterial color={color} transparent opacity={0.08} side={THREE.DoubleSide} />
+        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[unit.visionRange - 0.05, unit.visionRange + 0.05, 20]} />
+          <meshBasicMaterial color={color} transparent opacity={0.06} side={THREE.DoubleSide} />
         </mesh>
       )}
 
-      {/* ── Overwatch range ── */}
+      {/* Overwatch range */}
       {unit.isOnOverwatch && (
-        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[unit.attackRange - 0.1, unit.attackRange + 0.1, 24]} />
-          <meshBasicMaterial color="#44aaff" transparent opacity={0.15} side={THREE.DoubleSide} />
+        <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[unit.attackRange - 0.08, unit.attackRange + 0.08, 20]} />
+          <meshBasicMaterial color="#44aaff" transparent opacity={0.12} side={THREE.DoubleSide} />
         </mesh>
       )}
     </group>

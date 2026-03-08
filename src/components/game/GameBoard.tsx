@@ -171,60 +171,53 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         }}
         shadows
         gl={{
-          antialias: false,
+          antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.1,
+          toneMappingExposure: 1.2,
           powerPreference: 'high-performance',
         }}
-        dpr={[1, 1.25]}
+        dpr={[1, 1.5]}
       >
         <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />
         <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} />
-        <color attach="background" args={['#080e1a']} />
-        <Stars radius={100} depth={60} count={1500} factor={3} saturation={0.3} fade speed={0.2} />
+        <color attach="background" args={['#0c1220']} />
+        <Stars radius={100} depth={60} count={1200} factor={2.5} saturation={0.2} fade speed={0.15} />
 
-        {/* Sky dome */}
+        {/* Sky dome — deeper blue-gray */}
         <mesh scale={[-1, 1, 1]}>
-          <sphereGeometry args={[95, 32, 16]} />
-          <meshBasicMaterial side={THREE.BackSide}>
-            <color attach="color" args={['#0a101e']} />
-          </meshBasicMaterial>
+          <sphereGeometry args={[95, 24, 12]} />
+          <meshBasicMaterial side={THREE.BackSide} color="#0e1628" />
         </mesh>
 
-        {/* Moon with glow */}
+        {/* Moon — cleaner */}
         <group position={[-40, 48, -35]}>
           <mesh>
-            <sphereGeometry args={[4.5, 24, 24]} />
-            <meshBasicMaterial color="#e8e0d0" />
+            <sphereGeometry args={[4, 16, 16]} />
+            <meshBasicMaterial color="#e8e2d8" />
           </mesh>
-          {/* Moon glow */}
-          <mesh>
-            <sphereGeometry args={[7, 16, 16]} />
-            <meshBasicMaterial color="#ccd8ee" transparent opacity={0.08} depthWrite={false} blending={THREE.AdditiveBlending} />
-          </mesh>
-          <pointLight color="#b8c8dd" intensity={0.6} distance={150} />
+          <pointLight color="#b8c8dd" intensity={0.5} distance={150} />
         </group>
 
-        {/* Extended ground plane with subtle gradient */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRID_SIZE / 2 - 0.5, -0.15, GRID_SIZE / 2 - 0.5]}>
-          <planeGeometry args={[160, 160]} />
-          <meshStandardMaterial color="#0c160c" roughness={1} metalness={0} />
+        {/* Ground plane */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRID_SIZE / 2 - 0.5, -0.15, GRID_SIZE / 2 - 0.5]} receiveShadow>
+          <planeGeometry args={[140, 140]} />
+          <meshStandardMaterial color="#0e1a0e" roughness={1} metalness={0} />
         </mesh>
 
-        {/* Mountains - reduced count */}
-        {Array.from({ length: 8 }, (_, i) => {
-          const angle = (i / 8) * Math.PI * 2;
-          const dist = 35 + Math.sin(i * 2.7) * 12;
-          const height = 6 + Math.sin(i * 1.3) * 5;
+        {/* Mountains — cleaner silhouettes */}
+        {Array.from({ length: 10 }, (_, i) => {
+          const angle = (i / 10) * Math.PI * 2;
+          const dist = 38 + Math.sin(i * 2.7) * 10;
+          const height = 8 + Math.sin(i * 1.3) * 5;
           return (
             <mesh key={i} position={[
               GRID_SIZE / 2 + Math.cos(angle) * dist,
               height * 0.35,
               GRID_SIZE / 2 + Math.sin(angle) * dist
             ]}>
-              <coneGeometry args={[8 + i * 1.1, height, 5]} />
-              <meshStandardMaterial color="#08100a" roughness={1} />
+              <coneGeometry args={[7 + i * 0.8, height, 5]} />
+              <meshStandardMaterial color="#0a120c" roughness={1} />
             </mesh>
           );
         })}
@@ -232,54 +225,54 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <DistantTrees />
         <CloudLayer />
 
-        {/* ── Lighting Setup (cinematic) ── */}
-        <ambientLight intensity={0.35} color="#6677aa" />
+        {/* ── Lighting — XCOM-style dramatic ── */}
+        <ambientLight intensity={0.4} color="#5566aa" />
         
-        {/* Main directional (moon-like key light) */}
+        {/* Key light — warm directional */}
         <directionalLight
-          position={[20, 30, 15]}
-          intensity={1.2}
+          position={[18, 28, 12]}
+          intensity={1.4}
           castShadow
-          color="#ffe0b0"
+          color="#ffd8a0"
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
           shadow-camera-near={0.5}
           shadow-camera-far={80}
-          shadow-camera-left={-25}
-          shadow-camera-right={25}
-          shadow-camera-top={25}
-          shadow-camera-bottom={-25}
+          shadow-camera-left={-22}
+          shadow-camera-right={22}
+          shadow-camera-top={22}
+          shadow-camera-bottom={-22}
           shadow-bias={-0.0003}
         />
         
-        {/* Fill light (cool blue) */}
-        <directionalLight position={[-15, 18, -12]} intensity={0.3} color="#4466aa" />
+        {/* Fill light — cool blue */}
+        <directionalLight position={[-12, 16, -10]} intensity={0.35} color="#4466bb" />
         
-        {/* Rim light (warm orange from behind) */}
-        <directionalLight position={[-8, 12, 25]} intensity={0.2} color="#cc8844" />
+        {/* Rim light — accent orange */}
+        <directionalLight position={[-6, 10, 20]} intensity={0.25} color="#cc8844" />
         
-        {/* Hemisphere for ambient color variety */}
-        <hemisphereLight intensity={0.35} color="#556688" groundColor="#1a2a12" />
+        {/* Hemisphere */}
+        <hemisphereLight intensity={0.3} color="#556688" groundColor="#1a2a14" />
         
-        {/* Fog */}
-        <fog attach="fog" args={['#0a101e', 35, 80]} />
+        {/* Fog — slightly less aggressive */}
+        <fog attach="fog" args={['#0c1220', 40, 85]} />
 
-        {/* Atmospheric particles - reduced */}
+        {/* Particles */}
         <DustParticles />
         <EmberParticles />
         <ScreenShake events={state.combatEvents} />
 
-        {/* ── Post-processing pipeline (simplified) ── */}
+        {/* Post-processing */}
         <EffectComposer multisampling={0}>
           <Bloom
-            intensity={0.4}
-            luminanceThreshold={0.6}
-            luminanceSmoothing={0.9}
+            intensity={0.35}
+            luminanceThreshold={0.55}
+            luminanceSmoothing={0.85}
             mipmapBlur
           />
           <Vignette
-            offset={0.25}
-            darkness={0.7}
+            offset={0.2}
+            darkness={0.6}
             blendFunction={BlendFunction.NORMAL}
           />
         </EffectComposer>

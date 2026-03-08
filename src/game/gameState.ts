@@ -1354,7 +1354,6 @@ export function runAiUnitStep(
       }
     } else {
       // SOLDIER MOVE — XCOM-style: can choose to shoot first without moving
-      // Evaluate: is current position good enough to just shoot from?
       if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
         const canShootFromHere = visibleEnemies.some(e =>
           getManhattanDistance(unit.position, e.position) <= unit.attackRange
@@ -1368,19 +1367,29 @@ export function runAiUnitStep(
 
         if (movable.length > 0) {
           for (const t of movable) {
-            const score = evaluateWithLookahead(t, unit, allEnemies, newState);
+            let score = evaluateWithLookahead(t, unit, allEnemies, newState);
+            // If no enemies visible, bonus for moving toward nearest loot
+            if (visibleEnemies.length === 0) {
+              const nearestLoot = findNearestLoot(t, newState.grid);
+              if (nearestLoot) {
+                score += Math.max(0, 20 - getManhattanDistance(t, nearestLoot) * 3);
+              }
+              // Scouting bonus — move toward center / unexplored areas
+              const centerDist = getManhattanDistance(t, { x: Math.floor(GRID_SIZE/2), z: Math.floor(GRID_SIZE/2) });
+              score += Math.max(0, 10 - centerDist);
+            }
             if (score > bestScore) { bestTile = t; bestScore = score; }
           }
         }
 
         // Decision: stay and shoot or move to better position?
-        // If we can shoot from here and moving isn't much better, stay
-        const shouldStay = canShootFromHere && (bestScore <= currentScore + 8);
+        // If we can shoot from here and current cover is decent, prefer staying
+        const hasGoodCover = unit.coverType === 'full' || unit.coverType === 'half';
+        const shouldStay = canShootFromHere && hasGoodCover && (bestScore <= currentScore + 12);
 
         if (!shouldStay && (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z)) {
           moveToTile(bestTile);
         }
-        // If shouldStay: don't move, will shoot in combat phase
       }
     }
 

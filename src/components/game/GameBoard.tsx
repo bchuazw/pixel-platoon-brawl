@@ -210,6 +210,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         dpr={[1, 1.5]}
       >
         <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
+        <WASDControls orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />
         <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} cameraAngleIndex={angleIndex} />
 

@@ -529,28 +529,57 @@ function PropObject({ tile }: { tile: TileData }) {
         </group>
       );
 
-    // Concertina wire — ankle-shin height
+    // Concertina wire — 3D coils between posts
     case 'wire':
       return (
         <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
-          {/* Posts */}
-          <mesh position={[-0.32, 0.12, 0]}>
-            <cylinderGeometry args={[0.015, 0.015, 0.24, 4]} />
+          {/* Wooden/metal posts */}
+          <mesh position={[-0.32, 0.14, 0]} castShadow>
+            <cylinderGeometry args={[0.018, 0.018, 0.28, 5]} />
             <meshStandardMaterial color="#5a4a30" roughness={0.9} />
           </mesh>
-          <mesh position={[0.32, 0.12, 0]}>
-            <cylinderGeometry args={[0.015, 0.015, 0.24, 4]} />
+          <mesh position={[0.32, 0.14, 0]} castShadow>
+            <cylinderGeometry args={[0.018, 0.018, 0.28, 5]} />
             <meshStandardMaterial color="#5a4a30" roughness={0.9} />
           </mesh>
-          {/* Wire coils */}
-          <mesh position={[0, 0.12, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <torusGeometry args={[0.12, 0.012, 5, 12]} />
-            <meshStandardMaterial color="#7a7a78" metalness={0.6} roughness={0.4} />
+          <mesh position={[0, 0.14, 0]} castShadow>
+            <cylinderGeometry args={[0.012, 0.012, 0.26, 4]} />
+            <meshStandardMaterial color="#5a4a30" roughness={0.9} />
           </mesh>
-          <mesh position={[0.15, 0.15, 0]} rotation={[0.3, 0, Math.PI / 2]}>
-            <torusGeometry args={[0.10, 0.01, 5, 10]} />
-            <meshStandardMaterial color="#6a6a68" metalness={0.6} roughness={0.4} />
+          {/* Horizontal support wire */}
+          <mesh position={[0, 0.24, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.004, 0.004, 0.64, 3]} />
+            <meshStandardMaterial color="#8a8a88" metalness={0.7} roughness={0.3} />
           </mesh>
+          <mesh position={[0, 0.06, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.004, 0.004, 0.64, 3]} />
+            <meshStandardMaterial color="#7a7a78" metalness={0.7} roughness={0.3} />
+          </mesh>
+          {/* 3D wire coils — multiple offset torus rings */}
+          {[0, 1, 2, 3, 4].map(i => {
+            const cx = -0.24 + i * 0.12;
+            const cy = 0.12 + (i % 2 === 0 ? 0.04 : -0.01);
+            const rAngle = tileHash(tile.x + i, tile.z, 150 + i) * 0.6 - 0.3;
+            return (
+              <group key={`wc${i}`} position={[cx, cy, 0]} rotation={[rAngle, 0.4 * i, Math.PI / 2 + rAngle * 0.5]}>
+                <mesh>
+                  <torusGeometry args={[0.065, 0.006, 5, 8]} />
+                  <meshStandardMaterial color="#7a7a78" metalness={0.6} roughness={0.4} />
+                </mesh>
+              </group>
+            );
+          })}
+          {/* Barb clusters */}
+          {[0, 1, 2].map(i => {
+            const bx = -0.18 + i * 0.18;
+            const by = 0.14 + tileHash(tile.x, tile.z + i, 160) * 0.06;
+            return (
+              <mesh key={`wb${i}`} position={[bx, by, 0.02]}>
+                <octahedronGeometry args={[0.012, 0]} />
+                <meshStandardMaterial color="#999" metalness={0.8} roughness={0.2} />
+              </mesh>
+            );
+          })}
         </group>
       );
 

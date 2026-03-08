@@ -128,37 +128,77 @@ export function findPath(from: Position, to: Position, state: GameState): Positi
   return [to];
 }
 
+// ── Random spawn point generation ──
+const MIN_SPAWN_DISTANCE = 10; // minimum manhattan distance between team spawns
+
+function generateSpawnPoints(rand: () => number): Position[] {
+  const margin = 3; // keep away from edges
+  const max = GRID_SIZE - margin;
+  const spawns: Position[] = [];
+  let attempts = 0;
+
+  while (spawns.length < 4 && attempts < 500) {
+    attempts++;
+    const x = margin + Math.floor(rand() * (max - margin));
+    const z = margin + Math.floor(rand() * (max - margin));
+
+    // Check distance from all existing spawns
+    let tooClose = false;
+    for (const s of spawns) {
+      const dist = Math.abs(s.x - x) + Math.abs(s.z - z);
+      if (dist < MIN_SPAWN_DISTANCE) { tooClose = true; break; }
+    }
+    if (!tooClose) {
+      spawns.push({ x, z });
+    }
+  }
+
+  // Fallback: spread evenly if random placement failed
+  if (spawns.length < 4) {
+    return [
+      { x: 4, z: 4 },
+      { x: GRID_SIZE - 5, z: GRID_SIZE - 5 },
+      { x: GRID_SIZE - 5, z: 4 },
+      { x: 4, z: GRID_SIZE - 5 },
+    ];
+  }
+
+  return spawns;
+}
+
 // ── Grid Generation ──
-function createGrid(): TileData[][] {
+function createGrid(spawnPoints: Position[]): TileData[][] {
   const grid: TileData[][] = [];
   const rand = seededRandom(Date.now());
   const terrainSeed = Date.now() % 10000;
+  const center = GRID_SIZE / 2;
 
   for (let x = 0; x < GRID_SIZE; x++) {
     grid[x] = [];
     for (let z = 0; z < GRID_SIZE; z++) {
-      const distFromCenter = Math.sqrt((x - 10) ** 2 + (z - 10) ** 2);
+      const distFromCenter = Math.sqrt((x - center) ** 2 + (z - center) ** 2);
       const r = rand();
 
       let type: TileType = 'grass';
-      let elevation = getTerrainElevation(x, z, terrainSeed);
+      let elevation = getTerrainElevation(x, z, terrainSeed, spawnPoints);
 
-      const onHorizPath = Math.abs(z - 10) <= 1 && x > 3 && x < 17;
-      const onVertPath = Math.abs(x - 10) <= 1 && z > 3 && z < 17;
+      // Paths through center
+      const onHorizPath = Math.abs(z - center) <= 1 && x > 4 && x < GRID_SIZE - 5;
+      const onVertPath = Math.abs(x - center) <= 1 && z > 4 && z < GRID_SIZE - 5;
       const onDiagPath1 = Math.abs(x - z) <= 1;
       const onDiagPath2 = Math.abs(x - (GRID_SIZE - 1 - z)) <= 1;
 
       if (onHorizPath || onVertPath) {
-        type = 'dirt'; elevation = Math.max(0, elevation * 0.3); // flatten paths
+        type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
       } else if ((onDiagPath1 || onDiagPath2) && r < 0.4) {
         type = 'sand'; elevation = Math.max(0, elevation * 0.4);
-      } else if (distFromCenter < 3 && r < 0.3) {
+      } else if (distFromCenter < 4 && r < 0.3) {
         type = 'stone'; elevation = elevation + 0.1;
       } else if (elevation < 0.15 && r < 0.08) {
         type = 'water'; elevation = -0.15;
       } else if (elevation > 1.2) {
-        type = 'stone'; // high ground is rocky
-      } else if (r < 0.04 && distFromCenter > 4) {
+        type = 'stone';
+      } else if (r < 0.03 && distFromCenter > 5) {
         type = 'water'; elevation = -0.15;
       }
 
@@ -170,19 +210,19 @@ function createGrid(): TileData[][] {
         isBlocked = true;
       } else if (type !== 'dirt' && type !== 'sand') {
         const propRoll = rand();
-        if (propRoll < 0.03 && distFromCenter > 3) {
+        if (propRoll < 0.025 && distFromCenter > 4) {
           prop = 'tree'; isBlocked = true; coverValue = 2;
-        } else if (propRoll < 0.06) {
+        } else if (propRoll < 0.05) {
           prop = 'rock'; isBlocked = true; coverValue = 2;
-        } else if (propRoll < 0.08) {
+        } else if (propRoll < 0.07) {
           prop = 'bush'; coverValue = 1;
-        } else if (propRoll < 0.10) {
+        } else if (propRoll < 0.085) {
           prop = 'crate'; isBlocked = true; coverValue = 2;
-        } else if (propRoll < 0.12) {
+        } else if (propRoll < 0.10) {
           prop = 'barrel'; isBlocked = true; coverValue = 1;
-        } else if (propRoll < 0.14 && distFromCenter > 5) {
+        } else if (propRoll < 0.115 && distFromCenter > 6) {
           prop = 'sandbag'; coverValue = 2;
-        } else if (propRoll < 0.155 && distFromCenter > 6) {
+        } else if (propRoll < 0.13 && distFromCenter > 7) {
           prop = 'ruins'; isBlocked = true; coverValue = 2; elevation += 0.3;
         }
       }
@@ -191,29 +231,30 @@ function createGrid(): TileData[][] {
     }
   }
 
-  // Strategic cover clusters
-  const coverPositions = [
-    { x: 8, z: 8 }, { x: 8, z: 9 }, { x: 9, z: 8 },
-    { x: 11, z: 11 }, { x: 11, z: 12 }, { x: 12, z: 11 },
-    { x: 8, z: 12 }, { x: 12, z: 8 },
-    { x: 5, z: 10 }, { x: 14, z: 10 }, { x: 10, z: 5 }, { x: 10, z: 14 },
-    { x: 4, z: 4 }, { x: 15, z: 15 }, { x: 4, z: 15 }, { x: 15, z: 4 },
-    { x: 7, z: 5 }, { x: 12, z: 14 }, { x: 5, z: 13 }, { x: 14, z: 7 },
-  ];
+  // Strategic cover clusters scattered around the map
+  const coverPositions: Position[] = [];
+  for (let i = 0; i < 30; i++) {
+    const cx = 3 + Math.floor(rand() * (GRID_SIZE - 6));
+    const cz = 3 + Math.floor(rand() * (GRID_SIZE - 6));
+    coverPositions.push({ x: cx, z: cz });
+    // Add a neighbor for cluster feel
+    if (rand() > 0.4) coverPositions.push({ x: Math.min(GRID_SIZE - 1, cx + 1), z: cz });
+    if (rand() > 0.5) coverPositions.push({ x: cx, z: Math.min(GRID_SIZE - 1, cz + 1) });
+  }
   const coverProps: PropType[] = ['sandbag', 'crate', 'barrel'];
   for (const pos of coverPositions) {
-    if (pos.x < GRID_SIZE && pos.z < GRID_SIZE && grid[pos.x][pos.z].type !== 'water') {
+    if (pos.x < GRID_SIZE && pos.z < GRID_SIZE && grid[pos.x][pos.z].type !== 'water' && !grid[pos.x][pos.z].prop) {
       grid[pos.x][pos.z].prop = coverProps[Math.floor(rand() * coverProps.length)];
       grid[pos.x][pos.z].isBlocked = true;
       grid[pos.x][pos.z].coverValue = 2;
     }
   }
 
-  // Clear spawn corners
-  for (const corner of [[0, 0], [0, GRID_SIZE - 1], [GRID_SIZE - 1, 0], [GRID_SIZE - 1, GRID_SIZE - 1]]) {
+  // Clear spawn areas (radius 3 around each spawn point)
+  for (const spawn of spawnPoints) {
     for (let dx = -3; dx <= 3; dx++) {
       for (let dz = -3; dz <= 3; dz++) {
-        const cx = corner[0] + dx, cz = corner[1] + dz;
+        const cx = spawn.x + dx, cz = spawn.z + dz;
         if (cx >= 0 && cx < GRID_SIZE && cz >= 0 && cz < GRID_SIZE) {
           grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, coverValue: 0, elevation: 0, hasSmoke: false, loot: null };
         }
@@ -221,18 +262,18 @@ function createGrid(): TileData[][] {
     }
   }
 
-  // Spawn loot
-  const lootCount = 18 + Math.floor(rand() * 8);
+  // Spawn loot (more for bigger map)
+  const lootCount = 25 + Math.floor(rand() * 12);
   let placed = 0;
   let attempts = 0;
-  while (placed < lootCount && attempts < 300) {
+  while (placed < lootCount && attempts < 500) {
     attempts++;
     const lx = Math.floor(rand() * GRID_SIZE);
     const lz = Math.floor(rand() * GRID_SIZE);
     const tile = grid[lx][lz];
-    const inCorner = (lx <= 3 && lz <= 3) || (lx <= 3 && lz >= GRID_SIZE - 4) ||
-                     (lx >= GRID_SIZE - 4 && lz <= 3) || (lx >= GRID_SIZE - 4 && lz >= GRID_SIZE - 4);
-    if (!tile.isBlocked && tile.type !== 'water' && !tile.loot && !inCorner) {
+    // Don't place loot near spawn points
+    const nearSpawn = spawnPoints.some(s => Math.abs(s.x - lx) <= 3 && Math.abs(s.z - lz) <= 3);
+    if (!tile.isBlocked && tile.type !== 'water' && !tile.loot && !nearSpawn) {
       grid[lx][lz].loot = generateLootItem(rand);
       placed++;
     }

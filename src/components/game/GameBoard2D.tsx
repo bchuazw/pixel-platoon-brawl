@@ -113,6 +113,9 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
           x: unit.position.x, z: unit.position.z,
           flash: 0, floatText: null, floatY: 0, floatOpacity: 0,
           scale: 1, deathProgress: unit.isAlive ? 0 : 1,
+          walkCycle: 0, isMoving: false,
+          prevX: unit.position.x, prevZ: unit.position.z,
+        };
         };
       }
     }

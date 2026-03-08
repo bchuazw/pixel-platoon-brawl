@@ -9,7 +9,7 @@ const Index = () => {
   const {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
-    sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit,
+    sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
   } = useGameStore();
 
   const handleTileClick = useCallback((pos: Position) => {
@@ -24,7 +24,6 @@ const Index = () => {
   }, [state.phase, state.autoPlay, state.movableTiles, state.attackableTiles, state.abilityTargetTiles, moveUnit, attackTarget, executeAbility]);
 
   const handleUnitClick = useCallback((unitId: string) => {
-    // In auto-play mode, clicking a unit opens the character/sponsor panel
     if (state.autoPlay) {
       inspectUnit(unitId);
       return;
@@ -58,6 +57,10 @@ const Index = () => {
     sponsorUnit(unitId, action);
   }, [sponsorUnit]);
 
+  const handleMoveComplete = useCallback(() => {
+    clearMovePath();
+  }, [clearMovePath]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (inspectedUnitId && e.key === 'Escape') { inspectUnit(null); return; }
@@ -84,6 +87,7 @@ const Index = () => {
         onTileClick={handleTileClick}
         onUnitClick={handleUnitClick}
         onTileHover={handleTileHover}
+        onMoveComplete={handleMoveComplete}
       />
       <GameHUD
         state={state}

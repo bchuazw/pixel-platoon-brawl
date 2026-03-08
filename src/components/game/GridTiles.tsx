@@ -594,9 +594,10 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Civilian wrecked car — good cover, realistic proportions
-    case 'wrecked_car':
+    case 'wrecked_car': {
+      const carColor = h > 0.7 ? '#4a3a2a' : h > 0.4 ? '#2a3a4a' : '#3a2a3a';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.1, h * Math.PI * 2, rotVar * 0.15]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Body/chassis */}
           <mesh position={[0, 0.14, 0]} castShadow>
             <boxGeometry args={[0.8, 0.22, 0.4]} />

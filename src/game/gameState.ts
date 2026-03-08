@@ -123,7 +123,8 @@ export function findPath(from: Position, to: Position, state: GameState): Positi
       const nKey = `${nx},${nz}`;
       if (nx < 0 || nx >= GRID_SIZE || nz < 0 || nz >= GRID_SIZE) continue;
       if (visited.has(nKey)) continue;
-      if (state.grid[nx][nz].isBlocked) continue;
+      const nextTile = state.grid[nx][nz];
+      if (nextTile.isBlocked || nextTile.prop || nextTile.type === 'water') continue;
       if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz &&
         !(nx === to.x && nz === to.z))) continue;
 
@@ -773,7 +774,8 @@ export function getMovableTiles(unit: Unit, state: GameState): Position[] {
   for (let x = 0; x < GRID_SIZE; x++) {
     for (let z = 0; z < GRID_SIZE; z++) {
       const dist = getManhattanDistance(unit.position, { x, z });
-      if (dist > 0 && dist <= unit.moveRange && !state.grid[x][z].isBlocked) {
+      const tile = state.grid[x][z];
+      if (dist > 0 && dist <= unit.moveRange && !tile.isBlocked && !tile.prop && tile.type !== 'water') {
         if (!state.units.some(u => u.isAlive && u.position.x === x && u.position.z === z)) {
           tiles.push({ x, z });
         }

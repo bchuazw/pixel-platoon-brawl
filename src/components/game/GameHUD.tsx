@@ -77,7 +77,111 @@ function UnitCard({ unit, isActive }: { unit: Unit; isActive: boolean }) {
   );
 }
 
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay }: GameHUDProps) {
+const MINIMAP_SIZE = 140;
+const CELL = MINIMAP_SIZE / GRID_SIZE;
+
+const TILE_MINIMAP_COLORS: Record<string, string> = {
+  grass: '#3a5a2a', dirt: '#6a5a40', stone: '#55555a',
+  water: '#2244668', sand: '#8a7a50', wall: '#44444a',
+};
+
+function Minimap({ state }: { state: GameState }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, MINIMAP_SIZE, MINIMAP_SIZE);
+
+    // Draw tiles
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const tile = state.grid[x][z];
+        const outOfZone = state.shrinkLevel > 0 && !isInZone(x, z, state.shrinkLevel);
+
+        if (outOfZone) {
+          ctx.fillStyle = '#3a1515';
+        } else {
+          ctx.fillStyle = TILE_MINIMAP_COLORS[tile.type] || '#3a5a2a';
+        }
+        ctx.fillRect(x * CELL, z * CELL, CELL, CELL);
+
+        // Props as darker dots
+        if (tile.prop) {
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
+          ctx.fillRect(x * CELL + 1, z * CELL + 1, CELL - 2, CELL - 2);
+        }
+
+        // Smoke
+        if (tile.hasSmoke) {
+          ctx.fillStyle = 'rgba(150,170,190,0.4)';
+          ctx.fillRect(x * CELL, z * CELL, CELL, CELL);
+        }
+      }
+    }
+
+    // Draw zone border
+    if (state.shrinkLevel > 0) {
+      const margin = state.shrinkLevel * 2;
+      ctx.strokeStyle = '#ff4444';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(
+        margin * CELL, margin * CELL,
+        (GRID_SIZE - margin * 2) * CELL, (GRID_SIZE - margin * 2) * CELL
+      );
+    }
+
+    // Draw grid lines (subtle)
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= GRID_SIZE; i++) {
+      ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, MINIMAP_SIZE); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(MINIMAP_SIZE, i * CELL); ctx.stroke();
+    }
+
+    // Draw units
+    for (const unit of state.units) {
+      if (!unit.isAlive) continue;
+      const cx = unit.position.x * CELL + CELL / 2;
+      const cz = unit.position.z * CELL + CELL / 2;
+
+      // Outer glow
+      ctx.beginPath();
+      ctx.arc(cx, cz, CELL * 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = TEAM_COLORS[unit.team] + '44';
+      ctx.fill();
+
+      // Unit dot
+      ctx.beginPath();
+      ctx.arc(cx, cz, CELL * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = TEAM_COLORS[unit.team];
+      ctx.fill();
+
+      // White border
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }, [state.units, state.grid, state.shrinkLevel]);
+
+  return (
+    <div className="pointer-events-auto absolute right-2 top-14 bg-card/90 backdrop-blur-sm border border-border/40 rounded-lg p-1.5">
+      <div className="text-[6px] text-muted-foreground tracking-[0.15em] text-center mb-1">TACTICAL MAP</div>
+      <canvas
+        ref={canvasRef}
+        width={MINIMAP_SIZE}
+        height={MINIMAP_SIZE}
+        className="rounded border border-border/30"
+        style={{ width: MINIMAP_SIZE, height: MINIMAP_SIZE, imageRendering: 'pixelated' }}
+      />
+    </div>
+  );
+}
+
+
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

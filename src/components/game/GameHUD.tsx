@@ -145,7 +145,7 @@ function TeamRoster({ state, onUnitInspect, visible }: { state: GameState; onUni
 }
 
 /* ── Right Sidebar: Combat Feed ── */
-function CombatFeed({ log }: { log: string[] }) {
+function CombatFeed({ log, visible }: { log: string[]; visible: boolean }) {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -167,7 +167,9 @@ function CombatFeed({ log }: { log: string[] }) {
   };
 
   return (
-    <div className="pointer-events-auto absolute right-0 top-12 sm:top-14 bottom-8 w-48 sm:w-64 flex flex-col overflow-hidden"
+    <div className={`pointer-events-auto absolute right-0 top-12 sm:top-14 bottom-8 w-48 sm:w-64 flex flex-col overflow-hidden transition-transform duration-300 ${
+      visible ? 'translate-x-0' : 'translate-x-full sm:translate-x-0'
+    }`}
       style={{
         background: 'linear-gradient(270deg, rgba(8,12,18,0.95) 0%, rgba(8,12,18,0.88) 75%, rgba(8,12,18,0) 100%)',
       }}>

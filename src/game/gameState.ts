@@ -384,7 +384,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
       for (let dz = -3; dz <= 3; dz++) {
         const cx = spawn.x + dx, cz = spawn.z + dz;
         if (cx >= 0 && cx < GRID_SIZE && cz >= 0 && cz < GRID_SIZE) {
-          grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, coverValue: 0, elevation: 0, hasSmoke: false, loot: null };
+          grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, coverValue: 0, elevation: 0, hasSmoke: false, loot: null, damaged: false, scorchMark: false };
         }
       }
     }

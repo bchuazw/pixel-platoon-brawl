@@ -403,7 +403,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Ruined wall / building fragment — shoulder height with rubble
     case 'ruins':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Foundation slab */}
           <mesh position={[0, 0.04, 0]} castShadow>
             <boxGeometry args={[0.7, 0.08, 0.6]} />

@@ -365,9 +365,12 @@ function PropObject({ tile }: { tile: TileData }) {
     }
 
     // Tree — 2-3x soldier height (1.5-2.2 total)
-    case 'tree':
+    case 'tree': {
+      const trunkColor = h > 0.5 ? '#5a3818' : '#4a2e14';
+      const leafColor1 = h > 0.6 ? '#2e7018' : '#1e6010';
+      const leafColor2 = h > 0.4 ? '#389222' : '#2a7a18';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.15, h * Math.PI * 2, rotVar * 0.1]} scale={[scaleVar, 0.85 + tileHash(tile.x, tile.z, 203) * 0.35, scaleVar]}>
           {/* Trunk */}
           <mesh position={[0, 0.35, 0]} castShadow>
             <cylinderGeometry args={[0.05, 0.09, 0.7, 7]} />

@@ -173,6 +173,8 @@ function LoadingFallback() {
 export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
   const [autoFollow, setAutoFollow] = useState(true);
+  const orbitRef = useRef<any>(null);
+
   const rotateCamera = useCallback(() => {
     setAngleIndex(prev => (prev + 1) % 4);
   }, []);
@@ -190,9 +192,9 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         }}
         shadows
       >
-        <CameraController angleIndex={angleIndex} />
+        <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />
-        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} />
+        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} />
         <color attach="background" args={['#0e1a2e']} />
         <Stars radius={80} depth={50} count={2500} factor={3} saturation={0.4} fade speed={0.3} />
 

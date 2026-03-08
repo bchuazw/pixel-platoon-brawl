@@ -384,7 +384,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     const unitBaseY = getUnitBaseY(grid, unit.position.x, unit.position.z);
 
     // ── DEATH ──
-    if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 5)) {
+    if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 1.5)) {
       deathTimer.current += delta;
       const dt = deathTimer.current;
       if (dt < 0.3) {
@@ -402,10 +402,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
         if (rightLegRef.current) rightLegRef.current.rotation.x = e * 0.3;
       } else {
         bodyRef.current.rotation.x = Math.PI / 2;
-        const s = dt - 1.2;
-        bodyRef.current.position.y = -0.3 + Math.exp(-s * 4) * Math.sin(s * 8) * 0.03;
-        if (leftArmRef.current) leftArmRef.current.rotation.z = -Math.PI / 2.5;
-        if (rightArmRef.current) rightArmRef.current.rotation.z = Math.PI / 2.5;
+        bodyRef.current.position.y = -0.3;
       }
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       return;
@@ -505,26 +502,43 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       const breathe = Math.sin(t * 1.8 + unit.position.x * 2) * 0.006;
       const sway = Math.sin(t * 0.7 + unit.position.z) * 0.01;
-      bodyRef.current.position.y = breathe;
-      bodyRef.current.rotation.z = sway;
-      bodyRef.current.rotation.x = 0;
-      if (leftArmRef.current) leftArmRef.current.rotation.x = Math.sin(t * 1.2) * 0.02;
-      if (rightArmRef.current) rightArmRef.current.rotation.x = Math.sin(t * 1.2 + 1) * 0.02;
-      if (leftLegRef.current) leftLegRef.current.rotation.x = 0;
-      if (rightLegRef.current) rightLegRef.current.rotation.x = 0;
 
-      // Cover crouch
-      if (unit.coverType === 'full') {
-        bodyRef.current.position.y = -0.08;
-        if (leftLegRef.current) leftLegRef.current.rotation.x = -0.35;
-        if (rightLegRef.current) rightLegRef.current.rotation.x = -0.25;
-      } else if (unit.coverType === 'half') {
-        bodyRef.current.position.y = -0.04;
-        if (leftLegRef.current) leftLegRef.current.rotation.x = -0.15;
+      if (unit.isHunkered) {
+        // ── HUNKER DOWN: full crouch, knees bent, head tucked, shield pose ──
+        bodyRef.current.position.y = -0.18;
+        bodyRef.current.rotation.x = 0.25; // lean forward
+        if (leftLegRef.current) { leftLegRef.current.rotation.x = -0.7; }
+        if (rightLegRef.current) { rightLegRef.current.rotation.x = -0.55; }
+        // Arms up protecting head
+        if (leftArmRef.current) { leftArmRef.current.rotation.x = -1.2; leftArmRef.current.rotation.z = -0.3; }
+        if (rightArmRef.current) { rightArmRef.current.rotation.x = -1.0; rightArmRef.current.rotation.z = 0.3; }
+      } else {
+        bodyRef.current.position.y = breathe;
+        bodyRef.current.rotation.z = sway;
+        bodyRef.current.rotation.x = 0;
+        if (leftArmRef.current) { leftArmRef.current.rotation.x = Math.sin(t * 1.2) * 0.02; leftArmRef.current.rotation.z = 0; }
+        if (rightArmRef.current) { rightArmRef.current.rotation.x = Math.sin(t * 1.2 + 1) * 0.02; rightArmRef.current.rotation.z = 0; }
+        if (leftLegRef.current) leftLegRef.current.rotation.x = 0;
+        if (rightLegRef.current) rightLegRef.current.rotation.x = 0;
+
+        // Cover crouch (lighter than hunker)
+        if (unit.coverType === 'full') {
+          bodyRef.current.position.y = -0.08;
+          if (leftLegRef.current) leftLegRef.current.rotation.x = -0.35;
+          if (rightLegRef.current) rightLegRef.current.rotation.x = -0.25;
+        } else if (unit.coverType === 'half') {
+          bodyRef.current.position.y = -0.04;
+          if (leftLegRef.current) leftLegRef.current.rotation.x = -0.15;
+        }
       }
 
       if (unit.isSuppressed) {
         bodyRef.current.rotation.z += Math.sin(t * 20) * 0.015;
+      }
+      if (unit.isOnOverwatch) {
+        if (rightArmRef.current) rightArmRef.current.rotation.x = -Math.PI / 4;
+        if (leftArmRef.current) leftArmRef.current.rotation.x = -Math.PI / 5;
+        bodyRef.current.rotation.x = 0.04;
       }
       if (unit.isOnOverwatch) {
         if (rightArmRef.current) rightArmRef.current.rotation.x = -Math.PI / 4;
@@ -549,8 +563,8 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.45).getHexString();
   }, [color]);
 
-  // Show tombstone after death animation completes
-  if (!unit.isAlive && deathTimer.current >= 5) {
+  // Show tombstone immediately after death animation (1.5s instead of 5s)
+  if (!unit.isAlive && deathTimer.current >= 1.5) {
     const unitBaseY = getUnitBaseY(grid, unit.position.x, unit.position.z);
     return (
       <group position={[unit.position.x, unitBaseY, unit.position.z]}>
@@ -740,13 +754,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
         <meshBasicMaterial color={color} />
       </mesh>
 
-      {/* Vision ring */}
-      {unit.isAlive && (
-        <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[unit.visionRange - 0.05, unit.visionRange + 0.05, 20]} />
-          <meshBasicMaterial color={color} transparent opacity={0.06} side={THREE.DoubleSide} />
-        </mesh>
-      )}
+      {/* Vision ring - hidden by default, too confusing visually */}
 
       {/* Attack range ring when hunkered */}
       {unit.isHunkered && (

@@ -1520,26 +1520,86 @@ export function runAiUnitStep(
         const hasGoodCover = unit.coverType === 'full' || unit.coverType === 'half';
         
         if (canShootFromHere && hasGoodCover) {
-          // Stay and shoot — don't move
+          // Even with cover, check if we can reposition for MUCH better accuracy
+          const movable = getMovableTiles(unit, newState);
+          const currentBestTarget = visibleEnemies
+            .filter(e => getManhattanDistance(unit.position, e.position) <= unit.attackRange)
+            .sort((a, b) => {
+              const pa = getAttackPreview(unit, a, newState.grid);
+              const pb = getAttackPreview(unit, b, newState.grid);
+              return pb.hitChance - pa.hitChance;
+            })[0];
+          
+          if (currentBestTarget) {
+            const currentHitChance = getAttackPreview(unit, currentBestTarget, newState.grid).hitChance;
+            
+            // Only reposition if we can gain significant accuracy (>15%)
+            let bestTile = unit.position;
+            let bestAccuracy = currentHitChance;
+            let bestCoverScore = hasGoodCover ? (unit.coverType === 'full' ? 2 : 1) : 0;
+            
+            for (const t of movable) {
+              // Check if we can still shoot the target from this tile
+              const distFromT = getManhattanDistance(t, currentBestTarget.position);
+              if (distFromT > unit.attackRange) continue;
+              
+              // Simulate accuracy from this position
+              const fakeUnit = { ...unit, position: t };
+              const preview = getAttackPreview(fakeUnit, currentBestTarget, newState.grid);
+              
+              // Check cover at new position
+              let coverAtT = 0;
+              for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                const nx = t.x + dx, nz = t.z + dz;
+                if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                  coverAtT = Math.max(coverAtT, newState.grid[nx][nz].coverValue);
+                }
+              }
+              
+              // Only move if significantly better accuracy AND don't lose too much cover
+              const accGain = preview.hitChance - currentHitChance;
+              const coverLoss = bestCoverScore - coverAtT;
+              if (accGain > 15 && coverLoss <= 1 && preview.hitChance > bestAccuracy) {
+                bestAccuracy = preview.hitChance;
+                bestTile = t;
+              }
+              // Or if we gain cover AND maintain range
+              if (coverAtT > bestCoverScore && preview.hitChance >= currentHitChance - 5) {
+                bestCoverScore = coverAtT;
+                bestAccuracy = preview.hitChance;
+                bestTile = t;
+              }
+            }
+            
+            if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
+              moveToTile(bestTile);
+            }
+          }
         } else if (visibleEnemies.length > 0 && !canShootFromHere) {
-          // Enemies visible but out of range — move toward weapon max range
+          // Enemies visible but out of range — move toward optimal firing position
           const movable = getMovableTiles(unit, newState);
           let bestTile = unit.position;
           let bestScore = -Infinity;
 
           for (const t of movable) {
             let score = evaluateWithLookahead(t, unit, allEnemies, newState);
-            // Bonus for getting in attack range
-            const inRangeFromT = visibleEnemies.some(e => getManhattanDistance(t, e.position) <= unit.attackRange);
-            if (inRangeFromT) score += 30;
+            // Big bonus for getting in attack range
+            const inRangeFromT = visibleEnemies.filter(e => getManhattanDistance(t, e.position) <= unit.attackRange);
+            if (inRangeFromT.length > 0) {
+              score += 30;
+              // Bonus for accuracy from this position
+              const fakeUnit = { ...unit, position: t };
+              const bestTarget = inRangeFromT.sort((a, b) => a.hp - b.hp)[0];
+              const preview = getAttackPreview(fakeUnit, bestTarget, newState.grid);
+              score += preview.hitChance * 0.5; // Prefer higher accuracy positions
+            }
             if (score > bestScore) { bestTile = t; bestScore = score; }
           }
 
           if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
-            // Check path for mid-movement target detection
             const stopTile = findBestStopAlongPath(unit.position, bestTile);
             if (stopTile && (stopTile.x !== bestTile.x || stopTile.z !== bestTile.z)) {
-              moveToTile(stopTile); // Stop early — enemy spotted along path
+              moveToTile(stopTile);
             } else {
               moveToTile(bestTile);
             }
@@ -1575,16 +1635,23 @@ export function runAiUnitStep(
             }
           }
         } else {
-          // Can shoot but no cover — try to reposition to cover then shoot
+          // Can shoot but no cover — reposition to cover with best accuracy
           const movable = getMovableTiles(unit, newState);
           let bestTile = unit.position;
-          let bestScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
+          let bestScore = -Infinity;
 
           for (const t of movable) {
-            const score = evaluateWithLookahead(t, unit, allEnemies, newState);
+            let score = evaluateWithLookahead(t, unit, allEnemies, newState);
             // Must still be in attack range after moving
-            const inRangeFromT = visibleEnemies.some(e => getManhattanDistance(t, e.position) <= unit.attackRange);
-            if (inRangeFromT && score > bestScore) { bestTile = t; bestScore = score; }
+            const inRangeFromT = visibleEnemies.filter(e => getManhattanDistance(t, e.position) <= unit.attackRange);
+            if (inRangeFromT.length > 0) {
+              // Bonus for accuracy from this position
+              const fakeUnit = { ...unit, position: t };
+              const bestTarget = inRangeFromT.sort((a, b) => a.hp - b.hp)[0];
+              const preview = getAttackPreview(fakeUnit, bestTarget, newState.grid);
+              score += preview.hitChance * 0.3;
+              if (score > bestScore) { bestTile = t; bestScore = score; }
+            }
           }
 
           if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {

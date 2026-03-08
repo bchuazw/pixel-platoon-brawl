@@ -469,23 +469,6 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
               </div>
             </div>
 
-            {/* Betting panel (right side) */}
-            <div className="w-[200px] shrink-0 pt-4">
-              {onPlaceBet && sponsorPoints !== undefined && !betTeam && (
-                <BettingPanel onPlaceBet={onPlaceBet} sponsorPoints={sponsorPoints} />
-              )}
-
-              {betTeam && (
-                <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-2.5 text-center">
-                  <div className="text-[8px] text-accent font-bold">🎰 BET PLACED</div>
-                  <div className="text-[12px] font-bold text-foreground mt-0.5">⭐{betAmount}</div>
-                  <div className="text-[7px] text-muted-foreground">
-                    on <span className="font-bold uppercase" style={{ color: TEAM_COLORS[betTeam] }}>{betTeam}</span>
-                  </div>
-                  <div className="text-[6px] text-accent mt-1">Win: ⭐{(betAmount || 0) * 3}</div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}

@@ -1,7 +1,13 @@
 import { Unit, TEAM_COLORS, WEAPONS, WeaponId, LootItem } from '@/game/types';
 import { X, Heart, Swords, Shield, Crosshair, Eye, Footprints, Zap, MapPin, Package, Target } from 'lucide-react';
-import portraitSoldier from '@/assets/portrait-soldier.png';
-import portraitMedic from '@/assets/portrait-medic.png';
+import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
+import portraitSoldierRed from '@/assets/portrait-soldier-red.png';
+import portraitSoldierGreen from '@/assets/portrait-soldier-green.png';
+import portraitSoldierYellow from '@/assets/portrait-soldier-yellow.png';
+import portraitMedicBlue from '@/assets/portrait-medic-blue.png';
+import portraitMedicRed from '@/assets/portrait-medic-red.png';
+import portraitMedicGreen from '@/assets/portrait-medic-green.png';
+import portraitMedicYellow from '@/assets/portrait-medic-yellow.png';
 
 export type SponsorAction = 'reveal_enemies' | 'reveal_loot' | 'gift_rifle' | 'gift_sniper' | 'gift_shotgun' | 'gift_rocket' | 'gift_medkit' | 'gift_armor';
 
@@ -10,7 +16,7 @@ export interface SponsorOption {
   name: string;
   description: string;
   icon: string;
-  cost: number; // sponsor points cost
+  cost: number;
   category: 'intel' | 'weapon' | 'supply';
 }
 
@@ -26,8 +32,14 @@ export const SPONSOR_OPTIONS: SponsorOption[] = [
 ];
 
 const PORTRAITS: Record<string, string> = {
-  soldier: portraitSoldier,
-  medic: portraitMedic,
+  'blue-soldier': portraitSoldierBlue,
+  'red-soldier': portraitSoldierRed,
+  'green-soldier': portraitSoldierGreen,
+  'yellow-soldier': portraitSoldierYellow,
+  'blue-medic': portraitMedicBlue,
+  'red-medic': portraitMedicRed,
+  'green-medic': portraitMedicGreen,
+  'yellow-medic': portraitMedicYellow,
 };
 
 interface CharacterPanelProps {
@@ -39,7 +51,7 @@ interface CharacterPanelProps {
 
 export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: CharacterPanelProps) {
   const teamColor = TEAM_COLORS[unit.team];
-  const portrait = PORTRAITS[unit.unitClass];
+  const portrait = PORTRAITS[unit.id] || PORTRAITS[`${unit.team}-${unit.unitClass}`];
   const hpPercent = (unit.hp / unit.maxHp) * 100;
 
   const statRows = [

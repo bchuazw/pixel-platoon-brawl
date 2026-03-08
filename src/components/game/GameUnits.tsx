@@ -546,8 +546,8 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.45).getHexString();
   }, [color]);
 
-  // Show tombstone after death animation completes
-  if (!unit.isAlive && deathTimer.current >= 5) {
+  // Show tombstone immediately after death animation (1.5s instead of 5s)
+  if (!unit.isAlive && deathTimer.current >= 1.5) {
     const unitBaseY = getUnitBaseY(grid, unit.position.x, unit.position.z);
     return (
       <group position={[unit.position.x, unitBaseY, unit.position.z]}>

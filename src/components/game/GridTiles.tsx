@@ -19,14 +19,18 @@ interface GridTilesProps {
 
 // ── Naturalistic terrain palette ──
 const TERRAIN: Record<string, { base: string; dark: string; light: string; side: string }> = {
-  grass:   { base: '#5a9438', dark: '#4a7e2e', light: '#6aaa48', side: '#3d6828' },
-  dirt:    { base: '#b08a58', dark: '#9a7848', light: '#c49a68', side: '#7a5e38' },
-  stone:   { base: '#8a8a90', dark: '#6e6e76', light: '#a0a0a8', side: '#5a5a62' },
-  water:   { base: '#3888bb', dark: '#2a6a99', light: '#4499cc', side: '#1a5580' },
-  sand:    { base: '#d4b870', dark: '#baa058', light: '#e0c880', side: '#9a8048' },
-  wall:    { base: '#707078', dark: '#585860', light: '#888890', side: '#484850' },
-  trench:  { base: '#6a5a38', dark: '#544828', light: '#7a6a48', side: '#3e3220' },
-  crater:  { base: '#383330', dark: '#282420', light: '#484340', side: '#1e1a18' },
+  grass:         { base: '#5a9438', dark: '#4a7e2e', light: '#6aaa48', side: '#3d6828' },
+  dirt:          { base: '#b08a58', dark: '#9a7848', light: '#c49a68', side: '#7a5e38' },
+  stone:         { base: '#8a8a90', dark: '#6e6e76', light: '#a0a0a8', side: '#5a5a62' },
+  water:         { base: '#3888bb', dark: '#2a6a99', light: '#4499cc', side: '#1a5580' },
+  sand:          { base: '#d4b870', dark: '#baa058', light: '#e0c880', side: '#9a8048' },
+  wall:          { base: '#707078', dark: '#585860', light: '#888890', side: '#484850' },
+  trench:        { base: '#6a5a38', dark: '#544828', light: '#7a6a48', side: '#3e3220' },
+  crater:        { base: '#383330', dark: '#282420', light: '#484340', side: '#1e1a18' },
+  cobblestone:   { base: '#8a8078', dark: '#6e6860', light: '#9a9088', side: '#5a5450' },
+  beach_sand:    { base: '#e8d8a0', dark: '#d4c488', light: '#f0e0b0', side: '#c0a870' },
+  shallow_water: { base: '#5aaabb', dark: '#4899aa', light: '#6cbbcc', side: '#3a8899' },
+  mud:           { base: '#6a5a3a', dark: '#544828', light: '#7a6a4a', side: '#3e3220' },
 };
 
 // ── Deterministic hash for per-tile variation ──

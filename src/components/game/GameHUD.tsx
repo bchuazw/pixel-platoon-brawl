@@ -521,7 +521,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {!isPreGame && <Minimap state={state} />}
 
       {/* Bottom bar */}
-      <div className="pointer-events-auto absolute bottom-0 left-0 right-0 bg-card/90 backdrop-blur-sm border-t border-border/40">
+      <div className="pointer-events-auto absolute bottom-0 left-0 right-0 glass-panel-dark border-t border-border/40">
         <div className="flex">
           <div ref={logRef} className="flex-1 h-24 overflow-y-auto px-4 py-2 font-mono">
             {state.log.slice(-20).map((msg, i) => (

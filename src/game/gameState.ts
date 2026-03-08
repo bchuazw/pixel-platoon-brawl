@@ -682,12 +682,22 @@ export function createInitialState(): GameState {
   for (let i = 0; i < teams.length; i++) {
     const team = teams[i];
     const spawn = spawnPoints[i];
-    // Soldier at spawn, medic adjacent
-    const medicOffset = [{ x: 1, z: 0 }, { x: 0, z: 1 }, { x: 1, z: 1 }, { x: -1, z: 0 }][i];
+    
+    // Randomize medic position: 2-4 tiles away in a random direction
+    const angle = globalRand() * Math.PI * 2;
+    const dist = 2 + Math.floor(globalRand() * 3); // 2-4 tiles
     const medicPos = {
-      x: Math.max(0, Math.min(GRID_SIZE - 1, spawn.x + medicOffset.x)),
-      z: Math.max(0, Math.min(GRID_SIZE - 1, spawn.z + medicOffset.z)),
+      x: Math.max(0, Math.min(GRID_SIZE - 1, spawn.x + Math.round(Math.cos(angle) * dist))),
+      z: Math.max(0, Math.min(GRID_SIZE - 1, spawn.z + Math.round(Math.sin(angle) * dist))),
     };
+    // Ensure medic doesn't land on blocked tile
+    const medicTile = grid[medicPos.x]?.[medicPos.z];
+    if (medicTile && (medicTile.isBlocked || medicTile.type === 'water' || medicTile.prop)) {
+      // Fallback to adjacent
+      medicPos.x = Math.max(0, Math.min(GRID_SIZE - 1, spawn.x + (globalRand() > 0.5 ? 1 : -1)));
+      medicPos.z = Math.max(0, Math.min(GRID_SIZE - 1, spawn.z + (globalRand() > 0.5 ? 1 : -1)));
+    }
+    
     units.push(createUnit(`${team}-soldier`, shuffledSoldiers[soldierIdx++], 'soldier', team, { ...spawn }));
     units.push(createUnit(`${team}-medic`, shuffledMedics[medicIdx++], 'medic', team, medicPos));
   }
@@ -697,6 +707,7 @@ export function createInitialState(): GameState {
     let key = `${u.position.x},${u.position.z}`;
     while (occupied.has(key)) {
       u.position.x = Math.max(0, Math.min(GRID_SIZE - 1, u.position.x + (Math.random() > 0.5 ? 1 : -1)));
+      u.position.z = Math.max(0, Math.min(GRID_SIZE - 1, u.position.z + (Math.random() > 0.5 ? 1 : -1)));
       key = `${u.position.x},${u.position.z}`;
     }
     occupied.add(key);
@@ -715,8 +726,8 @@ export function createInitialState(): GameState {
       '═══════════════════════════',
       '» 4 squads. 8 combatants. 1 team survives.',
       '» Each squad: 1 Soldier + 1 Medic',
+      '» 2 AP per turn: Move (1 AP, 4 tiles) • Shoot/Hunker (ends turn)',
       '» Everyone starts with a PISTOL — find loot to upgrade!',
-      '» Fog of war: squads share vision!',
       '» Press PLAY to watch the AI battle!',
     ],
     shrinkLevel: 0, zoneTimer: 6,
@@ -1256,7 +1267,7 @@ export function runAiUnitStep(
     }
   }
 
-  // Helper to move unit and return path
+  // Helper to move unit and return path (optionally to an intermediate stop along the path)
   const moveToTile = (bestTile: Position) => {
     const path = findPath(unit.position, bestTile, newState);
     unit.position = bestTile;
@@ -1275,7 +1286,54 @@ export function runAiUnitStep(
     }
   };
 
+  // ── Helper: scan path for enemies — find best tile to stop at where we can shoot ──
+  function findBestStopAlongPath(from: Position, to: Position): Position | null {
+    const path = findPath(from, to, newState);
+    // Walk along path and check each tile for attack opportunities
+    for (let i = 0; i < path.length; i++) {
+      const tile = path[i];
+      const enemiesInRange = allEnemies.filter(e => 
+        e.isAlive && getManhattanDistance(tile, e.position) <= unit.attackRange &&
+        teamCanSee(unit.team, e.position, newState.units)
+      );
+      if (enemiesInRange.length > 0) {
+        // Check if this tile has cover
+        let coverScore = 0;
+        for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          const nx = tile.x + dx, nz = tile.z + dz;
+          if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+            coverScore += newState.grid[nx][nz].coverValue;
+          }
+        }
+        // Prefer stopping at tiles with cover, but any tile with enemies in range is good
+        if (coverScore > 0 || i >= path.length - 1) {
+          return tile;
+        }
+        // If no cover, check next few tiles for cover
+        for (let j = i + 1; j < Math.min(i + 3, path.length); j++) {
+          const nextTile = path[j];
+          const stillInRange = enemiesInRange.some(e => 
+            getManhattanDistance(nextTile, e.position) <= unit.attackRange
+          );
+          if (stillInRange) {
+            let nextCover = 0;
+            for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+              const nx = nextTile.x + dx, nz = nextTile.z + dz;
+              if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+                nextCover += newState.grid[nx][nz].coverValue;
+              }
+            }
+            if (nextCover > coverScore) return nextTile;
+          }
+        }
+        return tile; // Stop here
+      }
+    }
+    return null; // No enemies found along path
+  }
+
   // ══ MOVE PHASE ══
+  // Units can spend 1 or 2 AP on movement (4 tiles per AP, up to 8 total)
   if (phase === 'move') {
     // Killstreak activation
     if (unit.killstreak && visibleEnemies.length > 0) {
@@ -1304,6 +1362,21 @@ export function runAiUnitStep(
           if (score > bestScore) { bestTile = t; bestScore = score; }
         }
         moveToTile(bestTile);
+        // If still outside zone and has AP, move again
+        if (unit.ap >= AP_MOVE_COST && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel)) {
+          const movable2 = getMovableTiles(unit, newState);
+          if (movable2.length > 0) {
+            let bestTile2 = movable2[0];
+            let bestScore2 = -Infinity;
+            for (const t of movable2) {
+              let score = 0;
+              if (isInZone(t.x, t.z, newState.shrinkLevel)) score += 200;
+              score -= getManhattanDistance(t, center);
+              if (score > bestScore2) { bestTile2 = t; bestScore2 = score; }
+            }
+            moveToTile(bestTile2);
+          }
+        }
       }
       updateAllUnitsCover(newState.units, newState.grid);
       return { state: newState, events: allEvents, didMove };
@@ -1311,7 +1384,7 @@ export function runAiUnitStep(
 
     // MEDIC MOVE
     if (unit.unitClass === 'medic') {
-      // Heal first
+      // Heal first (uses 1 AP)
       const firstAid = unit.abilities.find(a => a.id === 'first_aid');
       if (firstAid && unit.ap >= firstAid.apCost && (!unit.cooldowns['first_aid'] || unit.cooldowns['first_aid'] <= 0)) {
         let healTarget: Unit | null = null;
@@ -1341,77 +1414,132 @@ export function runAiUnitStep(
         }
       }
 
-      // Medic movement — can choose to stay if good position
-      if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+      // Medic movement — use remaining AP for movement
+      while (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
         const movable = getMovableTiles(unit, newState);
-        if (movable.length > 0) {
-          // Include current position as option (stay put)
-          const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
-          let bestTile = unit.position;
-          let bestScore = currentScore;
+        if (movable.length === 0) break;
 
-          const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
-          const stayNearTarget = injuredAlly || allies[0];
+        const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
+        let bestTile = unit.position;
+        let bestScore = currentScore;
 
-          for (const t of movable) {
-            let score = evaluateWithLookahead(t, unit, allEnemies, newState);
-            if (stayNearTarget) {
-              const distToAlly = getManhattanDistance(t, stayNearTarget.position);
-              score += -Math.abs(distToAlly - 2) * 5;
-            }
-            if (closest) {
-              const distToEnemy = getManhattanDistance(t, closest.position);
-              if (distToEnemy <= 2) score -= 15;
-            }
-            if (score > bestScore) { bestTile = t; bestScore = score; }
+        const injuredAlly = allies.find(a => a.hp < a.maxHp * 0.7);
+        const stayNearTarget = injuredAlly || allies[0];
+
+        for (const t of movable) {
+          let score = evaluateWithLookahead(t, unit, allEnemies, newState);
+          if (stayNearTarget) {
+            const distToAlly = getManhattanDistance(t, stayNearTarget.position);
+            score += -Math.abs(distToAlly - 2) * 5;
           }
+          if (closest) {
+            const distToEnemy = getManhattanDistance(t, closest.position);
+            if (distToEnemy <= 2) score -= 15;
+          }
+          if (score > bestScore) { bestTile = t; bestScore = score; }
+        }
 
-          // Only move if it's meaningfully better than staying
-          if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
-            if (bestScore > currentScore + 3) {
-              moveToTile(bestTile);
-            }
-            // else: stay put — better to hold position
+        if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
+          if (bestScore > currentScore + 3) {
+            moveToTile(bestTile);
+            continue; // Try to spend another AP on movement
           }
         }
+        break; // Not worth moving further
       }
     } else {
-      // SOLDIER MOVE — XCOM-style: can choose to shoot first without moving
+      // SOLDIER MOVE — can spend 1 or 2 AP on movement
+      // Strategy: if enemies visible and in range, don't move (save AP to shoot)
+      // If enemies visible but not in range, move toward optimal position
+      // If no enemies visible, spend both AP on scouting/looting
+      
       if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
         const canShootFromHere = visibleEnemies.some(e =>
           getManhattanDistance(unit.position, e.position) <= unit.attackRange
         ) && unit.weapon.ammo !== 0;
 
-        const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
+        const hasGoodCover = unit.coverType === 'full' || unit.coverType === 'half';
+        
+        if (canShootFromHere && hasGoodCover) {
+          // Stay and shoot — don't move
+        } else if (visibleEnemies.length > 0 && !canShootFromHere) {
+          // Enemies visible but out of range — move toward weapon max range
+          const movable = getMovableTiles(unit, newState);
+          let bestTile = unit.position;
+          let bestScore = -Infinity;
 
-        const movable = getMovableTiles(unit, newState);
-        let bestTile = unit.position;
-        let bestScore = currentScore;
-
-        if (movable.length > 0) {
           for (const t of movable) {
             let score = evaluateWithLookahead(t, unit, allEnemies, newState);
-            // If no enemies visible, bonus for moving toward nearest loot
-            if (visibleEnemies.length === 0) {
+            // Bonus for getting in attack range
+            const inRangeFromT = visibleEnemies.some(e => getManhattanDistance(t, e.position) <= unit.attackRange);
+            if (inRangeFromT) score += 30;
+            if (score > bestScore) { bestTile = t; bestScore = score; }
+          }
+
+          if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
+            // Check path for mid-movement target detection
+            const stopTile = findBestStopAlongPath(unit.position, bestTile);
+            if (stopTile && (stopTile.x !== bestTile.x || stopTile.z !== bestTile.z)) {
+              moveToTile(stopTile); // Stop early — enemy spotted along path
+            } else {
+              moveToTile(bestTile);
+            }
+          }
+        } else if (visibleEnemies.length === 0) {
+          // No enemies visible — can spend both AP on movement for scouting/looting
+          let movesRemaining = 2; // max 2 move actions
+          while (movesRemaining > 0 && unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+            movesRemaining--;
+            const movable = getMovableTiles(unit, newState);
+            if (movable.length === 0) break;
+
+            let bestTile = unit.position;
+            let bestScore = -Infinity;
+            const currentScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
+
+            for (const t of movable) {
+              let score = evaluateWithLookahead(t, unit, allEnemies, newState);
               const nearestLoot = findNearestLoot(t, newState.grid);
               if (nearestLoot) {
                 score += Math.max(0, 20 - getManhattanDistance(t, nearestLoot) * 3);
               }
-              // Scouting bonus — move toward center / unexplored areas
               const centerDist = getManhattanDistance(t, { x: Math.floor(GRID_SIZE/2), z: Math.floor(GRID_SIZE/2) });
               score += Math.max(0, 10 - centerDist);
+              if (score > bestScore) { bestTile = t; bestScore = score; }
             }
-            if (score > bestScore) { bestTile = t; bestScore = score; }
+
+            if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z && bestScore > currentScore) {
+              // Check path for mid-movement target detection
+              const stopTile = findBestStopAlongPath(unit.position, bestTile);
+              if (stopTile) {
+                moveToTile(stopTile);
+                break; // Found enemy, stop moving — save AP for combat
+              }
+              moveToTile(bestTile);
+              
+              // After moving, re-check for visible enemies
+              const newVisible = getVisibleEnemies(unit, newState.units);
+              if (newVisible.length > 0) break; // Found enemies, save remaining AP
+            } else {
+              break;
+            }
           }
-        }
+        } else {
+          // Can shoot but no cover — try to reposition to cover then shoot
+          const movable = getMovableTiles(unit, newState);
+          let bestTile = unit.position;
+          let bestScore = evaluateWithLookahead(unit.position, unit, allEnemies, newState);
 
-        // Decision: stay and shoot or move to better position?
-        // If we can shoot from here and current cover is decent, prefer staying
-        const hasGoodCover = unit.coverType === 'full' || unit.coverType === 'half';
-        const shouldStay = canShootFromHere && hasGoodCover && (bestScore <= currentScore + 12);
+          for (const t of movable) {
+            const score = evaluateWithLookahead(t, unit, allEnemies, newState);
+            // Must still be in attack range after moving
+            const inRangeFromT = visibleEnemies.some(e => getManhattanDistance(t, e.position) <= unit.attackRange);
+            if (inRangeFromT && score > bestScore) { bestTile = t; bestScore = score; }
+          }
 
-        if (!shouldStay && (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z)) {
-          moveToTile(bestTile);
+          if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) {
+            moveToTile(bestTile);
+          }
         }
       }
     }

@@ -773,7 +773,8 @@ export function getMovableTiles(unit: Unit, state: GameState): Position[] {
   for (let x = 0; x < GRID_SIZE; x++) {
     for (let z = 0; z < GRID_SIZE; z++) {
       const dist = getManhattanDistance(unit.position, { x, z });
-      if (dist > 0 && dist <= unit.moveRange && !state.grid[x][z].isBlocked) {
+      const tile = state.grid[x][z];
+      if (dist > 0 && dist <= unit.moveRange && !tile.isBlocked && !tile.prop && tile.type !== 'water') {
         if (!state.units.some(u => u.isAlive && u.position.x === x && u.position.z === z)) {
           tiles.push({ x, z });
         }

@@ -911,7 +911,10 @@ function SoundPlayer({ event }: { event: CombatEvent }) {
 // ── MAIN COMBAT VFX ORCHESTRATOR ──
 // ═══════════════════════════════════════════════════════
 export function CombatVFX({ events }: CombatVFXProps) {
-  const recentEvents = events.filter(e => Date.now() - e.timestamp < 5000);
+  // Only keep last 3 seconds of events and cap at 8 simultaneous
+  const recentEvents = events
+    .filter(e => Date.now() - e.timestamp < 3000)
+    .slice(-8);
 
   return (
     <group>
@@ -922,13 +925,9 @@ export function CombatVFX({ events }: CombatVFXProps) {
           <MuzzleFlash event={event} />
           <BulletTrail event={event} />
           <ImpactEffect event={event} />
-          <ShellCasings event={event} />
-          <DebrisParticles event={event} />
           <GrenadeProjectile event={event} />
           <RocketProjectile event={event} />
           <SmokePlume event={event} />
-          <MissRicochet event={event} />
-          <HealingEffect event={event} />
         </group>
       ))}
     </group>

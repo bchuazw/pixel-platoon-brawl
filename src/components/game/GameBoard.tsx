@@ -316,24 +316,24 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           enableRotate={true}
           enablePan={true}
           enableZoom={true}
-          minDistance={8}
-          maxDistance={50}
-          maxPolarAngle={Math.PI / 2.3}
-          minPolarAngle={Math.PI / 7}
-          rotateSpeed={0.5}
-          panSpeed={0.8}
-          zoomSpeed={0.8}
+          minDistance={12}
+          maxDistance={45}
+          maxPolarAngle={Math.PI / 2.5}
+          minPolarAngle={Math.PI / 6}
+          rotateSpeed={0.3}
+          panSpeed={0.5}
+          zoomSpeed={0.6}
           enableDamping={true}
-          dampingFactor={0.06}
+          dampingFactor={0.12}
           screenSpacePanning={false}
           mouseButtons={{
-            LEFT: THREE.MOUSE.PAN,
+            LEFT: THREE.MOUSE.ROTATE,
             MIDDLE: THREE.MOUSE.DOLLY,
-            RIGHT: THREE.MOUSE.ROTATE,
+            RIGHT: THREE.MOUSE.PAN,
           }}
           touches={{
-            ONE: THREE.TOUCH.PAN,
-            TWO: THREE.TOUCH.DOLLY_ROTATE,
+            ONE: THREE.TOUCH.ROTATE,
+            TWO: THREE.TOUCH.DOLLY_PAN,
           }}
         />
       </Canvas>

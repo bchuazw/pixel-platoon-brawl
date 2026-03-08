@@ -11,9 +11,9 @@ interface GameBoard2DProps {
 }
 
 // ── Isometric constants ──
-const TILE_W = 48;  // diamond width
-const TILE_H = 24;  // diamond height
-const ELEV_SCALE = 12; // pixels per elevation unit
+const TILE_W = 52;  // diamond width — slightly larger for readability
+const TILE_H = 26;  // diamond height
+const ELEV_SCALE = 10; // pixels per elevation unit
 const UNIT_H = 28;  // unit sprite height
 
 // ── Isometric transform: grid → screen ──

@@ -582,17 +582,17 @@ export function useGameStore() {
       if (!unit) return prev;
 
       const tiles = getAbilityTargetTiles(unit, abilityId, prev);
-      if (abilityId === 'overwatch' && tiles.length > 0) {
+      if (abilityId === 'hunker_down') {
         const units = prev.units.map(u => {
           if (u.id === prev.selectedUnitId) {
-            return { ...u, isOnOverwatch: true, ap: u.ap - 1, cooldowns: { ...u.cooldowns } };
+            return { ...u, isHunkered: true, ap: u.ap - 1, cooldowns: { ...u.cooldowns } };
           }
           return u;
         });
         const evt: CombatEvent = {
-          id: `evt-${Date.now()}`, type: 'overwatch',
+          id: `evt-${Date.now()}`, type: 'hunker',
           attackerPos: unit.position, targetPos: unit.position,
-          message: `👁 ${unit.name} goes on OVERWATCH`,
+          message: `🛡 ${unit.name} HUNKERS DOWN`,
           timestamp: Date.now(),
         };
         return {

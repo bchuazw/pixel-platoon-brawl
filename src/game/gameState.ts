@@ -1347,7 +1347,7 @@ export function runAiUnitStep(
       }
     }
 
-    // Flee zone
+    // Flee zone — ONE move per step
     const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);
     if (currentlyOutsideZone && unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
       const movable = getMovableTiles(unit, newState);
@@ -1362,21 +1362,6 @@ export function runAiUnitStep(
           if (score > bestScore) { bestTile = t; bestScore = score; }
         }
         moveToTile(bestTile);
-        // If still outside zone and has AP, move again
-        if (unit.ap >= AP_MOVE_COST && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel)) {
-          const movable2 = getMovableTiles(unit, newState);
-          if (movable2.length > 0) {
-            let bestTile2 = movable2[0];
-            let bestScore2 = -Infinity;
-            for (const t of movable2) {
-              let score = 0;
-              if (isInZone(t.x, t.z, newState.shrinkLevel)) score += 200;
-              score -= getManhattanDistance(t, center);
-              if (score > bestScore2) { bestTile2 = t; bestScore2 = score; }
-            }
-            moveToTile(bestTile2);
-          }
-        }
       }
       updateAllUnitsCover(newState.units, newState.grid);
       return { state: newState, events: allEvents, didMove };

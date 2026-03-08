@@ -3,7 +3,7 @@ import {
   CLASS_STATS, CLASS_ABILITIES, TileType, PropType, CombatEvent,
   AP_MOVE_COST, AP_ATTACK_COST, AttackPreview, AbilityId,
   WEAPONS, WeaponId, LootItem, LootType, Weapon, VISION_RANGE,
-  KillstreakId,
+  KillstreakId, AirdropData,
 } from './types';
 
 // ── Random ──

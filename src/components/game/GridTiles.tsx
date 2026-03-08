@@ -434,7 +434,7 @@ function PropObject({ tile }: { tile: TileData }) {
         <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar * 0.5 : Math.PI / 2 + rotVar * 0.5, 0]}>
           <mesh position={[0, 0.225, 0]} castShadow>
             <boxGeometry args={[0.72, 0.45, 0.28]} />
-            <meshStandardMaterial color="#a0a0a0" roughness={0.85} />
+            <meshStandardMaterial color={jbColor} roughness={0.85} />
           </mesh>
           {/* Sloped base */}
           <mesh position={[0, 0.04, 0]} castShadow>
@@ -443,6 +443,7 @@ function PropObject({ tile }: { tile: TileData }) {
           </mesh>
         </group>
       );
+    }
 
     // Burnt vehicle wreck — large cover, ~chest height
     case 'burnt_vehicle':

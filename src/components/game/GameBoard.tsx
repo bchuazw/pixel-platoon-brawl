@@ -186,7 +186,7 @@ function LoadingFallback() {
   );
 }
 
-export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete, onAirdropLanded }: GameBoardProps) {
+export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete, onAirdropLanded, inspectedUnitId }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
   const [autoFollow, setAutoFollow] = useState(true);
   const orbitRef = useRef<any>(null);

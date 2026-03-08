@@ -9,17 +9,17 @@ import * as THREE from 'three';
 export type HelmetStyle = 'standard' | 'tactical' | 'beret' | 'bandana';
 export type VestStyle = 'light' | 'heavy' | 'tactical' | 'medic';
 export type BootStyle = 'standard' | 'combat' | 'sneakers';
-export type CamoPattern = 'solid' | 'woodland' | 'desert' | 'urban';
+export type ShoulderStyle = 'standard' | 'heavy' | 'spikes' | 'radio';
 
 export interface UnitCustomization {
   helmet: HelmetStyle;
   vest: VestStyle;
   boots: BootStyle;
-  camo: CamoPattern;
+  shoulder: ShoulderStyle;
 }
 
 const DEFAULT_CUSTOM: UnitCustomization = {
-  helmet: 'standard', vest: 'light', boots: 'standard', camo: 'solid',
+  helmet: 'standard', vest: 'light', boots: 'standard', shoulder: 'standard',
 };
 
 const HELMET_OPTIONS: { id: HelmetStyle; name: string; desc: string }[] = [
@@ -42,11 +42,11 @@ const BOOT_OPTIONS: { id: BootStyle; name: string; desc: string }[] = [
   { id: 'sneakers', name: 'Tactical Sneakers', desc: 'Lightweight & quiet' },
 ];
 
-const CAMO_OPTIONS: { id: CamoPattern; name: string; colors: [string, string] }[] = [
-  { id: 'solid', name: 'Solid', colors: ['#556B2F', '#4a5f28'] },
-  { id: 'woodland', name: 'Woodland', colors: ['#2d4a1e', '#5c3d1a'] },
-  { id: 'desert', name: 'Desert', colors: ['#c4a76c', '#8b7355'] },
-  { id: 'urban', name: 'Urban', colors: ['#6b6b6b', '#3d3d3d'] },
+const SHOULDER_OPTIONS: { id: ShoulderStyle; name: string; desc: string }[] = [
+  { id: 'standard', name: 'Standard Pads', desc: 'Basic shoulder armor' },
+  { id: 'heavy', name: 'Heavy Pads', desc: 'Extra-thick shoulder plates' },
+  { id: 'spikes', name: 'Spiked Pads', desc: 'Intimidating spiked shoulders' },
+  { id: 'radio', name: 'Radio Gear', desc: 'Antenna + comms equipment' },
 ];
 
 // ── Material helper (matching GameUnits.tsx) ──

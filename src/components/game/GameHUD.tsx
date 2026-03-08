@@ -187,73 +187,205 @@ function CombatFeed({ log }: { log: string[] }) {
 function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onRestart: () => void; onMainMenu?: () => void }) {
   const [show, setShow] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const winnerLine = state.log.find(l => l.includes('WINS'))?.replace('🏆 ', '') || '';
   const winningTeam = (['blue', 'red', 'green', 'yellow'] as const).find(t =>
     state.units.some(u => u.team === t && u.isAlive)
   );
   const winnerColor = winningTeam ? TEAM_COLORS[winningTeam] : '#ffcc00';
+  const winnerName = winningTeam ? TEAM_NAMES[winningTeam] : 'UNKNOWN';
+
+  // Winning team survivors
+  const survivors = state.units.filter(u => u.team === winningTeam && u.isAlive);
+  const fallenHeroes = state.units.filter(u => u.team === winningTeam && !u.isAlive);
+
+  // MVP (most kills overall)
   const mvp = [...state.units].sort((a, b) => b.kills - a.kills)[0];
   const mvpPortrait = mvp ? (PORTRAITS[mvp.id] || PORTRAITS[`${mvp.team}-${mvp.unitClass}`]) : null;
+
+  // Stats
   const totalKills = state.units.reduce((s, u) => s + u.kills, 0);
+  const teamKills: Record<Team, number> = { blue: 0, red: 0, green: 0, yellow: 0 };
+  state.units.forEach(u => { teamKills[u.team] += u.kills; });
+  const mostDamageUnit = [...state.units].sort((a, b) => (b.maxHp - b.hp + b.kills * 30) - (a.maxHp - a.hp + a.kills * 30))[0];
 
   useEffect(() => {
     playVictoryFanfare();
     setTimeout(() => setShow(true), 200);
-    setTimeout(() => setShowStats(true), 1000);
+    setTimeout(() => setShowStats(true), 800);
+    setTimeout(() => setShowDetails(true), 1500);
   }, []);
 
   return (
     <div className="absolute inset-0 z-40 pointer-events-auto">
+      {/* Backdrop */}
       <div className="absolute inset-0 bg-background/95 backdrop-blur-2xl transition-opacity duration-1000" style={{ opacity: show ? 1 : 0 }} />
 
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full transition-all duration-[2s]"
-        style={{ background: `radial-gradient(circle, ${winnerColor}10 0%, transparent 70%)`, opacity: show ? 1 : 0 }}
+      {/* Radial glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full transition-all duration-[2s]"
+        style={{ background: `radial-gradient(circle, ${winnerColor}15 0%, ${winnerColor}05 40%, transparent 70%)`, opacity: show ? 1 : 0 }}
       />
 
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-6">
+      {/* Animated border lines */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] transition-all duration-[2s]"
+        style={{ background: `linear-gradient(90deg, transparent, ${winnerColor}, transparent)`, opacity: show ? 0.6 : 0 }} />
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] transition-all duration-[2s]"
+        style={{ background: `linear-gradient(90deg, transparent, ${winnerColor}, transparent)`, opacity: show ? 0.6 : 0 }} />
+
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-y-auto py-8">
+        {/* Victory Title */}
         <div className="text-center transition-all duration-700" style={{ opacity: show ? 1 : 0, transform: `translateY(${show ? 0 : 30}px)` }}>
-          <h1 className="text-4xl font-display font-black tracking-[0.6em]"
-            style={{ color: winnerColor, textShadow: `0 0 30px ${winnerColor}44` }}>
+          <div className="text-[10px] tracking-[1em] text-muted-foreground/50 mb-2 font-display">BATTLE ROYALE</div>
+          <h1 className="text-5xl font-display font-black tracking-[0.5em]"
+            style={{ color: winnerColor, textShadow: `0 0 40px ${winnerColor}44, 0 0 80px ${winnerColor}22` }}>
             VICTORY
           </h1>
-          <p className="text-sm text-foreground/50 tracking-[0.12em] mt-2">{winnerLine}</p>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="w-8 h-[1px]" style={{ backgroundColor: winnerColor + '40' }} />
+            <p className="text-sm font-bold tracking-[0.2em]" style={{ color: winnerColor }}>{winnerName} TEAM</p>
+            <div className="w-8 h-[1px]" style={{ backgroundColor: winnerColor + '40' }} />
+          </div>
         </div>
 
-        <div className="flex gap-4 transition-all duration-700" style={{ opacity: showStats ? 1 : 0, transform: `translateY(${showStats ? 0 : 20}px)` }}>
+        {/* Surviving soldiers showcase */}
+        <div className="flex gap-6 transition-all duration-700" style={{ opacity: showStats ? 1 : 0, transform: `translateY(${showStats ? 0 : 20}px)` }}>
+          {survivors.map(unit => {
+            const portrait = PORTRAITS[unit.id] || PORTRAITS[`${unit.team}-${unit.unitClass}`];
+            const hpPct = (unit.hp / unit.maxHp) * 100;
+            return (
+              <div key={unit.id} className="glass-panel rounded-xl p-4 text-center min-w-[140px] relative overflow-hidden">
+                {/* Glow behind portrait */}
+                <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 50% 30%, ${winnerColor}, transparent 70%)` }} />
+                <div className="relative">
+                  <div className="text-[9px] tracking-[0.3em] text-muted-foreground/50 mb-2 font-display">
+                    {unit.unitClass === 'medic' ? 'MEDIC' : 'SOLDIER'}
+                  </div>
+                  {portrait && (
+                    <div className="w-20 h-20 rounded-lg overflow-hidden mx-auto mb-2 border-2 shadow-lg" style={{ borderColor: winnerColor + '60' }}>
+                      <img src={portrait} alt={unit.name} className="w-full h-full object-cover object-top" />
+                    </div>
+                  )}
+                  <div className="text-sm font-bold text-foreground">{unit.name}</div>
+                  {/* HP bar */}
+                  <div className="mt-2 h-[4px] bg-muted/30 rounded-full overflow-hidden mx-2">
+                    <div className="h-full rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${hpPct}%`,
+                        backgroundColor: hpPct > 50 ? 'hsl(142,70%,45%)' : hpPct > 25 ? 'hsl(35,90%,55%)' : 'hsl(0,75%,55%)',
+                      }}
+                    />
+                  </div>
+                  <div className="text-[9px] text-muted-foreground/50 mt-1">{unit.hp}/{unit.maxHp} HP</div>
+                  <div className="flex items-center justify-center gap-3 mt-2">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-destructive font-display">{unit.kills}</div>
+                      <div className="text-[8px] text-muted-foreground/50">KILLS</div>
+                    </div>
+                    <div className="w-px h-6 bg-border/20" />
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-foreground/70 font-display">LV{unit.level}</div>
+                      <div className="text-[8px] text-muted-foreground/50">LEVEL</div>
+                    </div>
+                  </div>
+                  <div className="text-[9px] text-muted-foreground/40 mt-1">{unit.weapon.name}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Fallen heroes */}
+        {fallenHeroes.length > 0 && (
+          <div className="transition-all duration-700" style={{ opacity: showDetails ? 0.6 : 0, transform: `translateY(${showDetails ? 0 : 10}px)` }}>
+            <div className="text-[9px] tracking-[0.3em] text-muted-foreground/30 text-center mb-1 font-display">FALLEN IN BATTLE</div>
+            <div className="flex gap-2">
+              {fallenHeroes.map(unit => {
+                const portrait = PORTRAITS[unit.id] || PORTRAITS[`${unit.team}-${unit.unitClass}`];
+                return (
+                  <div key={unit.id} className="flex items-center gap-1.5 px-2 py-1 rounded bg-card/20 border border-border/10 grayscale opacity-60">
+                    {portrait && (
+                      <div className="w-6 h-6 rounded overflow-hidden">
+                        <img src={portrait} alt={unit.name} className="w-full h-full object-cover object-top" />
+                      </div>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">{unit.name} ({unit.kills}☠)</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Stats row */}
+        <div className="flex gap-3 transition-all duration-700" style={{ opacity: showDetails ? 1 : 0, transform: `translateY(${showDetails ? 0 : 15}px)` }}>
+          {/* MVP */}
           {mvp && (
-            <div className="glass-panel rounded-xl p-5 text-center min-w-[160px]">
-              <div className="text-[10px] text-accent tracking-[0.3em] mb-2 font-display">MVP</div>
+            <div className="glass-panel rounded-xl p-4 text-center min-w-[120px]">
+              <div className="text-[9px] tracking-[0.3em] text-accent mb-2 font-display">⭐ MVP</div>
               {mvpPortrait && (
-                <div className="w-16 h-16 rounded-lg overflow-hidden mx-auto mb-2 border-2" style={{ borderColor: TEAM_COLORS[mvp.team] + '40' }}>
+                <div className="w-12 h-12 rounded-lg overflow-hidden mx-auto mb-1 border" style={{ borderColor: TEAM_COLORS[mvp.team] + '40' }}>
                   <img src={mvpPortrait} alt={mvp.name} className="w-full h-full object-cover object-top" />
                 </div>
               )}
-              <div className="text-sm font-bold text-foreground">{mvp.name}</div>
-              <div className="text-2xl font-bold text-accent mt-1 font-display">{mvp.kills}</div>
-              <div className="text-[10px] text-muted-foreground">KILLS</div>
+              <div className="text-xs font-bold text-foreground">{mvp.name}</div>
+              <div className="text-[9px] font-bold" style={{ color: TEAM_COLORS[mvp.team] }}>{TEAM_NAMES[mvp.team]}</div>
+              <div className="text-xl font-bold text-accent mt-1 font-display">{mvp.kills} kills</div>
             </div>
           )}
 
-          <div className="glass-panel rounded-xl p-5 text-center min-w-[120px]">
-            <div className="text-[10px] text-muted-foreground tracking-[0.3em] mb-2 font-display">STATS</div>
-            <div className="space-y-3">
+          {/* Battle stats */}
+          <div className="glass-panel rounded-xl p-4 text-center min-w-[100px]">
+            <div className="text-[9px] tracking-[0.3em] text-muted-foreground/50 mb-2 font-display">BATTLE</div>
+            <div className="space-y-2">
               <div>
                 <div className="text-xl font-bold text-foreground font-display">{state.turn}</div>
-                <div className="text-[10px] text-muted-foreground">TURNS</div>
+                <div className="text-[9px] text-muted-foreground/50">ROUNDS</div>
               </div>
               <div>
                 <div className="text-xl font-bold text-destructive font-display">{totalKills}</div>
-                <div className="text-[10px] text-muted-foreground">KILLS</div>
+                <div className="text-[9px] text-muted-foreground/50">TOTAL KILLS</div>
               </div>
+              <div>
+                <div className="text-sm font-bold text-foreground/60 font-display">LV{state.shrinkLevel}</div>
+                <div className="text-[9px] text-muted-foreground/50">FINAL ZONE</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Team scoreboard */}
+          <div className="glass-panel rounded-xl p-4 min-w-[130px]">
+            <div className="text-[9px] tracking-[0.3em] text-muted-foreground/50 mb-2 font-display text-center">SCOREBOARD</div>
+            <div className="space-y-1.5">
+              {(['blue', 'red', 'green', 'yellow'] as const)
+                .sort((a, b) => {
+                  const aAlive = state.units.filter(u => u.team === a && u.isAlive).length;
+                  const bAlive = state.units.filter(u => u.team === b && u.isAlive).length;
+                  if (bAlive !== aAlive) return bAlive - aAlive;
+                  return teamKills[b] - teamKills[a];
+                })
+                .map((team, i) => {
+                  const alive = state.units.filter(u => u.team === team && u.isAlive).length;
+                  return (
+                    <div key={team} className={`flex items-center gap-2 px-2 py-1 rounded ${team === winningTeam ? 'bg-white/5' : ''}`}>
+                      <span className="text-[10px] text-muted-foreground/30 w-3">{i + 1}.</span>
+                      <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team] }} />
+                      <span className="text-[10px] font-bold flex-1" style={{ color: alive > 0 ? TEAM_COLORS[team] : TEAM_COLORS[team] + '40' }}>
+                        {TEAM_NAMES[team]}
+                      </span>
+                      <span className="text-[10px] text-destructive/60">☠{teamKills[team]}</span>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </div>
 
-        <div className="flex gap-3 mt-2 transition-all duration-700" style={{ opacity: showStats ? 1 : 0, transitionDelay: '0.3s' }}>
+        {/* Action buttons */}
+        <div className="flex gap-3 mt-2 transition-all duration-700" style={{ opacity: showDetails ? 1 : 0, transitionDelay: '0.3s' }}>
           <button onClick={onRestart}
             className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all text-sm tracking-[0.2em] flex items-center gap-2 font-bold font-display">
-            <RotateCcw className="w-4 h-4" /> AGAIN
+            <RotateCcw className="w-4 h-4" /> PLAY AGAIN
           </button>
           {onMainMenu && (
             <button onClick={onMainMenu}

@@ -394,28 +394,7 @@ function darken(hex: string, amount: number): string {
   return `rgb(${Math.max(0, Math.min(255, Math.floor(r * f)))},${Math.max(0, Math.min(255, Math.floor(g * f)))},${Math.max(0, Math.min(255, Math.floor(b * f)))})`;
 }
 
-// ── Terrain detail decorations ──
-function drawTileDecor(ctx: CanvasRenderingContext2D, type: string, sx: number, sy: number, variant: number) {
-  const n = tileNoise(sx, sy, 42);
-  if (type === 'grass') {
-    ctx.fillStyle = '#6aaa55';
-    if (n > 0.5) { ctx.fillRect(sx - 8, sy - 3, 2, 3); ctx.fillRect(sx - 6, sy - 4, 2, 4); }
-    if (n > 0.7) { ctx.fillRect(sx + 5, sy - 2, 2, 3); }
-    if (n < 0.3) {
-      ctx.fillStyle = '#c8b040';
-      ctx.fillRect(sx + 3 + n * 4, sy - 2, 2, 2); // flower
-    }
-  } else if (type === 'dirt') {
-    ctx.fillStyle = '#786040';
-    if (n > 0.4) ctx.fillRect(sx - 4, sy - 1, 3, 2);
-    if (n > 0.6) ctx.fillRect(sx + 3, sy + 1, 2, 2);
-  } else if (type === 'water') {
-    const shimmer = Math.sin(variant * 0.01 + sx * 0.1) * 0.5 + 0.5;
-    ctx.fillStyle = `rgba(120,200,255,${shimmer * 0.2})`;
-    ctx.fillRect(sx - 6, sy - 1, 8, 1);
-    ctx.fillRect(sx + 2, sy + 1, 6, 1);
-  }
-}
+// ── Terrain detail removed — noise variation is now baked into drawIsoTile ──
 
 // ── Unit animation state ──
 interface UnitAnim {

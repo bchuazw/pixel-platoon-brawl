@@ -416,17 +416,8 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
         </div>
       ))}
 
-      {/* Winner overlay */}
-      {isGameOver && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-          <div className="bg-card/95 backdrop-blur-md border border-accent/50 rounded-xl px-12 py-8 text-center space-y-3 shadow-[0_0_40px_hsl(35_90%_55%/0.2)]">
-            <div className="text-[14px] text-accent glow-accent tracking-[0.3em]">🏆 VICTORY</div>
-            <div className="text-[10px] text-foreground tracking-wider">
-              {state.log.find(l => l.includes('WINS'))?.replace('🏆 ', '')}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Victory screen */}
+      {isGameOver && <VictoryScreen state={state} onRestart={onRestart} onMainMenu={onMainMenu} />}
     </div>
   );
 }

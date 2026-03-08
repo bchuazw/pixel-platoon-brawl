@@ -267,6 +267,19 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
             movePath={state.movePath}
             onTileClick={onTileClick}
             onTileHover={onTileHover}
+            weaponRangeTiles={(() => {
+              if (!inspectedUnitId) return undefined;
+              const u = state.units.find(u => u.id === inspectedUnitId && u.isAlive);
+              if (!u) return undefined;
+              const tiles: Position[] = [];
+              for (let x = 0; x < GRID_SIZE; x++) {
+                for (let z = 0; z < GRID_SIZE; z++) {
+                  const dist = Math.abs(x - u.position.x) + Math.abs(z - u.position.z);
+                  if (dist > 0 && dist <= u.attackRange) tiles.push({ x, z });
+                }
+              }
+              return tiles;
+            })()}
           />
           <GameUnits
             units={state.units}

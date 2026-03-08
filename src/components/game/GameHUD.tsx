@@ -85,7 +85,7 @@ function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; 
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-[9px] text-muted-foreground/60 font-mono">{unit.hp}/{unit.maxHp}</span>
-          {unit.isOnOverwatch && <span className="text-[9px] text-[#4488ff]">◉</span>}
+          {/* overwatch removed — only hunker shows */}
           {unit.isHunkered && <span className="text-[9px] text-accent">🛡</span>}
           {unit.coverType !== 'none' && (
             <span className={`text-[8px] ${unit.coverType === 'full' ? 'text-[#4488ff]' : 'text-accent/60'}`}>

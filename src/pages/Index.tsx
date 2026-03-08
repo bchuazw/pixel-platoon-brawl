@@ -92,6 +92,7 @@ const Index = () => {
         onTileHover={handleTileHover}
         onMoveComplete={handleMoveComplete}
         onAirdropLanded={handleAirdropLanded}
+        inspectedUnitId={inspectedUnitId}
       />
       <GameHUD
         state={state}

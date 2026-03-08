@@ -19,6 +19,40 @@ export interface Ability {
   icon: string;
 }
 
+// ── Weapon System ──
+export type WeaponId = 'pistol' | 'rifle' | 'shotgun' | 'sniper_rifle' | 'rocket_launcher' | 'smg';
+
+export interface Weapon {
+  id: WeaponId;
+  name: string;
+  attack: number;
+  accuracy: number;
+  range: number;
+  ammo: number; // -1 = infinite (pistol)
+  maxAmmo: number;
+  icon: string;
+}
+
+export const WEAPONS: Record<WeaponId, Weapon> = {
+  pistol: { id: 'pistol', name: 'Pistol', attack: 15, accuracy: 70, range: 3, ammo: -1, maxAmmo: -1, icon: '🔫' },
+  rifle: { id: 'rifle', name: 'Assault Rifle', attack: 22, accuracy: 78, range: 4, ammo: 12, maxAmmo: 12, icon: '🔫' },
+  shotgun: { id: 'shotgun', name: 'Shotgun', attack: 35, accuracy: 60, range: 2, ammo: 6, maxAmmo: 6, icon: '💥' },
+  sniper_rifle: { id: 'sniper_rifle', name: 'Sniper Rifle', attack: 45, accuracy: 90, range: 8, ammo: 4, maxAmmo: 4, icon: '🎯' },
+  rocket_launcher: { id: 'rocket_launcher', name: 'Rocket Launcher', attack: 60, accuracy: 55, range: 5, ammo: 2, maxAmmo: 2, icon: '🚀' },
+  smg: { id: 'smg', name: 'SMG', attack: 18, accuracy: 65, range: 3, ammo: 20, maxAmmo: 20, icon: '⚡' },
+};
+
+// ── Loot System ──
+export type LootType = 'weapon' | 'medkit' | 'armor' | 'ammo';
+
+export interface LootItem {
+  type: LootType;
+  weaponId?: WeaponId;
+  value: number; // heal amount, armor amount, etc
+  icon: string;
+  name: string;
+}
+
 export interface Unit {
   id: string;
   name: string;
@@ -43,6 +77,9 @@ export interface Unit {
   isSuppressed: boolean;
   coverType: 'none' | 'half' | 'full';
   kills: number;
+  weapon: Weapon;
+  visionRange: number;
+  armor: number;
 }
 
 export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand';
@@ -58,13 +95,14 @@ export interface TileData {
   coverValue: 0 | 1 | 2;
   variant: number;
   hasSmoke: boolean;
+  loot: LootItem | null;
 }
 
 export type GamePhase = 'select' | 'move' | 'attack' | 'ability' | 'enemy_turn' | 'game_over' | 'pre_game';
 
 export interface CombatEvent {
   id: string;
-  type: 'damage' | 'miss' | 'crit' | 'kill' | 'heal' | 'ability' | 'overwatch';
+  type: 'damage' | 'miss' | 'crit' | 'kill' | 'heal' | 'ability' | 'overwatch' | 'loot';
   attackerPos: Position;
   targetPos: Position;
   value?: number;
@@ -103,6 +141,7 @@ export interface GameState {
 export const GRID_SIZE = 20;
 export const AP_MOVE_COST = 1;
 export const AP_ATTACK_COST = 1;
+export const VISION_RANGE = 7;
 
 export const TEAM_COLORS: Record<Team, string> = {
   blue: '#4488ff',
@@ -133,12 +172,18 @@ export const CLASS_ABILITIES: Record<UnitClass, Ability[]> = {
   }],
 };
 
+// All units start with same base stats now
+export const BASE_STATS = {
+  hp: 80, attack: 15, defense: 6, accuracy: 70,
+  moveRange: 4, attackRange: 3, maxAp: 2,
+};
+
 export const CLASS_STATS: Record<UnitClass, {
   hp: number; attack: number; defense: number; accuracy: number;
   moveRange: number; attackRange: number; maxAp: number;
 }> = {
-  soldier: { hp: 100, attack: 22, defense: 10, accuracy: 80, moveRange: 4, attackRange: 2, maxAp: 2 },
-  sniper: { hp: 60, attack: 38, defense: 5, accuracy: 90, moveRange: 3, attackRange: 6, maxAp: 2 },
-  medic: { hp: 85, attack: 12, defense: 8, accuracy: 70, moveRange: 5, attackRange: 2, maxAp: 3 },
-  heavy: { hp: 150, attack: 28, defense: 22, accuracy: 65, moveRange: 2, attackRange: 2, maxAp: 2 },
+  soldier: { ...BASE_STATS },
+  sniper: { ...BASE_STATS },
+  medic: { ...BASE_STATS },
+  heavy: { ...BASE_STATS },
 };

@@ -1,4 +1,6 @@
 import { useRef, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { Billboard, Text } from '@react-three/drei';
 import { TileData, Position, GRID_SIZE } from '@/game/types';
 import { isInZone } from '@/game/gameState';
 import * as THREE from 'three';
@@ -59,7 +61,6 @@ function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, has
         <boxGeometry args={[0.96, height, 0.96]} />
         <meshStandardMaterial color={color} emissive={emissive} emissiveIntensity={emissiveIntensity} roughness={0.85} />
       </mesh>
-      {/* Smoke cloud */}
       {hasSmoke && (
         <mesh position={[tile.x, 0.4, tile.z]}>
           <sphereGeometry args={[0.4, 6, 5]} />
@@ -131,6 +132,57 @@ function PropObject({ tile }: { tile: TileData }) {
   }
 }
 
+// Loot item floating on tile
+function LootObject({ tile }: { tile: TileData }) {
+  if (!tile.loot) return null;
+  const ref = useRef<THREE.Group>(null);
+  const baseY = tile.elevation * 0.3 + 0.15;
+
+  const color = tile.loot.type === 'weapon' ? '#ffaa22' :
+                tile.loot.type === 'medkit' ? '#ff4466' :
+                tile.loot.type === 'armor' ? '#4488ff' :
+                '#88cc44';
+
+  const glowColor = tile.loot.type === 'weapon' ? '#ffcc44' :
+                    tile.loot.type === 'medkit' ? '#ff6688' :
+                    tile.loot.type === 'armor' ? '#66aaff' :
+                    '#aaee66';
+
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    ref.current.position.y = baseY + 0.15 + Math.sin(t * 2 + tile.x * 0.7 + tile.z * 1.3) * 0.08;
+    ref.current.rotation.y = t * 1.5 + tile.x;
+  });
+
+  return (
+    <group ref={ref} position={[tile.x, baseY + 0.15, tile.z]}>
+      {/* Glow ring on ground */}
+      <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.2, 0.35, 12]} />
+        <meshBasicMaterial color={glowColor} transparent opacity={0.3} side={THREE.DoubleSide} />
+      </mesh>
+      
+      {/* Item box */}
+      <mesh>
+        <boxGeometry args={[0.25, 0.25, 0.25]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} roughness={0.5} metalness={0.3} />
+      </mesh>
+      
+      {/* Light beacon */}
+      <pointLight color={glowColor} intensity={0.8} distance={2.5} />
+
+      {/* Label */}
+      <Billboard position={[0, 0.3, 0]}>
+        <Text fontSize={0.08} color={glowColor} anchorX="center" anchorY="middle" font={undefined}
+          outlineWidth={0.015} outlineColor="#000000">
+          {tile.loot.icon} {tile.loot.name}
+        </Text>
+      </Billboard>
+    </group>
+  );
+}
+
 function GrassTuft({ x, z }: { x: number; z: number }) {
   return (
     <group position={[x, 0.1, z]}>
@@ -157,10 +209,15 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
     return positions;
   }, [grid]);
 
+  const lootTiles = useMemo(() => {
+    return grid.flat().filter(t => t.loot !== null);
+  }, [grid]);
+
   return (
     <group>
+      {/* Ground plane - extends beyond grid for atmosphere */}
       <mesh position={[GRID_SIZE / 2 - 0.5, -0.05, GRID_SIZE / 2 - 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[GRID_SIZE + 2, GRID_SIZE + 2]} /><meshStandardMaterial color="#2a4a1a" roughness={1} />
+        <planeGeometry args={[GRID_SIZE + 20, GRID_SIZE + 20]} /><meshStandardMaterial color="#1a3012" roughness={1} />
       </mesh>
       {grid.map((row, x) => row.map((tile, z) => (
         <Tile
@@ -176,6 +233,9 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
       )))}
       {grid.flat().filter(t => t.prop).map(tile => (
         <PropObject key={`p-${tile.x}-${tile.z}`} tile={tile} />
+      ))}
+      {lootTiles.map(tile => (
+        <LootObject key={`l-${tile.x}-${tile.z}`} tile={tile} />
       ))}
       {grassPositions.map((pos, i) => (
         <GrassTuft key={`g-${i}`} x={pos.x} z={pos.z} />

@@ -1,7 +1,8 @@
 import {
   GameState, Unit, Position, TileData, Team, UnitClass, GRID_SIZE,
-  CLASS_STATS, CLASS_ABILITIES, TileType, PropType, CombatEvent,
+  CLASS_ABILITIES, TileType, PropType, CombatEvent,
   AP_MOVE_COST, AP_ATTACK_COST, AttackPreview, AbilityId,
+  WEAPONS, WeaponId, LootItem, LootType, Weapon, VISION_RANGE, BASE_STATS,
 } from './types';
 
 // ── Random ──
@@ -11,11 +12,32 @@ function seededRandom(seed: number) {
   return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
 
-// Global random for variety
 const globalRand = () => Math.random();
 
 let eventCounter = 0;
 function makeEventId() { return `evt-${++eventCounter}-${Date.now()}`; }
+
+// ── Loot Generation ──
+function generateLootItem(rand: () => number): LootItem {
+  const roll = rand();
+  if (roll < 0.18) {
+    return { type: 'weapon', weaponId: 'rifle', value: 0, icon: '🔫', name: 'Assault Rifle' };
+  } else if (roll < 0.30) {
+    return { type: 'weapon', weaponId: 'shotgun', value: 0, icon: '💥', name: 'Shotgun' };
+  } else if (roll < 0.40) {
+    return { type: 'weapon', weaponId: 'sniper_rifle', value: 0, icon: '🎯', name: 'Sniper Rifle' };
+  } else if (roll < 0.46) {
+    return { type: 'weapon', weaponId: 'rocket_launcher', value: 0, icon: '🚀', name: 'Rocket Launcher' };
+  } else if (roll < 0.56) {
+    return { type: 'weapon', weaponId: 'smg', value: 0, icon: '⚡', name: 'SMG' };
+  } else if (roll < 0.72) {
+    return { type: 'medkit', value: 40, icon: '❤️', name: 'Medkit' };
+  } else if (roll < 0.88) {
+    return { type: 'armor', value: 8, icon: '🛡️', name: 'Armor Vest' };
+  } else {
+    return { type: 'ammo', value: 0, icon: '📦', name: 'Ammo Crate' };
+  }
+}
 
 // ── Grid Generation ──
 function createGrid(): TileData[][] {
@@ -73,7 +95,7 @@ function createGrid(): TileData[][] {
         }
       }
 
-      grid[x][z] = { x, z, elevation, type, prop, isBlocked, coverValue, variant: Math.floor(rand() * 4), hasSmoke: false };
+      grid[x][z] = { x, z, elevation, type, prop, isBlocked, coverValue, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null };
     }
   }
 
@@ -101,39 +123,116 @@ function createGrid(): TileData[][] {
       for (let dz = -2; dz <= 2; dz++) {
         const cx = corner[0] + dx, cz = corner[1] + dz;
         if (cx >= 0 && cx < GRID_SIZE && cz >= 0 && cz < GRID_SIZE) {
-          grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, coverValue: 0, elevation: 0, hasSmoke: false };
+          grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, coverValue: 0, elevation: 0, hasSmoke: false, loot: null };
         }
       }
+    }
+  }
+
+  // ── Spawn loot across the map ──
+  const lootCount = 14 + Math.floor(rand() * 8);
+  let placed = 0;
+  let attempts = 0;
+  while (placed < lootCount && attempts < 200) {
+    attempts++;
+    const lx = Math.floor(rand() * GRID_SIZE);
+    const lz = Math.floor(rand() * GRID_SIZE);
+    const tile = grid[lx][lz];
+    // Don't place on blocked, water, or already has loot, or in spawn corners
+    const inCorner = (lx <= 2 && lz <= 2) || (lx <= 2 && lz >= GRID_SIZE - 3) ||
+                     (lx >= GRID_SIZE - 3 && lz <= 2) || (lx >= GRID_SIZE - 3 && lz >= GRID_SIZE - 3);
+    if (!tile.isBlocked && tile.type !== 'water' && !tile.loot && !inCorner) {
+      grid[lx][lz].loot = generateLootItem(rand);
+      placed++;
     }
   }
 
   return grid;
 }
 
-// ── Unit Creation ──
+// ── Unit Creation (all same stats, pistol) ──
 function createUnit(id: string, name: string, unitClass: UnitClass, team: Team, position: Position): Unit {
-  const stats = CLASS_STATS[unitClass];
+  const pistol = { ...WEAPONS.pistol };
   return {
     id, name, unitClass, team, position,
-    hp: stats.hp, maxHp: stats.hp, attack: stats.attack, defense: stats.defense,
-    accuracy: stats.accuracy, moveRange: stats.moveRange, attackRange: stats.attackRange,
-    ap: stats.maxAp, maxAp: stats.maxAp,
+    hp: BASE_STATS.hp, maxHp: BASE_STATS.hp,
+    attack: pistol.attack, defense: BASE_STATS.defense,
+    accuracy: pistol.accuracy, moveRange: BASE_STATS.moveRange,
+    attackRange: pistol.range,
+    ap: BASE_STATS.maxAp, maxAp: BASE_STATS.maxAp,
     isAlive: true, level: 1, xp: 0,
     abilities: [...CLASS_ABILITIES[unitClass]],
     cooldowns: {}, isOnOverwatch: false, isSuppressed: false,
     coverType: 'none', kills: 0,
+    weapon: pistol,
+    visionRange: VISION_RANGE,
+    armor: 0,
   };
 }
 
-// ── State Init ── (1 unit per team, randomized each game)
+// ── Loot Pickup ──
+export function pickupLoot(unit: Unit, tile: TileData): { picked: boolean; message: string } {
+  if (!tile.loot) return { picked: false, message: '' };
+  const loot = tile.loot;
+
+  switch (loot.type) {
+    case 'weapon': {
+      if (loot.weaponId) {
+        const newWeapon = { ...WEAPONS[loot.weaponId] };
+        unit.weapon = newWeapon;
+        unit.attack = newWeapon.attack;
+        unit.accuracy = newWeapon.accuracy;
+        unit.attackRange = newWeapon.range;
+        tile.loot = null;
+        return { picked: true, message: `📦 ${unit.name} picks up ${newWeapon.name}!` };
+      }
+      break;
+    }
+    case 'medkit': {
+      const healAmt = Math.min(loot.value, unit.maxHp - unit.hp);
+      if (healAmt > 0) {
+        unit.hp += healAmt;
+        tile.loot = null;
+        return { picked: true, message: `❤️ ${unit.name} uses Medkit (+${healAmt} HP)!` };
+      } else {
+        return { picked: false, message: '' }; // full HP, don't pick up
+      }
+    }
+    case 'armor': {
+      unit.armor += loot.value;
+      unit.defense += Math.floor(loot.value / 2);
+      tile.loot = null;
+      return { picked: true, message: `🛡️ ${unit.name} equips Armor Vest (+${loot.value} DEF)!` };
+    }
+    case 'ammo': {
+      if (unit.weapon.ammo !== -1) {
+        unit.weapon.ammo = unit.weapon.maxAmmo;
+        tile.loot = null;
+        return { picked: true, message: `📦 ${unit.name} refills ammo!` };
+      }
+      break;
+    }
+  }
+  tile.loot = null;
+  return { picked: true, message: `📦 ${unit.name} picks up ${loot.name}!` };
+}
+
+// ── Fog of War (AI vision check) ──
+export function canUnitSee(unit: Unit, targetPos: Position): boolean {
+  return getManhattanDistance(unit.position, targetPos) <= unit.visionRange;
+}
+
+export function getVisibleEnemies(unit: Unit, allUnits: Unit[]): Unit[] {
+  return allUnits.filter(u => u.isAlive && u.team !== unit.team && canUnitSee(unit, u.position));
+}
+
+// ── State Init ──
 export function createInitialState(): GameState {
   const grid = createGrid();
 
-  // Randomize class per team
   const classes: UnitClass[] = ['soldier', 'sniper', 'medic', 'heavy'];
   const shuffledClasses = [...classes].sort(() => globalRand() - 0.5);
 
-  // Random names per class
   const namePool: Record<UnitClass, string[]> = {
     soldier: ['Marco', 'Ralf', 'Knox', 'Hawk', 'Blaze', 'Steel'],
     sniper: ['Viper', 'Ghost', 'Scope', 'Lynx', 'Shade', 'Frost'],
@@ -146,7 +245,6 @@ export function createInitialState(): GameState {
     return names[Math.floor(globalRand() * names.length)];
   };
 
-  // Spawn positions at 4 corners with slight randomization
   const corners = [
     { x: 1 + Math.floor(globalRand() * 2), z: 1 + Math.floor(globalRand() * 2) },
     { x: 17 + Math.floor(globalRand() * 2), z: 17 + Math.floor(globalRand() * 2) },
@@ -173,6 +271,8 @@ export function createInitialState(): GameState {
       '⚔ TACTICAL ROYALE',
       '═══════════════════════════',
       '» 4 warriors. 4 corners. 1 survivor.',
+      '» Everyone starts with a PISTOL — find loot to upgrade!',
+      '» AI has limited vision — fog of war is active!',
       '» Press PLAY to watch the AI battle!',
     ],
     shrinkLevel: 0, zoneTimer: 5,
@@ -241,11 +341,12 @@ export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]
 
 export function calcCritChance(attacker: Unit, defender: Unit): number {
   let crit = 10;
-  if (attacker.unitClass === 'sniper') crit += 15;
+  if (attacker.weapon.id === 'sniper_rifle') crit += 20;
   if (defender.coverType === 'none') crit += 10;
   const dist = getManhattanDistance(attacker.position, defender.position);
   if (dist <= 1) crit += 10;
-  return Math.min(40, crit);
+  if (attacker.weapon.id === 'shotgun' && dist <= 2) crit += 15;
+  return Math.min(45, crit);
 }
 
 export function getAttackPreview(attacker: Unit, defender: Unit, grid: TileData[][]): AttackPreview {
@@ -285,6 +386,8 @@ export function getMovableTiles(unit: Unit, state: GameState): Position[] {
 
 export function getAttackableTiles(unit: Unit, state: GameState): Position[] {
   if (unit.ap < AP_ATTACK_COST) return [];
+  // Check ammo
+  if (unit.weapon.ammo === 0) return [];
   const tiles: Position[] = [];
   for (let x = 0; x < GRID_SIZE; x++) {
     for (let z = 0; z < GRID_SIZE; z++) {
@@ -349,6 +452,10 @@ export function performAttack(
   attacker: Unit, defender: Unit, grid: TileData[][]
 ): { damage: number; killed: boolean; hit: boolean; crit: boolean; events: CombatEvent[] } {
   const events: CombatEvent[] = [];
+
+  // Consume ammo
+  if (attacker.weapon.ammo > 0) attacker.weapon.ammo--;
+
   const hitChance = calcHitChance(attacker, defender, grid);
   const critChance = calcCritChance(attacker, defender);
   const roll = Math.random() * 100;
@@ -357,7 +464,7 @@ export function performAttack(
     events.push({
       id: makeEventId(), type: 'miss',
       attackerPos: { ...attacker.position }, targetPos: { ...defender.position },
-      message: `${attacker.name} MISSED ${defender.name}!`,
+      message: `${attacker.name} MISSED ${defender.name}! [${attacker.weapon.name}]`,
       timestamp: Date.now(),
     });
     return { damage: 0, killed: false, hit: false, crit: false, events };
@@ -368,6 +475,11 @@ export function performAttack(
   const variance = 0.85 + Math.random() * 0.3;
   let damage = Math.floor(baseDmg * variance);
   if (isCrit) damage = Math.floor(damage * 1.5);
+
+  // Rocket launcher splash (mini AoE on hit)
+  if (attacker.weapon.id === 'rocket_launcher') {
+    damage = Math.floor(damage * 1.2);
+  }
 
   defender.hp -= damage;
   const killed = defender.hp <= 0;
@@ -383,19 +495,20 @@ export function performAttack(
   if (attacker.xp >= 100) {
     attacker.xp -= 100; attacker.level++;
     attacker.maxHp += 10; attacker.hp = Math.min(attacker.hp + 10, attacker.maxHp);
-    attacker.attack += 3; attacker.defense += 2; attacker.accuracy += 2;
+    attacker.attack += 2; attacker.defense += 1; attacker.accuracy += 2;
   }
 
+  const weaponTag = `[${attacker.weapon.name}]`;
   events.push({
     id: makeEventId(),
     type: killed ? 'kill' : isCrit ? 'crit' : 'damage',
     attackerPos: { ...attacker.position }, targetPos: { ...defender.position },
     value: damage,
     message: killed
-      ? `💀 ${attacker.name} ELIMINATED ${defender.name}! (${damage} dmg)`
+      ? `💀 ${attacker.name} ELIMINATED ${defender.name}! (${damage} dmg) ${weaponTag}`
       : isCrit
-        ? `💥 CRITICAL HIT! ${attacker.name} → ${defender.name} for ${damage} dmg!`
-        : `${attacker.name} → ${defender.name} for ${damage} dmg`,
+        ? `💥 CRITICAL! ${attacker.name} → ${defender.name} for ${damage} dmg ${weaponTag}`
+        : `${attacker.name} → ${defender.name} for ${damage} dmg ${weaponTag}`,
     timestamp: Date.now(),
   });
 
@@ -419,90 +532,131 @@ export function getAliveTeams(units: Unit[]): Team[] {
   return Array.from(teams);
 }
 
-// ── AI ──
+// ── AI (with fog of war) ──
 export function runAiTurn(state: GameState): { state: GameState; events: CombatEvent[] } {
-  const newState = { ...state, units: state.units.map(u => ({ ...u })) };
+  const newState = { ...state, units: state.units.map(u => ({ ...u, weapon: { ...u.weapon } })), grid: state.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null }))) };
   const allEvents: CombatEvent[] = [];
   const teamUnits = newState.units.filter(u => u.team === newState.currentTeam && u.isAlive);
 
   for (const unit of teamUnits) {
-    const enemies = newState.units.filter(u => u.isAlive && u.team !== unit.team);
-    if (enemies.length === 0) break;
+    // FOG OF WAR: AI only sees enemies within vision range
+    const visibleEnemies = getVisibleEnemies(unit, newState.units);
+    const allEnemies = newState.units.filter(u => u.isAlive && u.team !== unit.team);
+    if (allEnemies.length === 0) break;
 
-    let closest = enemies[0];
-    let closestDist = getManhattanDistance(unit.position, closest.position);
-    for (const e of enemies) {
-      const d = getManhattanDistance(unit.position, e.position);
-      if (d < closestDist) { closest = e; closestDist = d; }
-    }
-
-    // Try ability first
-    if (unit.ap >= 1) {
-      if (unit.unitClass === 'medic') {
-        const injuredAlly = newState.units.find(u =>
-          u.isAlive && u.team === unit.team && u.id !== unit.id &&
-          u.hp < u.maxHp * 0.6 && getManhattanDistance(unit.position, u.position) <= 2
-        );
-        if (injuredAlly && (!unit.cooldowns['heal'] || unit.cooldowns['heal'] <= 0)) {
-          const healAmt = 40;
-          injuredAlly.hp = Math.min(injuredAlly.maxHp, injuredAlly.hp + healAmt);
-          unit.ap -= 1;
-          unit.cooldowns['heal'] = 2;
-          allEvents.push({
-            id: makeEventId(), type: 'heal',
-            attackerPos: { ...unit.position }, targetPos: { ...injuredAlly.position },
-            value: healAmt,
-            message: `💊 ${unit.name} heals ${injuredAlly.name} for ${healAmt} HP!`,
-            timestamp: Date.now(),
-          });
-        }
+    // Find closest VISIBLE enemy (or move toward center if none visible)
+    let closest: Unit | null = visibleEnemies.length > 0 ? visibleEnemies[0] : null;
+    if (closest) {
+      let closestDist = getManhattanDistance(unit.position, closest.position);
+      for (const e of visibleEnemies) {
+        const d = getManhattanDistance(unit.position, e.position);
+        if (d < closestDist) { closest = e; closestDist = d; }
       }
     }
 
-    // Move toward closest enemy (prefer cover)
+    // Try ability first (heal)
+    if (unit.ap >= 1 && unit.unitClass === 'medic') {
+      const injuredAlly = newState.units.find(u =>
+        u.isAlive && u.team === unit.team && u.id !== unit.id &&
+        u.hp < u.maxHp * 0.6 && getManhattanDistance(unit.position, u.position) <= 2
+      );
+      if (injuredAlly && (!unit.cooldowns['heal'] || unit.cooldowns['heal'] <= 0)) {
+        const healAmt = 40;
+        injuredAlly.hp = Math.min(injuredAlly.maxHp, injuredAlly.hp + healAmt);
+        unit.ap -= 1;
+        unit.cooldowns['heal'] = 2;
+        allEvents.push({
+          id: makeEventId(), type: 'heal',
+          attackerPos: { ...unit.position }, targetPos: { ...injuredAlly.position },
+          value: healAmt,
+          message: `💊 ${unit.name} heals ${injuredAlly.name} for ${healAmt} HP!`,
+          timestamp: Date.now(),
+        });
+      }
+    }
+
+    // Move: toward visible enemy, or toward center/loot if no enemies visible
     if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
       const movable = getMovableTiles(unit, newState);
       if (movable.length > 0) {
         let bestTile = movable[0];
         let bestScore = -Infinity;
+
         for (const t of movable) {
-          const dist = getManhattanDistance(t, closest.position);
-          let score = -dist * 2;
+          let score = 0;
+
+          if (closest) {
+            // Move toward visible enemy
+            const dist = getManhattanDistance(t, closest.position);
+            score = -dist * 2;
+            if (unit.weapon.id === 'sniper_rifle' && dist < 3) score -= 10;
+            if (unit.weapon.id === 'shotgun' && dist > 3) score -= 5;
+          } else {
+            // No visible enemies: move toward center
+            const distToCenter = getManhattanDistance(t, { x: 10, z: 10 });
+            score = -distToCenter;
+          }
+
+          // Prefer tiles with loot
+          const tileData = newState.grid[t.x][t.z];
+          if (tileData.loot) {
+            score += 15; // strong incentive to pick up loot
+            if (tileData.loot.type === 'weapon') score += 10;
+          }
+
+          // Cover bonus
           for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const nx = t.x + dx, nz = t.z + dz;
             if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
               score += newState.grid[nx][nz].coverValue * 3;
             }
           }
-          if (unit.unitClass === 'sniper' && dist < 3) score -= 10;
+
           if (score > bestScore) { bestTile = t; bestScore = score; }
         }
+
         unit.position = bestTile;
         unit.ap -= AP_MOVE_COST;
+
+        // Pickup loot on arrival
+        const arrivalTile = newState.grid[bestTile.x][bestTile.z];
+        if (arrivalTile.loot) {
+          const { picked, message } = pickupLoot(unit, arrivalTile);
+          if (picked) {
+            allEvents.push({
+              id: makeEventId(), type: 'loot',
+              attackerPos: { ...unit.position }, targetPos: { ...unit.position },
+              message, timestamp: Date.now(),
+            });
+            newState.log = [...newState.log, message];
+          }
+        }
       }
     }
 
-    // Attack
-    if (unit.ap >= AP_ATTACK_COST) {
-      const attackable = getAttackableTiles(unit, newState);
-      if (attackable.length > 0) {
-        let bestTarget: Unit | null = null;
-        let lowestHp = Infinity;
-        for (const tp of attackable) {
-          const target = newState.units.find(u => u.isAlive && u.position.x === tp.x && u.position.z === tp.z && u.team !== unit.team);
-          if (target && target.hp < lowestHp) { bestTarget = target; lowestHp = target.hp; }
+    // Re-check visible enemies after moving
+    const visibleAfterMove = getVisibleEnemies(unit, newState.units);
+
+    // Attack (only visible enemies)
+    if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
+      const inRangeVisible = visibleAfterMove.filter(e =>
+        getManhattanDistance(unit.position, e.position) <= unit.attackRange
+      );
+      if (inRangeVisible.length > 0) {
+        // Target lowest HP visible enemy
+        let bestTarget = inRangeVisible[0];
+        for (const t of inRangeVisible) {
+          if (t.hp < bestTarget.hp) bestTarget = t;
         }
-        if (bestTarget) {
-          const result = performAttack(unit, bestTarget, newState.grid);
-          allEvents.push(...result.events);
-          newState.log = [...newState.log, ...result.events.map(e => e.message)];
-          unit.ap -= AP_ATTACK_COST;
-        }
+        const result = performAttack(unit, bestTarget, newState.grid);
+        allEvents.push(...result.events);
+        newState.log = [...newState.log, ...result.events.map(e => e.message)];
+        unit.ap -= AP_ATTACK_COST;
       }
     }
 
     // Overwatch with remaining AP
-    if (unit.unitClass === 'sniper' && unit.ap >= 1 && !unit.isOnOverwatch) {
+    if (unit.weapon.id === 'sniper_rifle' && unit.ap >= 1 && !unit.isOnOverwatch) {
       unit.isOnOverwatch = true;
       unit.ap -= 1;
       allEvents.push({
@@ -523,6 +677,8 @@ export function checkOverwatch(movingUnit: Unit, state: GameState): CombatEvent[
   const events: CombatEvent[] = [];
   for (const u of state.units) {
     if (!u.isAlive || u.team === movingUnit.team || !u.isOnOverwatch) continue;
+    // Overwatch also respects vision
+    if (!canUnitSee(u, movingUnit.position)) continue;
     const dist = getManhattanDistance(u.position, movingUnit.position);
     if (dist <= u.attackRange) {
       const result = performAttack(u, movingUnit, state.grid);

@@ -1,7 +1,7 @@
-import { GameState, Unit, TEAM_COLORS, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, GRID_SIZE } from '@/game/types';
+import { GameState, Unit, TEAM_COLORS, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, GRID_SIZE, VISION_RANGE } from '@/game/types';
 import { useEffect, useRef, useMemo } from 'react';
-import { Play, Pause, RotateCcw, Swords, Shield, Heart, Crosshair } from 'lucide-react';
-import { isInZone } from '@/game/gameState';
+import { Play, Pause, RotateCcw, Swords, Shield, Heart, Crosshair, Eye } from 'lucide-react';
+import { isInZone, getManhattanDistance } from '@/game/gameState';
 import bgTactical from '@/assets/bg-tactical.png';
 
 interface GameHUDProps {
@@ -34,7 +34,6 @@ function UnitCard({ unit, isActive }: { unit: Unit; isActive: boolean }) {
           : 'bg-card/60 border-border/20'
       } ${!unit.isAlive ? 'opacity-20 grayscale' : ''}`}
     >
-      {/* Team color indicator */}
       <div
         className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
         style={{ backgroundColor: teamColor + '22', border: `2px solid ${teamColor}` }}
@@ -62,6 +61,8 @@ function UnitCard({ unit, isActive }: { unit: Unit; isActive: boolean }) {
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[7px] text-muted-foreground">{unit.hp}/{unit.maxHp} HP</span>
           <div className="flex items-center gap-1">
+            {/* Weapon indicator */}
+            <span className="text-[6px] text-accent">{unit.weapon.icon}{unit.weapon.ammo !== -1 ? `${unit.weapon.ammo}` : ''}</span>
             {unit.isOnOverwatch && <span className="text-[7px] text-[#44aaff]">👁</span>}
             {unit.isSuppressed && <span className="text-[7px] text-destructive">⛔</span>}
             {unit.coverType !== 'none' && (
@@ -72,6 +73,9 @@ function UnitCard({ unit, isActive }: { unit: Unit; isActive: boolean }) {
             {unit.kills > 0 && <span className="text-[7px] text-destructive">💀{unit.kills}</span>}
           </div>
         </div>
+        
+        {/* Weapon name */}
+        <div className="text-[6px] text-muted-foreground/70 mt-0.5">{unit.weapon.name}</div>
       </div>
     </div>
   );
@@ -109,13 +113,19 @@ function Minimap({ state }: { state: GameState }) {
         }
         ctx.fillRect(x * CELL, z * CELL, CELL, CELL);
 
-        // Props as darker dots
         if (tile.prop) {
           ctx.fillStyle = 'rgba(0,0,0,0.35)';
           ctx.fillRect(x * CELL + 1, z * CELL + 1, CELL - 2, CELL - 2);
         }
 
-        // Smoke
+        // Loot markers
+        if (tile.loot) {
+          ctx.fillStyle = tile.loot.type === 'weapon' ? '#ffaa22' :
+                         tile.loot.type === 'medkit' ? '#ff4466' :
+                         tile.loot.type === 'armor' ? '#4488ff' : '#88cc44';
+          ctx.fillRect(x * CELL + 1, z * CELL + 1, CELL - 2, CELL - 2);
+        }
+
         if (tile.hasSmoke) {
           ctx.fillStyle = 'rgba(150,170,190,0.4)';
           ctx.fillRect(x * CELL, z * CELL, CELL, CELL);
@@ -134,7 +144,7 @@ function Minimap({ state }: { state: GameState }) {
       );
     }
 
-    // Draw grid lines (subtle)
+    // Grid lines
     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.lineWidth = 0.5;
     for (let i = 0; i <= GRID_SIZE; i++) {
@@ -142,11 +152,18 @@ function Minimap({ state }: { state: GameState }) {
       ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(MINIMAP_SIZE, i * CELL); ctx.stroke();
     }
 
-    // Draw units
+    // Draw units with vision circles
     for (const unit of state.units) {
       if (!unit.isAlive) continue;
       const cx = unit.position.x * CELL + CELL / 2;
       const cz = unit.position.z * CELL + CELL / 2;
+
+      // Vision range circle (subtle)
+      ctx.beginPath();
+      ctx.arc(cx, cz, VISION_RANGE * CELL, 0, Math.PI * 2);
+      ctx.strokeStyle = TEAM_COLORS[unit.team] + '20';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
 
       // Outer glow
       ctx.beginPath();
@@ -160,7 +177,6 @@ function Minimap({ state }: { state: GameState }) {
       ctx.fillStyle = TEAM_COLORS[unit.team];
       ctx.fill();
 
-      // White border
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 0.5;
       ctx.stroke();
@@ -177,6 +193,10 @@ function Minimap({ state }: { state: GameState }) {
         className="rounded border border-border/30"
         style={{ width: MINIMAP_SIZE, height: MINIMAP_SIZE, imageRendering: 'pixelated' }}
       />
+      <div className="flex items-center justify-center gap-1 mt-1">
+        <Eye className="w-2.5 h-2.5 text-muted-foreground" />
+        <span className="text-[5px] text-muted-foreground">FOG OF WAR ACTIVE</span>
+      </div>
     </div>
   );
 }
@@ -206,6 +226,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
             <div className="space-y-2">
               <h1 className="text-[20px] text-primary glow-text tracking-[0.3em]">TACTICAL ROYALE</h1>
               <p className="text-[9px] text-muted-foreground tracking-wider">4 WARRIORS • 4 CORNERS • 1 SURVIVOR</p>
+              <p className="text-[7px] text-accent tracking-wider">ALL START WITH PISTOL • FIND LOOT TO UPGRADE!</p>
             </div>
 
             {/* Unit previews */}
@@ -221,24 +242,26 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
                   <div>
                     <div className="text-[9px] text-foreground font-bold">{u.name}</div>
                     <div className="text-[7px] uppercase tracking-wider" style={{ color: TEAM_COLORS[u.team] }}>
-                      {u.unitClass} • {u.team}
+                      {u.team}
                     </div>
                     <div className="text-[7px] text-muted-foreground">
-                      HP:{u.hp} ATK:{u.attack} DEF:{u.defense}
+                      HP:{u.hp} • {u.weapon.name} • Vision:{u.visionRange}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <button
-              onClick={onStartAutoPlay}
-              className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all glow-text text-[11px] tracking-[0.2em] flex items-center gap-3 mx-auto"
-            >
-              <Play className="w-5 h-5" />
-              START BATTLE
-            </button>
-            <p className="text-[7px] text-muted-foreground">AI controls all teams • Watch the battle unfold</p>
+            <div className="space-y-2">
+              <button
+                onClick={onStartAutoPlay}
+                className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all glow-text text-[11px] tracking-[0.2em] flex items-center gap-3 mx-auto"
+              >
+                <Play className="w-5 h-5" />
+                START BATTLE
+              </button>
+              <p className="text-[7px] text-muted-foreground">AI controls all teams • Fog of War active • Find weapons to win!</p>
+            </div>
           </div>
         </div>
       )}
@@ -263,7 +286,6 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
           )}
         </div>
         <div className="flex items-center gap-4">
-          {/* Team status indicators */}
           <div className="flex items-center gap-2">
             {(['blue', 'red', 'green', 'yellow'] as const).map(team => {
               const alive = state.units.filter(u => u.team === team && u.isAlive).length;
@@ -296,7 +318,6 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {/* Bottom bar */}
       <div className="pointer-events-auto absolute bottom-0 left-0 right-0 bg-card/90 backdrop-blur-sm border-t border-border/40">
         <div className="flex">
-          {/* Combat log */}
           <div ref={logRef} className="flex-1 h-24 overflow-y-auto px-4 py-2 font-mono">
             {state.log.slice(-20).map((msg, i) => (
               <div
@@ -310,6 +331,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
                   msg.includes('MISSED') ? 'text-muted-foreground/50' :
                   msg.includes('heals') || msg.includes('💊') ? 'text-primary' :
                   msg.includes('OVERWATCH') ? 'text-[#44aaff]' :
+                  msg.includes('picks up') || msg.includes('📦') || msg.includes('equips') ? 'text-accent' :
                   msg.includes('»') ? 'text-foreground' :
                   'text-muted-foreground'
                 }`}
@@ -319,7 +341,6 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
             ))}
           </div>
 
-          {/* Controls */}
           <div className="flex flex-col items-center justify-center gap-2 px-4 border-l border-border/40 min-w-[150px]">
             {isGameOver ? (
               <button
@@ -373,6 +394,15 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
         <div key={e.id} className="absolute top-1/4 left-1/2 -translate-x-1/2 animate-fade-in z-20">
           <div className="bg-destructive/90 text-destructive-foreground px-6 py-2.5 rounded-lg text-[11px] tracking-[0.15em] font-bold whitespace-nowrap border border-destructive">
             💀 {e.message.split('!')[0]}!
+          </div>
+        </div>
+      ))}
+
+      {/* Loot pickup notification */}
+      {state.combatEvents.filter(e => e.type === 'loot' && Date.now() - e.timestamp < 2000).map(e => (
+        <div key={e.id} className="absolute top-1/3 left-1/2 -translate-x-1/2 animate-fade-in z-20">
+          <div className="bg-accent/90 text-accent-foreground px-6 py-2 rounded-lg text-[10px] tracking-[0.1em] font-bold whitespace-nowrap border border-accent">
+            {e.message}
           </div>
         </div>
       ))}

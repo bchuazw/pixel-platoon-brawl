@@ -21,6 +21,7 @@ export function useGameStore() {
   // Track which unit is currently acting in the auto-play sequence
   const unitQueueRef = useRef<string[]>([]);
   const currentTeamRef = useRef<Team>('blue');
+  const pendingCombatUnitRef = useRef<string | null>(null); // unit awaiting combat after move
 
   // Earn sponsor points over time
   useEffect(() => {

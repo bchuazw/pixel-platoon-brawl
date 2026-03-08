@@ -263,13 +263,84 @@ function GameSoldierPreview({ teamColor, isMedic, customization }: { teamColor: 
         <boxGeometry args={[0.18, 0.18, 0.08]} />
       </mesh>
 
-      {/* ── SHOULDER PADS (team colored) ── */}
-      <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
-        <boxGeometry args={[0.06, 0.07, 0.12]} />
-      </mesh>
-      <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
-        <boxGeometry args={[0.06, 0.07, 0.12]} />
-      </mesh>
+      {/* ── SHOULDER PAD VARIANTS ── */}
+      {customization.shoulder === 'standard' && (
+        <>
+          <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+        </>
+      )}
+      {customization.shoulder === 'heavy' && (
+        <>
+          <mesh position={[-0.18, 0.53, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.08, 0.09, 0.14]} />
+          </mesh>
+          <mesh position={[0.18, 0.53, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.08, 0.09, 0.14]} />
+          </mesh>
+          {/* Extra plate */}
+          <mesh position={[-0.2, 0.54, 0]} material={gearMat}>
+            <boxGeometry args={[0.02, 0.06, 0.1]} />
+          </mesh>
+          <mesh position={[0.2, 0.54, 0]} material={gearMat}>
+            <boxGeometry args={[0.02, 0.06, 0.1]} />
+          </mesh>
+        </>
+      )}
+      {customization.shoulder === 'spikes' && (
+        <>
+          <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          {/* Spikes */}
+          <mesh position={[-0.2, 0.58, 0]}>
+            <coneGeometry args={[0.015, 0.06, 4]} />
+            <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[-0.2, 0.58, 0.04]}>
+            <coneGeometry args={[0.012, 0.05, 4]} />
+            <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[0.2, 0.58, 0]}>
+            <coneGeometry args={[0.015, 0.06, 4]} />
+            <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[0.2, 0.58, 0.04]}>
+            <coneGeometry args={[0.012, 0.05, 4]} />
+            <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+          </mesh>
+        </>
+      )}
+      {customization.shoulder === 'radio' && (
+        <>
+          <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          {/* Radio box on left shoulder */}
+          <mesh position={[-0.2, 0.56, -0.02]} material={gearMat}>
+            <boxGeometry args={[0.04, 0.04, 0.04]} />
+          </mesh>
+          {/* Antenna */}
+          <mesh position={[-0.2, 0.64, -0.02]}>
+            <cylinderGeometry args={[0.003, 0.003, 0.14, 4]} />
+            <meshStandardMaterial color="#222222" metalness={0.6} roughness={0.3} />
+          </mesh>
+          <mesh position={[-0.2, 0.72, -0.02]}>
+            <sphereGeometry args={[0.008, 4, 4]} />
+            <meshStandardMaterial color={teamColor} emissive={teamColor} emissiveIntensity={0.6} />
+          </mesh>
+        </>
+      )}
 
       {/* ── ARMS ── */}
       <group position={[-0.19, 0.44, 0]}>
@@ -281,16 +352,21 @@ function GameSoldierPreview({ teamColor, isMedic, customization }: { teamColor: 
         <mesh position={[0, -0.12, 0]} material={skinMat}><boxGeometry args={[0.05, 0.05, 0.05]} /></mesh>
       </group>
 
-      {/* ── Medic cross (game-accurate) ── */}
+      {/* ── Medic red cross (game-accurate) ── */}
       {isMedic && (
         <>
           <mesh position={[0, 0.48, 0.069]}>
-            <boxGeometry args={[0.06, 0.02, 0.002]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+            <boxGeometry args={[0.08, 0.025, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.5} />
           </mesh>
           <mesh position={[0, 0.48, 0.069]}>
-            <boxGeometry args={[0.02, 0.06, 0.002]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+            <boxGeometry args={[0.025, 0.08, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.5} />
+          </mesh>
+          {/* White background */}
+          <mesh position={[0, 0.48, 0.067]}>
+            <boxGeometry args={[0.1, 0.1, 0.002]} />
+            <meshStandardMaterial color="#dddddd" />
           </mesh>
         </>
       )}

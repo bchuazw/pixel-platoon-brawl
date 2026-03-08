@@ -241,8 +241,8 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           intensity={1.2}
           castShadow
           color="#ffe0b0"
-          shadow-mapSize-width={4096}
-          shadow-mapSize-height={4096}
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
           shadow-camera-near={0.5}
           shadow-camera-far={80}
           shadow-camera-left={-25}
@@ -250,7 +250,6 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           shadow-camera-top={25}
           shadow-camera-bottom={-25}
           shadow-bias={-0.0003}
-          shadow-normalBias={0.02}
         />
         
         {/* Fill light (cool blue) */}

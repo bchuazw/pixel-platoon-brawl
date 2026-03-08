@@ -10,6 +10,8 @@ import spriteSoldierImg from '@/assets/sprite-soldier.png';
 import spriteSniperImg from '@/assets/sprite-sniper.png';
 import spriteHeavyImg from '@/assets/sprite-heavy.png';
 import spriteMedicImg from '@/assets/sprite-medic.png';
+import coverHalfImg from '@/assets/cover-half.png';
+import coverFullImg from '@/assets/cover-full.png';
 
 interface GameUnitsProps {
   units: Unit[];
@@ -62,20 +64,33 @@ const SPRITE_MAP: Record<string, string> = {
 
 type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';
 
-function CoverShield({ coverType }: { coverType: 'none' | 'half' | 'full' }) {
+function CoverProp({ coverType }: { coverType: 'none' | 'half' | 'full' }) {
+  const textureHalf = useLoader(THREE.TextureLoader, coverHalfImg);
+  const textureFull = useLoader(THREE.TextureLoader, coverFullImg);
+  const processedTex = useMemo(() => {
+    const tex = (coverType === 'full' ? textureFull : textureHalf).clone();
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }, [coverType, textureHalf, textureFull]);
+
   if (coverType === 'none') return null;
+
+  const height = coverType === 'full' ? 0.7 : 0.45;
+  const width = coverType === 'full' ? 0.7 : 0.55;
+
   return (
-    <Billboard position={[0.35, 0.3, 0]}>
+    <Billboard position={[0, height * 0.5, 0.25]} renderOrder={10}>
       <mesh>
-        <planeGeometry args={[0.18, 0.18]} />
+        <planeGeometry args={[width, height]} />
         <meshBasicMaterial
-          color={coverType === 'full' ? '#4488ff' : '#ffaa44'}
-          transparent opacity={0.8}
+          map={processedTex}
+          transparent
+          alphaTest={0.1}
+          side={THREE.DoubleSide}
         />
       </mesh>
-      <Text fontSize={0.1} color="#ffffff" anchorX="center" anchorY="middle" position={[0, 0, 0.01]} font={undefined}>
-        {coverType === 'full' ? '🛡' : '◐'}
-      </Text>
     </Billboard>
   );
 }
@@ -395,11 +410,23 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       // ── Idle animation ──
       groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       const bounce = Math.sin(t * 2.5 + unit.position.x * 1.5) * 0.04;
-      innerRef.current.position.y = bounce;
       innerRef.current.position.x = 0;
       innerRef.current.rotation.x = 0;
       innerRef.current.rotation.z = Math.sin(t * 1.5) * 0.02;
-      innerRef.current.scale.set(1, 1, 1);
+
+      // Crouch behind cover
+      if (unit.coverType === 'full') {
+        // Deep crouch behind full cover
+        innerRef.current.position.y = bounce - 0.2;
+        innerRef.current.scale.set(0.95, 0.7, 1);
+      } else if (unit.coverType === 'half') {
+        // Slight crouch behind half cover
+        innerRef.current.position.y = bounce - 0.1;
+        innerRef.current.scale.set(0.98, 0.85, 1);
+      } else {
+        innerRef.current.position.y = bounce;
+        innerRef.current.scale.set(1, 1, 1);
+      }
 
       if (unit.isSuppressed) {
         innerRef.current.position.x = Math.sin(t * 15) * 0.03;
@@ -564,7 +591,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
           </Billboard>
         )}
 
-        <CoverShield coverType={unit.coverType} />
+        <CoverProp coverType={unit.coverType} />
         <StatusIcons unit={unit} />
 
         {/* Selection ring */}

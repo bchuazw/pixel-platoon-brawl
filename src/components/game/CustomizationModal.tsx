@@ -24,7 +24,7 @@ const FULLBODY_MAP: Record<string, string> = {
 // ── Customization Types ──
 export type HelmetStyle = 'standard' | 'tactical' | 'beret' | 'bandana';
 export type VestStyle = 'light' | 'heavy' | 'tactical' | 'medic';
-export type BootStyle = 'standard' | 'combat' | 'sneakers';
+export type BootStyle = 'standard' | 'combat' | 'sneakers' | 'armored' | 'wrapped';
 export type ShoulderStyle = 'standard' | 'heavy' | 'spikes' | 'radio';
 
 export interface UnitCustomization {
@@ -46,16 +46,18 @@ const HELMET_OPTIONS: { id: HelmetStyle; name: string; desc: string }[] = [
 ];
 
 const VEST_OPTIONS: { id: VestStyle; name: string; desc: string }[] = [
-  { id: 'light', name: 'Light Vest', desc: 'Lightweight carrier' },
-  { id: 'heavy', name: 'Heavy Armor', desc: 'Full ballistic plate carrier' },
-  { id: 'tactical', name: 'Tactical Rig', desc: 'Modular pouch system' },
-  { id: 'medic', name: 'Medic Vest', desc: 'Medical supplies carrier' },
+  { id: 'light', name: 'Light Vest', desc: 'Minimal chest plate' },
+  { id: 'heavy', name: 'Heavy Armor', desc: 'Massive plate carrier + collar' },
+  { id: 'tactical', name: 'Tactical Rig', desc: 'Pouches & ammo belts' },
+  { id: 'medic', name: 'Medic Vest', desc: 'White vest with red cross' },
 ];
 
 const BOOT_OPTIONS: { id: BootStyle; name: string; desc: string }[] = [
   { id: 'standard', name: 'Standard Boots', desc: 'Military-issue boots' },
-  { id: 'combat', name: 'Combat Boots', desc: 'Reinforced tall boots' },
+  { id: 'combat', name: 'Combat Boots', desc: 'Tall reinforced boots' },
   { id: 'sneakers', name: 'Tactical Sneakers', desc: 'Lightweight & quiet' },
+  { id: 'armored', name: 'Armored Greaves', desc: 'Plated leg armor + boots' },
+  { id: 'wrapped', name: 'Wrapped Boots', desc: 'Bandage-wrapped desert boots' },
 ];
 
 const SHOULDER_OPTIONS: { id: ShoulderStyle; name: string; desc: string }[] = [
@@ -64,6 +66,9 @@ const SHOULDER_OPTIONS: { id: ShoulderStyle; name: string; desc: string }[] = [
   { id: 'spikes', name: 'Spiked Pads', desc: 'Intimidating spiked shoulders' },
   { id: 'radio', name: 'Radio Gear', desc: 'Antenna + comms equipment' },
 ];
+
+// Units with beards based on their portrait art
+const BEARDED_UNITS = new Set(['blue-soldier', 'yellow-soldier', 'red-medic', 'yellow-medic']);
 
 // ── Material helper (matching GameUnits.tsx) ──
 function getMat(color: string, metalness = 0.1, roughness = 0.7, emissive = '#000000', emissiveIntensity = 0): THREE.MeshStandardMaterial {

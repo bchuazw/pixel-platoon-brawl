@@ -134,9 +134,17 @@ function PropObject({ tile }: { tile: TileData }) {
 
 // Loot item floating on tile
 function LootObject({ tile }: { tile: TileData }) {
-  if (!tile.loot) return null;
   const ref = useRef<THREE.Group>(null);
   const baseY = tile.elevation * 0.3 + 0.15;
+
+  useFrame(({ clock }) => {
+    if (!ref.current || !tile.loot) return;
+    const t = clock.getElapsedTime();
+    ref.current.position.y = baseY + 0.15 + Math.sin(t * 2 + tile.x * 0.7 + tile.z * 1.3) * 0.08;
+    ref.current.rotation.y = t * 1.5 + tile.x;
+  });
+
+  if (!tile.loot) return null;
 
   const color = tile.loot.type === 'weapon' ? '#ffaa22' :
                 tile.loot.type === 'medkit' ? '#ff4466' :

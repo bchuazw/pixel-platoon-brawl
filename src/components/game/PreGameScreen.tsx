@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { startAmbientAudio, stopAmbientAudio } from '@/game/ambientAudio';
 import { GameState, Unit, TEAM_COLORS, Team } from '@/game/types';
 import { Play, ChevronDown, ChevronUp, Swords, Heart, Shield, Crosshair, Target, Zap } from 'lucide-react';
 import { CryptoBettingPanel } from './CryptoBettingPanel';
@@ -201,6 +202,27 @@ function Scanlines() {
 // ── Main Pre-Game Screen ──
 export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
   const teams: Team[] = ['blue', 'red', 'green', 'yellow'];
+  const [audioStarted, setAudioStarted] = useState(false);
+
+  // Start ambient on first user interaction (browsers require gesture)
+  const handleInteraction = useCallback(() => {
+    if (!audioStarted) {
+      startAmbientAudio();
+      setAudioStarted(true);
+    }
+  }, [audioStarted]);
+
+  // Clean up on unmount (battle starts)
+  useEffect(() => {
+    return () => stopAmbientAudio();
+  }, []);
+
+  // Also try starting on mount click
+  useEffect(() => {
+    const handler = () => handleInteraction();
+    window.addEventListener('click', handler, { once: true });
+    return () => window.removeEventListener('click', handler);
+  }, [handleInteraction]);
 
   return (
     <div className="absolute inset-0 z-30 pointer-events-auto overflow-y-auto">

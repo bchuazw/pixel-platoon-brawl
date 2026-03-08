@@ -65,15 +65,17 @@ const SPRITE_MAP: Record<string, string> = {
 type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';
 
 function CoverProp({ coverType }: { coverType: 'none' | 'half' | 'full' }) {
-  if (coverType === 'none') return null;
-  const texture = useLoader(THREE.TextureLoader, coverType === 'half' ? coverHalfImg : coverFullImg);
+  const textureHalf = useLoader(THREE.TextureLoader, coverHalfImg);
+  const textureFull = useLoader(THREE.TextureLoader, coverFullImg);
   const processedTex = useMemo(() => {
-    const tex = texture.clone();
+    const tex = (coverType === 'full' ? textureFull : textureHalf).clone();
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
     tex.needsUpdate = true;
     return tex;
-  }, [texture]);
+  }, [coverType, textureHalf, textureFull]);
+
+  if (coverType === 'none') return null;
 
   const height = coverType === 'full' ? 0.7 : 0.45;
   const width = coverType === 'full' ? 0.7 : 0.55;

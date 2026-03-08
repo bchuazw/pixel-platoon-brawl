@@ -102,10 +102,6 @@ const Index = () => {
         onMainMenu={restart}
         sponsorPoints={sponsorPoints}
         onUnitInspect={inspectUnit}
-        onPlaceBet={handlePlaceBet}
-        betTeam={betTeam}
-        betAmount={betAmount}
-        collectBetPayout={collectBetPayout}
       />
       {/* Broadcast overlay for cinematic announcements */}
       {state.autoPlay && <BroadcastOverlay state={state} />}

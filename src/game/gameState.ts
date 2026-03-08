@@ -789,6 +789,9 @@ export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]
   if (cover === 'half') chance -= 25;
   if (cover === 'full') chance -= 45;
 
+  // Hunker down bonus — significantly harder to hit
+  if (defender.isHunkered) chance -= 30;
+
   if (attacker.isSuppressed) chance -= 30;
 
   const aElev = grid[attacker.position.x]?.[attacker.position.z]?.elevation || 0;

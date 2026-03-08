@@ -1,10 +1,11 @@
 import { GameState, Unit, TEAM_COLORS, AbilityId, GRID_SIZE, Team } from '@/game/types';
 import { useEffect, useRef, useMemo, useState } from 'react';
-import { Play, Pause, RotateCcw, Heart, Shield, Crosshair, Home, Target, Skull } from 'lucide-react';
+import { Play, Pause, RotateCcw, Heart, Shield, Crosshair, Home, Target, Skull, Users, MessageSquare } from 'lucide-react';
 import { isInZone } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import { PreGameScreen } from './PreGameScreen';
 import { TacticalMinimap } from './TacticalMinimap';
+import { SponsorHUDPanel } from './SponsorHUDPanel';
 
 import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
 import portraitSoldierRed from '@/assets/portrait-soldier-red.png';

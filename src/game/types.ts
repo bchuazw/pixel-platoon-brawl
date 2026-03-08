@@ -214,12 +214,13 @@ export const MEDIC_ABILITIES: Ability[] = [{
 }];
 
 // ── Class Stats (differentiated) ──
+// Both classes get 2 AP. Move = 1 AP (up to 4 tiles). Shoot/Hunker = 1 AP (ends turn if first action).
 export const CLASS_STATS: Record<UnitClass, {
   hp: number; attack: number; defense: number; accuracy: number;
   moveRange: number; attackRange: number; maxAp: number;
 }> = {
-  soldier: { hp: 90, attack: 15, defense: 8, accuracy: 72, moveRange: 2, attackRange: 3, maxAp: 2 },
-  medic: { hp: 70, attack: 12, defense: 5, accuracy: 65, moveRange: 2, attackRange: 2, maxAp: 3 },
+  soldier: { hp: 90, attack: 15, defense: 8, accuracy: 72, moveRange: 4, attackRange: 3, maxAp: 2 },
+  medic: { hp: 70, attack: 12, defense: 5, accuracy: 65, moveRange: 4, attackRange: 2, maxAp: 2 },
 };
 
 // Legacy compat

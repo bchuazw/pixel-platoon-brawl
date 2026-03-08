@@ -682,12 +682,22 @@ export function createInitialState(): GameState {
   for (let i = 0; i < teams.length; i++) {
     const team = teams[i];
     const spawn = spawnPoints[i];
-    // Soldier at spawn, medic adjacent
-    const medicOffset = [{ x: 1, z: 0 }, { x: 0, z: 1 }, { x: 1, z: 1 }, { x: -1, z: 0 }][i];
+    
+    // Randomize medic position: 2-4 tiles away in a random direction
+    const angle = globalRand() * Math.PI * 2;
+    const dist = 2 + Math.floor(globalRand() * 3); // 2-4 tiles
     const medicPos = {
-      x: Math.max(0, Math.min(GRID_SIZE - 1, spawn.x + medicOffset.x)),
-      z: Math.max(0, Math.min(GRID_SIZE - 1, spawn.z + medicOffset.z)),
+      x: Math.max(0, Math.min(GRID_SIZE - 1, spawn.x + Math.round(Math.cos(angle) * dist))),
+      z: Math.max(0, Math.min(GRID_SIZE - 1, spawn.z + Math.round(Math.sin(angle) * dist))),
     };
+    // Ensure medic doesn't land on blocked tile
+    const medicTile = grid[medicPos.x]?.[medicPos.z];
+    if (medicTile && (medicTile.isBlocked || medicTile.type === 'water' || medicTile.prop)) {
+      // Fallback to adjacent
+      medicPos.x = Math.max(0, Math.min(GRID_SIZE - 1, spawn.x + (globalRand() > 0.5 ? 1 : -1)));
+      medicPos.z = Math.max(0, Math.min(GRID_SIZE - 1, spawn.z + (globalRand() > 0.5 ? 1 : -1)));
+    }
+    
     units.push(createUnit(`${team}-soldier`, shuffledSoldiers[soldierIdx++], 'soldier', team, { ...spawn }));
     units.push(createUnit(`${team}-medic`, shuffledMedics[medicIdx++], 'medic', team, medicPos));
   }
@@ -697,6 +707,7 @@ export function createInitialState(): GameState {
     let key = `${u.position.x},${u.position.z}`;
     while (occupied.has(key)) {
       u.position.x = Math.max(0, Math.min(GRID_SIZE - 1, u.position.x + (Math.random() > 0.5 ? 1 : -1)));
+      u.position.z = Math.max(0, Math.min(GRID_SIZE - 1, u.position.z + (Math.random() > 0.5 ? 1 : -1)));
       key = `${u.position.x},${u.position.z}`;
     }
     occupied.add(key);

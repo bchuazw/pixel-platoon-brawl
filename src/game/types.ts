@@ -1,4 +1,4 @@
-export type UnitClass = 'soldier' | 'sniper' | 'medic' | 'heavy';
+export type UnitClass = 'soldier' | 'medic';
 export type Team = 'blue' | 'red' | 'green' | 'yellow';
 
 export interface Position {
@@ -6,7 +6,7 @@ export interface Position {
   z: number;
 }
 
-export type AbilityId = 'grenade' | 'overwatch' | 'heal' | 'suppress' | 'smoke';
+export type AbilityId = 'grenade' | 'overwatch' | 'heal' | 'suppress' | 'smoke' | 'first_aid';
 
 export interface Ability {
   id: AbilityId;
@@ -28,7 +28,7 @@ export interface Weapon {
   attack: number;
   accuracy: number;
   range: number;
-  ammo: number; // -1 = infinite (pistol)
+  ammo: number;
   maxAmmo: number;
   icon: string;
 }
@@ -48,7 +48,7 @@ export type LootType = 'weapon' | 'medkit' | 'armor' | 'ammo';
 export interface LootItem {
   type: LootType;
   weaponId?: WeaponId;
-  value: number; // heal amount, armor amount, etc
+  value: number;
   icon: string;
   name: string;
 }
@@ -108,6 +108,7 @@ export interface CombatEvent {
   value?: number;
   message: string;
   timestamp: number;
+  weaponId?: WeaponId; // for sound selection
 }
 
 export interface AttackPreview {
@@ -150,40 +151,34 @@ export const TEAM_COLORS: Record<Team, string> = {
   yellow: '#ffcc44',
 };
 
-export const CLASS_ABILITIES: Record<UnitClass, Ability[]> = {
-  soldier: [{
-    id: 'grenade', name: 'FRAG GRENADE', description: 'Explosive dealing 20 dmg in 2-tile radius',
-    apCost: 1, cooldown: 3, range: 4, aoeRadius: 2, icon: '💣',
-  }],
-  sniper: [{
-    id: 'overwatch', name: 'OVERWATCH', description: 'Shoot first enemy that moves in range',
-    apCost: 1, cooldown: 0, range: 0, icon: '👁',
-  }],
-  medic: [{
-    id: 'heal', name: 'FIELD HEAL', description: 'Restore 40 HP to adjacent ally',
-    apCost: 1, cooldown: 2, range: 2, icon: '💊',
-  }, {
-    id: 'smoke', name: 'SMOKE BOMB', description: 'Drop smoke granting cover in area',
-    apCost: 1, cooldown: 3, range: 3, aoeRadius: 1, icon: '💨',
-  }],
-  heavy: [{
-    id: 'suppress', name: 'SUPPRESS', description: 'Pin enemy: -50% accuracy, can\'t move next turn',
-    apCost: 2, cooldown: 2, range: 3, icon: '🔫',
-  }],
-};
+// ── Class Abilities ──
+export const SOLDIER_ABILITIES: Ability[] = [{
+  id: 'grenade', name: 'FRAG GRENADE', description: 'Explosive dealing 25 dmg in 2-tile radius',
+  apCost: 1, cooldown: 3, range: 4, aoeRadius: 2, icon: '💣',
+}, {
+  id: 'overwatch', name: 'OVERWATCH', description: 'Shoot first enemy that moves in range',
+  apCost: 1, cooldown: 0, range: 0, icon: '👁',
+}];
 
-// All units start with same base stats now
-export const BASE_STATS = {
-  hp: 80, attack: 15, defense: 6, accuracy: 70,
-  moveRange: 4, attackRange: 3, maxAp: 2,
-};
+export const MEDIC_ABILITIES: Ability[] = [{
+  id: 'first_aid', name: 'FIRST AID', description: 'Heal self or adjacent ally for 35 HP. 2-turn cooldown.',
+  apCost: 1, cooldown: 2, range: 2, icon: '💊',
+}, {
+  id: 'smoke', name: 'SMOKE SCREEN', description: 'Deploy smoke for concealment in area',
+  apCost: 1, cooldown: 3, range: 3, aoeRadius: 1, icon: '💨',
+}];
 
+// ── Class Stats (differentiated) ──
 export const CLASS_STATS: Record<UnitClass, {
   hp: number; attack: number; defense: number; accuracy: number;
   moveRange: number; attackRange: number; maxAp: number;
 }> = {
-  soldier: { ...BASE_STATS },
-  sniper: { ...BASE_STATS },
-  medic: { ...BASE_STATS },
-  heavy: { ...BASE_STATS },
+  soldier: { hp: 90, attack: 15, defense: 8, accuracy: 72, moveRange: 4, attackRange: 3, maxAp: 2 },
+  medic: { hp: 70, attack: 12, defense: 5, accuracy: 65, moveRange: 5, attackRange: 2, maxAp: 3 },
+};
+
+// Legacy compat
+export const CLASS_ABILITIES: Record<UnitClass, Ability[]> = {
+  soldier: SOLDIER_ABILITIES,
+  medic: MEDIC_ABILITIES,
 };

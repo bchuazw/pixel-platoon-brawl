@@ -16,9 +16,7 @@ interface GameHUDProps {
 
 const CLASS_ICONS: Record<string, typeof Swords> = {
   soldier: Swords,
-  sniper: Crosshair,
   medic: Heart,
-  heavy: Shield,
 };
 
 function UnitCard({ unit, isActive }: { unit: Unit; isActive: boolean }) {
@@ -224,9 +222,9 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
           <div className="absolute inset-0 bg-background/80" />
           <div className="relative z-10 text-center space-y-6">
             <div className="space-y-2">
-              <h1 className="text-[20px] text-primary glow-text tracking-[0.3em]">TACTICAL ROYALE</h1>
-              <p className="text-[9px] text-muted-foreground tracking-wider">4 WARRIORS • 4 CORNERS • 1 SURVIVOR</p>
-              <p className="text-[7px] text-accent tracking-wider">ALL START WITH PISTOL • FIND LOOT TO UPGRADE!</p>
+              <h1 className="text-[20px] text-primary glow-text tracking-[0.3em]">WARGAMING</h1>
+              <p className="text-[9px] text-muted-foreground tracking-wider">4 SQUADS • 8 COMBATANTS • 1 TEAM SURVIVES</p>
+              <p className="text-[7px] text-accent tracking-wider">EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE!</p>
             </div>
 
             {/* Unit previews */}
@@ -242,7 +240,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
                   <div>
                     <div className="text-[9px] text-foreground font-bold">{u.name}</div>
                     <div className="text-[7px] uppercase tracking-wider" style={{ color: TEAM_COLORS[u.team] }}>
-                      {u.team}
+                      {u.unitClass} • {u.team}
                     </div>
                     <div className="text-[7px] text-muted-foreground">
                       HP:{u.hp} • {u.weapon.name} • Vision:{u.visionRange}
@@ -260,7 +258,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
                 <Play className="w-5 h-5" />
                 START BATTLE
               </button>
-              <p className="text-[7px] text-muted-foreground">AI controls all teams • Fog of War active • Find weapons to win!</p>
+              <p className="text-[7px] text-muted-foreground">AI commands each squad • Fog of War active • Medics heal allies!</p>
             </div>
           </div>
         </div>
@@ -269,7 +267,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {/* Top bar */}
       <div className="pointer-events-auto flex items-center justify-between px-4 py-2 bg-card/90 backdrop-blur-sm border-b border-border/40">
         <div className="flex items-center gap-3">
-          <span className="text-[10px] text-primary glow-text tracking-[0.15em]">⚔ TACTICAL ROYALE</span>
+          <span className="text-[10px] text-primary glow-text tracking-[0.15em]">⚔ WARGAMING</span>
           <div className="h-4 w-px bg-border/30" />
           <span className="text-[8px] text-muted-foreground">TURN {state.turn}</span>
           {!isPreGame && (

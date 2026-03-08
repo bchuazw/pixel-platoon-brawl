@@ -2,14 +2,16 @@ import { useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
 import { CombatEvent } from '@/game/types';
-import { playGunshot, playSniperShot, playHeavyShot, playImpact, playCrit, playMiss, playKill, playHeal, playExplosion, playAbility } from '@/game/sounds';
+import {
+  playWeaponSound, playImpact, playCrit, playMiss, playKill,
+  playHeal, playExplosion, playAbility, playOverwatch, playGrenade, playSmoke,
+} from '@/game/sounds';
 import * as THREE from 'three';
 
 interface CombatVFXProps {
   events: CombatEvent[];
 }
 
-// Track which events we've already played sounds for
 const playedSounds = new Set<string>();
 
 function DamageNumber({ event }: { event: CombatEvent }) {
@@ -44,11 +46,13 @@ function DamageNumber({ event }: { event: CombatEvent }) {
     case 'miss':
       color = '#8888aa'; text = 'MISS'; size = 0.2; break;
     case 'heal':
-      color = '#44ff44'; text = `+${event.value}`; size = 0.22; break;
+      color = '#44ff88'; text = `+${event.value}`; size = 0.24; break;
     case 'ability':
       color = '#ffaa00'; text = '⚡'; size = 0.22; break;
     case 'overwatch':
       color = '#44aaff'; text = '👁 OVERWATCH'; size = 0.18; break;
+    case 'loot':
+      color = '#ffcc44'; text = '📦 LOOT!'; size = 0.2; break;
   }
 
   return (
@@ -75,7 +79,7 @@ function MuzzleFlash({ event }: { event: CombatEvent }) {
     ref.current.rotation.z += 0.3;
   });
 
-  if (age > 0.25 || event.type === 'heal' || event.type === 'overwatch') return null;
+  if (age > 0.25 || event.type === 'heal' || event.type === 'overwatch' || event.type === 'loot') return null;
 
   const dx = event.targetPos.x - event.attackerPos.x;
   const dz = event.targetPos.z - event.attackerPos.z;
@@ -83,23 +87,23 @@ function MuzzleFlash({ event }: { event: CombatEvent }) {
   const nx = len > 0 ? dx / len : 0;
   const nz = len > 0 ? dz / len : 0;
 
+  // Bigger flash for heavier weapons
+  const isHeavy = event.weaponId === 'rocket_launcher' || event.weaponId === 'shotgun';
+
   return (
     <group ref={ref} position={[event.attackerPos.x + nx * 0.4, 0.65, event.attackerPos.z + nz * 0.4]}>
-      {/* Core flash */}
       <mesh>
-        <sphereGeometry args={[1, 8, 6]} />
+        <sphereGeometry args={[isHeavy ? 1.5 : 1, 8, 6]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.9} />
       </mesh>
-      {/* Outer glow */}
       <mesh>
-        <sphereGeometry args={[1.5, 8, 6]} />
+        <sphereGeometry args={[isHeavy ? 2 : 1.5, 8, 6]} />
         <meshBasicMaterial
           color={event.type === 'crit' || event.type === 'kill' ? '#ff4400' : '#ffcc00'}
           transparent opacity={0.5}
         />
       </mesh>
-      {/* Light */}
-      <pointLight color="#ffaa00" intensity={5} distance={4} />
+      <pointLight color="#ffaa00" intensity={isHeavy ? 8 : 5} distance={isHeavy ? 6 : 4} />
     </group>
   );
 }
@@ -111,12 +115,10 @@ function BulletTrail({ event }: { event: CombatEvent }) {
   useFrame(() => {
     if (!ref.current) return;
     const t = (Date.now() - event.timestamp) / 1000;
-    // Bullet travels from attacker to target over 0.15s
     const bulletT = Math.min(1, t / 0.15);
 
     ref.current.children.forEach((child, i) => {
       if (i === 0) {
-        // Bullet head
         const bx = THREE.MathUtils.lerp(event.attackerPos.x, event.targetPos.x, bulletT);
         const bz = THREE.MathUtils.lerp(event.attackerPos.z, event.targetPos.z, bulletT);
         child.position.set(bx, 0.6, bz);
@@ -124,7 +126,6 @@ function BulletTrail({ event }: { event: CombatEvent }) {
       }
     });
 
-    // Fade trail
     const opacity = Math.max(0, 1 - t * 2.5);
     ref.current.children.forEach(child => {
       if ((child as THREE.Mesh).material) {
@@ -133,7 +134,7 @@ function BulletTrail({ event }: { event: CombatEvent }) {
     });
   });
 
-  if (age > 0.5 || event.type === 'heal' || event.type === 'overwatch' || event.type === 'ability') return null;
+  if (age > 0.5 || event.type === 'heal' || event.type === 'overwatch' || event.type === 'ability' || event.type === 'loot') return null;
 
   const dx = event.targetPos.x - event.attackerPos.x;
   const dz = event.targetPos.z - event.attackerPos.z;
@@ -142,22 +143,20 @@ function BulletTrail({ event }: { event: CombatEvent }) {
   const midX = (event.attackerPos.x + event.targetPos.x) / 2;
   const midZ = (event.attackerPos.z + event.targetPos.z) / 2;
 
+  // Rocket has thicker trail
+  const isRocket = event.weaponId === 'rocket_launcher';
+  const trailColor = isRocket ? '#ff6600' : event.type === 'miss' ? '#666688' : '#ffdd44';
+
   return (
     <group ref={ref}>
-      {/* Bullet */}
       <mesh position={[event.attackerPos.x, 0.6, event.attackerPos.z]}>
-        <sphereGeometry args={[0.04, 6, 4]} />
-        <meshBasicMaterial color="#ffee88" transparent opacity={1} />
+        <sphereGeometry args={[isRocket ? 0.08 : 0.04, 6, 4]} />
+        <meshBasicMaterial color={isRocket ? '#ff8844' : '#ffee88'} transparent opacity={1} />
       </mesh>
-      {/* Trail line */}
       <mesh position={[midX, 0.6, midZ]} rotation={[0, -angle, 0]}>
-        <boxGeometry args={[len, 0.015, 0.015]} />
-        <meshBasicMaterial
-          color={event.type === 'miss' ? '#666688' : '#ffdd44'}
-          transparent opacity={0.7}
-        />
+        <boxGeometry args={[len, isRocket ? 0.03 : 0.015, isRocket ? 0.03 : 0.015]} />
+        <meshBasicMaterial color={trailColor} transparent opacity={0.7} />
       </mesh>
-      {/* Second trail (thinner, brighter) */}
       <mesh position={[midX, 0.6, midZ]} rotation={[0, -angle, 0]}>
         <boxGeometry args={[len * 0.8, 0.005, 0.005]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.5} />
@@ -173,19 +172,17 @@ function ImpactEffect({ event }: { event: CombatEvent }) {
   useFrame(() => {
     if (!ref.current) return;
     const t = (Date.now() - event.timestamp) / 1000;
-    const impactT = Math.max(0, t - 0.1); // delay slightly after bullet arrives
+    const impactT = Math.max(0, t - 0.1);
 
     ref.current.children.forEach((child, i) => {
       const mesh = child as THREE.Mesh;
       if (!mesh.material) return;
 
       if (i === 0) {
-        // Expanding ring
         const scale = impactT * 4;
         mesh.scale.setScalar(scale);
         (mesh.material as THREE.Material).opacity = Math.max(0, 0.6 - impactT * 2);
       } else if (i === 1) {
-        // Flash sphere
         const scale = Math.max(0, (0.3 - impactT) * 3);
         mesh.scale.setScalar(scale);
         (mesh.material as THREE.Material).opacity = Math.max(0, 0.8 - impactT * 3);
@@ -193,7 +190,7 @@ function ImpactEffect({ event }: { event: CombatEvent }) {
     });
   });
 
-  if (age > 0.6 || event.type === 'miss' || event.type === 'overwatch') return null;
+  if (age > 0.6 || event.type === 'miss' || event.type === 'overwatch' || event.type === 'loot') return null;
 
   let ringColor = '#ff8800';
   let flashColor = '#ffcc44';
@@ -203,17 +200,14 @@ function ImpactEffect({ event }: { event: CombatEvent }) {
 
   return (
     <group ref={ref} position={[event.targetPos.x, 0.3, event.targetPos.z]}>
-      {/* Impact ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.15, 0.4, 16]} />
         <meshBasicMaterial color={ringColor} transparent opacity={0.6} side={THREE.DoubleSide} />
       </mesh>
-      {/* Flash */}
       <mesh>
         <sphereGeometry args={[0.3, 8, 6]} />
         <meshBasicMaterial color={flashColor} transparent opacity={0.8} />
       </mesh>
-      {/* Light flash */}
       <pointLight color={flashColor} intensity={3} distance={3} />
     </group>
   );
@@ -238,7 +232,7 @@ function ShellCasings({ event }: { event: CombatEvent }) {
     });
   });
 
-  if (age > 0.6 || event.type === 'heal' || event.type === 'overwatch' || event.type === 'ability') return null;
+  if (age > 0.6 || event.type === 'heal' || event.type === 'overwatch' || event.type === 'ability' || event.type === 'loot') return null;
 
   return (
     <group ref={ref} position={[event.attackerPos.x, 0.5, event.attackerPos.z]}>
@@ -261,12 +255,10 @@ function ExplosionEffect({ event }: { event: CombatEvent }) {
       const mesh = child as THREE.Mesh;
       if (!mesh.material) return;
       if (i === 0) {
-        // Fire sphere
         const scale = t * 3;
         mesh.scale.setScalar(scale);
         (mesh.material as THREE.Material).opacity = Math.max(0, 0.8 - t * 1.5);
       } else if (i === 1) {
-        // Smoke
         const scale = t * 4;
         mesh.scale.setScalar(scale);
         mesh.position.y = t * 1.5;
@@ -276,17 +268,14 @@ function ExplosionEffect({ event }: { event: CombatEvent }) {
   });
 
   if (age > 0.8) return null;
-  // Only for kill or ability events (grenades, etc.)
-  if (event.type !== 'kill' && event.message?.includes('grenade') !== true) return null;
+  if (event.type !== 'kill' && !event.message?.includes('grenade') && event.weaponId !== 'rocket_launcher') return null;
 
   return (
     <group ref={ref} position={[event.targetPos.x, 0.2, event.targetPos.z]}>
-      {/* Fire */}
       <mesh>
         <sphereGeometry args={[0.3, 8, 6]} />
         <meshBasicMaterial color="#ff4400" transparent opacity={0.8} />
       </mesh>
-      {/* Smoke */}
       <mesh position={[0, 0.3, 0]}>
         <sphereGeometry args={[0.25, 8, 6]} />
         <meshBasicMaterial color="#555555" transparent opacity={0.4} />
@@ -335,29 +324,78 @@ function MissRicochet({ event }: { event: CombatEvent }) {
   );
 }
 
-// Sound effect player component
+// Healing VFX - green sparkles
+function HealingEffect({ event }: { event: CombatEvent }) {
+  const ref = useRef<THREE.Group>(null);
+  const age = (Date.now() - event.timestamp) / 1000;
+
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = (Date.now() - event.timestamp) / 1000;
+    ref.current.children.forEach((child, i) => {
+      child.position.y = 0.3 + t * 1.2 + Math.sin(clock.getElapsedTime() * 5 + i) * 0.1;
+      child.position.x = Math.sin(clock.getElapsedTime() * 3 + i * 1.5) * 0.3;
+      child.position.z = Math.cos(clock.getElapsedTime() * 3 + i * 1.5) * 0.3;
+      const opacity = Math.max(0, 1 - t / 1.5);
+      if ((child as THREE.Mesh).material) {
+        ((child as THREE.Mesh).material as THREE.Material).opacity = opacity;
+      }
+    });
+  });
+
+  if (age > 1.5 || event.type !== 'heal') return null;
+
+  return (
+    <group ref={ref} position={[event.targetPos.x, 0, event.targetPos.z]}>
+      {[0, 1, 2, 3, 4, 5].map(i => (
+        <mesh key={i}>
+          <sphereGeometry args={[0.04, 6, 4]} />
+          <meshBasicMaterial color="#44ff88" transparent opacity={0.8} />
+        </mesh>
+      ))}
+      <pointLight color="#44ff88" intensity={2} distance={3} />
+    </group>
+  );
+}
+
+// Sound effect player - weapon-aware
 function SoundPlayer({ event }: { event: CombatEvent }) {
   useEffect(() => {
     if (playedSounds.has(event.id)) return;
     playedSounds.add(event.id);
 
-    // Clean old entries
     if (playedSounds.size > 100) {
       const arr = Array.from(playedSounds);
       arr.slice(0, 50).forEach(id => playedSounds.delete(id));
     }
 
-    const delay = 150; // slight delay for aiming animation
+    const delay = 150;
     switch (event.type) {
-      case 'damage': setTimeout(() => { playGunshot(); setTimeout(playImpact, 100); }, delay); break;
-      case 'crit': setTimeout(() => { playSniperShot(); setTimeout(playCrit, 100); }, delay); break;
-      case 'kill': setTimeout(() => { playHeavyShot(); setTimeout(playKill, 120); }, delay); break;
-      case 'miss': setTimeout(() => { playGunshot(); setTimeout(playMiss, 100); }, delay); break;
-      case 'heal': playHeal(); break;
-      case 'ability': playAbility(); break;
-      case 'overwatch': playAbility(); break;
+      case 'damage':
+        setTimeout(() => { playWeaponSound(event.weaponId); setTimeout(playImpact, 100); }, delay);
+        break;
+      case 'crit':
+        setTimeout(() => { playWeaponSound(event.weaponId); setTimeout(playCrit, 100); }, delay);
+        break;
+      case 'kill':
+        setTimeout(() => { playWeaponSound(event.weaponId); setTimeout(playKill, 120); }, delay);
+        break;
+      case 'miss':
+        setTimeout(() => { playWeaponSound(event.weaponId); setTimeout(playMiss, 80); }, delay);
+        break;
+      case 'heal':
+        playHeal();
+        break;
+      case 'ability':
+        if (event.message?.includes('SMOKE')) playSmoke();
+        else if (event.message?.includes('GRENADE') || event.message?.includes('grenade')) playGrenade();
+        else playAbility();
+        break;
+      case 'overwatch':
+        playOverwatch();
+        break;
     }
-  }, [event.id, event.type]);
+  }, [event.id, event.type, event.weaponId, event.message]);
 
   return null;
 }
@@ -377,6 +415,7 @@ export function CombatVFX({ events }: CombatVFXProps) {
           <ShellCasings event={event} />
           <ExplosionEffect event={event} />
           <MissRicochet event={event} />
+          <HealingEffect event={event} />
         </group>
       ))}
     </group>

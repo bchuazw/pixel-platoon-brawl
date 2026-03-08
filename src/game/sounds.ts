@@ -45,21 +45,62 @@ function playNoiseBuffer(duration: number, volume = 0.1) {
   } catch { /* ignore */ }
 }
 
-export function playGunshot() {
+// ── Weapon-specific gunshot sounds ──
+export function playPistolShot() {
+  playNoiseBuffer(0.1, 0.15);
+  playNoise(0.06, 900, 'square', 0.08);
+}
+
+export function playRifleShot() {
   playNoiseBuffer(0.15, 0.2);
-  playNoise(0.08, 800, 'square', 0.1);
+  playNoise(0.08, 700, 'square', 0.1);
+  setTimeout(() => playNoise(0.05, 400, 'sine', 0.04), 30);
+}
+
+export function playShotgunBlast() {
+  playNoiseBuffer(0.2, 0.3);
+  playNoise(0.1, 400, 'sawtooth', 0.15);
+  setTimeout(() => playNoiseBuffer(0.15, 0.2), 20);
 }
 
 export function playSniperShot() {
   playNoiseBuffer(0.25, 0.25);
   playNoise(0.12, 1200, 'sawtooth', 0.12);
-  setTimeout(() => playNoise(0.3, 200, 'sine', 0.05), 50);
+  setTimeout(() => playNoise(0.4, 150, 'sine', 0.06), 50); // echo
 }
 
-export function playHeavyShot() {
-  playNoiseBuffer(0.3, 0.3);
-  playNoise(0.15, 300, 'square', 0.15);
-  setTimeout(() => playNoiseBuffer(0.2, 0.15), 80);
+export function playRocketLaunch() {
+  playNoise(0.15, 200, 'sawtooth', 0.12);
+  playNoiseBuffer(0.3, 0.15);
+  setTimeout(() => {
+    playNoiseBuffer(0.5, 0.3); // explosion
+    playNoise(0.4, 80, 'sawtooth', 0.15);
+  }, 200);
+}
+
+export function playSMGBurst() {
+  // Rapid 3-round burst
+  playNoiseBuffer(0.08, 0.12);
+  playNoise(0.04, 950, 'square', 0.07);
+  setTimeout(() => { playNoiseBuffer(0.08, 0.12); playNoise(0.04, 900, 'square', 0.07); }, 60);
+  setTimeout(() => { playNoiseBuffer(0.08, 0.12); playNoise(0.04, 920, 'square', 0.07); }, 120);
+}
+
+// Generic fallbacks
+export function playGunshot() { playPistolShot(); }
+export function playHeavyShot() { playShotgunBlast(); }
+
+// Get weapon-specific sound
+export function playWeaponSound(weaponId?: string) {
+  switch (weaponId) {
+    case 'pistol': playPistolShot(); break;
+    case 'rifle': playRifleShot(); break;
+    case 'shotgun': playShotgunBlast(); break;
+    case 'sniper_rifle': playSniperShot(); break;
+    case 'rocket_launcher': playRocketLaunch(); break;
+    case 'smg': playSMGBurst(); break;
+    default: playPistolShot(); break;
+  }
 }
 
 export function playImpact() {
@@ -74,7 +115,9 @@ export function playCrit() {
 }
 
 export function playMiss() {
-  playNoise(0.15, 400, 'sine', 0.04);
+  // Bullet whiz past
+  playNoise(0.2, 1200, 'sine', 0.03);
+  setTimeout(() => playNoise(0.1, 600, 'sine', 0.02), 100);
 }
 
 export function playKill() {
@@ -84,9 +127,11 @@ export function playKill() {
 }
 
 export function playHeal() {
-  playNoise(0.2, 600, 'sine', 0.06);
-  setTimeout(() => playNoise(0.2, 800, 'sine', 0.06), 100);
-  setTimeout(() => playNoise(0.3, 1000, 'sine', 0.05), 200);
+  // Warm healing chime - ascending notes
+  playNoise(0.25, 523, 'sine', 0.06); // C5
+  setTimeout(() => playNoise(0.25, 659, 'sine', 0.06), 120); // E5
+  setTimeout(() => playNoise(0.3, 784, 'sine', 0.05), 240); // G5
+  setTimeout(() => playNoise(0.4, 1047, 'sine', 0.04), 380); // C6 (resolve)
 }
 
 export function playExplosion() {
@@ -101,17 +146,42 @@ export function playAbility() {
 }
 
 export function playMove() {
-  playNoise(0.06, 200, 'sine', 0.03);
-  setTimeout(() => playNoise(0.06, 250, 'sine', 0.03), 100);
+  // Footstep sound - two quick thuds
+  playNoise(0.04, 120, 'square', 0.04);
+  playNoiseBuffer(0.03, 0.03);
+  setTimeout(() => {
+    playNoise(0.04, 140, 'square', 0.04);
+    playNoiseBuffer(0.03, 0.03);
+  }, 150);
 }
 
 export function playPickup() {
-  playNoise(0.1, 800, 'sine', 0.08);
-  setTimeout(() => playNoise(0.1, 1200, 'sine', 0.08), 60);
-  setTimeout(() => playNoise(0.15, 1600, 'sine', 0.06), 120);
+  // Satisfying pickup jingle
+  playNoise(0.08, 800, 'sine', 0.08);
+  setTimeout(() => playNoise(0.08, 1000, 'sine', 0.08), 60);
+  setTimeout(() => playNoise(0.12, 1400, 'sine', 0.06), 120);
 }
 
-// ── Background Music (procedural ambient battlefield) ──
+export function playSmoke() {
+  // Hissing smoke sound
+  playNoiseBuffer(0.4, 0.08);
+  playNoise(0.3, 2000, 'sine', 0.02);
+}
+
+export function playOverwatch() {
+  // Tactical click + beep
+  playNoise(0.05, 1200, 'square', 0.06);
+  setTimeout(() => playNoise(0.15, 800, 'sine', 0.05), 100);
+}
+
+export function playGrenade() {
+  // Pin pull + throw whoosh
+  playNoise(0.05, 2000, 'square', 0.04); // pin
+  setTimeout(() => playNoise(0.15, 300, 'sine', 0.05), 100); // whoosh
+  setTimeout(() => playExplosion(), 400); // boom
+}
+
+// ── Background Music ──
 let bgInterval: ReturnType<typeof setInterval> | null = null;
 
 function playBgNote(freq: number, duration: number, vol: number, type: OscillatorType = 'sine') {
@@ -119,7 +189,7 @@ function playBgNote(freq: number, duration: number, vol: number, type: Oscillato
     const ctx = getAudioCtx();
     if (!bgMusicGain) {
       bgMusicGain = ctx.createGain();
-      bgMusicGain.gain.value = 0.04;
+      bgMusicGain.gain.value = 0.035;
       bgMusicGain.connect(ctx.destination);
     }
     const osc = ctx.createOscillator();
@@ -136,9 +206,7 @@ function playBgNote(freq: number, duration: number, vol: number, type: Oscillato
   } catch { /* ignore */ }
 }
 
-// Dark minor key ambient - battlefield atmosphere
 const BG_NOTES = [
-  // Am drone pattern
   { freq: 110, dur: 4, vol: 0.3, type: 'sine' as OscillatorType },
   { freq: 82.4, dur: 4, vol: 0.25, type: 'sine' as OscillatorType },
   { freq: 130.8, dur: 3, vol: 0.15, type: 'triangle' as OscillatorType },
@@ -160,21 +228,15 @@ export function startBgMusic() {
     const note = BG_NOTES[bgNoteIdx % BG_NOTES.length];
     playBgNote(note.freq, note.dur, note.vol, note.type);
     
-    // Occasional distant rumble
     if (Math.random() < 0.3) {
       setTimeout(() => {
-        if (bgMusicPlaying) {
-          playBgNote(40 + Math.random() * 30, 2, 0.08, 'sawtooth');
-        }
+        if (bgMusicPlaying) playBgNote(40 + Math.random() * 30, 2, 0.08, 'sawtooth');
       }, 1000 + Math.random() * 2000);
     }
     
-    // Occasional high ambient whistle
     if (Math.random() < 0.2) {
       setTimeout(() => {
-        if (bgMusicPlaying) {
-          playBgNote(800 + Math.random() * 400, 1.5, 0.02, 'sine');
-        }
+        if (bgMusicPlaying) playBgNote(800 + Math.random() * 400, 1.5, 0.02, 'sine');
       }, 500 + Math.random() * 1500);
     }
     

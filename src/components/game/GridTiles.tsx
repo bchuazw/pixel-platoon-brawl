@@ -592,6 +592,7 @@ function PropObject({ tile }: { tile: TileData }) {
           </mesh>
         </group>
       );
+    }
 
     // Civilian wrecked car — good cover, realistic proportions
     case 'wrecked_car': {

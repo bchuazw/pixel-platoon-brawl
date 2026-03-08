@@ -76,7 +76,7 @@ function getMat(color: string, metalness = 0.1, roughness = 0.7, emissive = '#00
 }
 
 // ── Game-accurate SoldierBody for customization preview ──
-function GameSoldierPreview({ teamColor, isMedic, customization }: { teamColor: string; isMedic: boolean; customization: UnitCustomization }) {
+function GameSoldierPreview({ teamColor, isMedic, customization, hasBeard }: { teamColor: string; isMedic: boolean; customization: UnitCustomization; hasBeard: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((_, delta) => {

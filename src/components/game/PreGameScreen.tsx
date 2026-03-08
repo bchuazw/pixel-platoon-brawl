@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { startAmbientAudio, stopAmbientAudio } from '@/game/ambientAudio';
 import { GameState, Unit, TEAM_COLORS, Team } from '@/game/types';
-import { Play, Swords, Heart, Shield, Crosshair } from 'lucide-react';
+import { Play, Swords, Heart, Shield, Crosshair, Coins, Lock, Settings } from 'lucide-react';
+import { CryptoBettingPanel } from './CryptoBettingPanel';
+import { CustomizationModal, DEFAULT_CUSTOM, UnitCustomization } from './CustomizationModal';
 
 import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
 import portraitSoldierRed from '@/assets/portrait-soldier-red.png';
@@ -44,14 +46,16 @@ function Reveal({ delay, children }: { delay: number; children: React.ReactNode 
   );
 }
 
-function UnitCard({ unit, index }: { unit: Unit; index: number }) {
+function UnitCard({ unit, index, onCustomize }: { unit: Unit; index: number; onCustomize: (unit: Unit) => void }) {
   const tc = TEAM_COLORS[unit.team];
   const portrait = PORTRAITS[unit.id];
 
   return (
     <Reveal delay={800 + index * 100}>
-      <div className="relative overflow-hidden bg-card/60 backdrop-blur-sm border rounded-xl flex items-stretch transition-all hover:scale-[1.02] hover:bg-card/80 group"
-        style={{ borderColor: `${tc}30` }}>
+      <div className="relative overflow-hidden bg-card/60 backdrop-blur-sm border rounded-xl flex items-stretch transition-all hover:scale-[1.02] hover:bg-card/80 group cursor-pointer"
+        style={{ borderColor: `${tc}30` }}
+        onClick={() => onCustomize(unit)}
+      >
         <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 relative overflow-hidden"
           style={{ background: `linear-gradient(135deg, ${tc}18, ${tc}06)` }}>
           {portrait ? (
@@ -65,6 +69,10 @@ function UnitCard({ unit, index }: { unit: Unit; index: number }) {
             </div>
           )}
           <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ backgroundColor: tc }} />
+          {/* Customize indicator */}
+          <div className="absolute top-1 right-1 w-5 h-5 rounded bg-card/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <Settings className="w-3 h-3 text-muted-foreground" />
+          </div>
         </div>
 
         <div className="flex-1 px-3 py-2 sm:px-4 sm:py-2.5 min-w-0">
@@ -95,6 +103,8 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
   const [audioStarted, setAudioStarted] = useState(false);
   const [titleRevealed, setTitleRevealed] = useState(0);
   const [showParticles, setShowParticles] = useState(false);
+  const [customizingUnit, setCustomizingUnit] = useState<Unit | null>(null);
+  const [customizations, setCustomizations] = useState<Record<string, UnitCustomization>>({});
   const title = 'WARGAMING';
 
   const handleClick = useCallback(() => {
@@ -129,6 +139,14 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
       opacity: 0.1 + Math.random() * 0.2,
     })), []);
 
+  const handleCustomize = useCallback((unit: Unit) => {
+    setCustomizingUnit(unit);
+  }, []);
+
+  const handleCustomizationChange = useCallback((unitId: string, c: UnitCustomization) => {
+    setCustomizations(prev => ({ ...prev, [unitId]: c }));
+  }, []);
+
   return (
     <div className="absolute inset-0 z-30 pointer-events-auto overflow-y-auto" onClick={handleClick}>
       <div className="absolute inset-0 bg-background/85 backdrop-blur-md" />
@@ -160,7 +178,7 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
       <div className="absolute top-0 left-0 right-0 h-[1px] z-20" style={{ background: 'linear-gradient(90deg, transparent 10%, hsl(142 70% 45% / 0.3) 50%, transparent 90%)' }} />
       <div className="absolute bottom-0 left-0 right-0 h-[1px] z-20" style={{ background: 'linear-gradient(90deg, transparent 10%, hsl(0 75% 55% / 0.3) 50%, transparent 90%)' }} />
 
-      <div className="relative z-10 flex flex-col items-center w-full max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-12 min-h-full">
+      <div className="relative z-10 flex flex-col items-center w-full max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-12 pb-16 sm:pb-24 min-h-full">
         {/* Title section */}
         <div className="text-center space-y-3 sm:space-y-4 mb-6 sm:mb-10">
           <Reveal delay={200}>
@@ -211,31 +229,59 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
           </Reveal>
         </div>
 
-        {/* Team Roster */}
-        <div className="w-full space-y-4 sm:space-y-5 mb-6 sm:mb-10">
-          {teams.map((team, ti) => {
-            const teamUnits = state.units.filter(u => u.team === team);
-            return (
-              <div key={team}>
-                <Reveal delay={750 + ti * 80}>
-                  <div className="flex items-center gap-3 justify-center mb-2">
-                    <div className="h-px flex-1 max-w-[60px] sm:max-w-[80px]" style={{ background: `linear-gradient(to right, transparent, ${TEAM_COLORS[team]}30)` }} />
-                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
-                    <span className="text-[11px] sm:text-xs font-bold tracking-[0.2em] sm:tracking-[0.25em] font-display" style={{ color: TEAM_COLORS[team] }}>
-                      {TEAM_NAMES[team]}
-                    </span>
-                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
-                    <div className="h-px flex-1 max-w-[60px] sm:max-w-[80px]" style={{ background: `linear-gradient(to left, transparent, ${TEAM_COLORS[team]}30)` }} />
+        {/* Two-column layout on desktop: Roster + Betting */}
+        <div className="w-full flex flex-col lg:flex-row gap-6 sm:gap-8 mb-6 sm:mb-10">
+          {/* Team Roster */}
+          <div className="flex-1 space-y-4 sm:space-y-5">
+            {teams.map((team, ti) => {
+              const teamUnits = state.units.filter(u => u.team === team);
+              return (
+                <div key={team}>
+                  <Reveal delay={750 + ti * 80}>
+                    <div className="flex items-center gap-3 justify-center mb-2">
+                      <div className="h-px flex-1 max-w-[60px] sm:max-w-[80px]" style={{ background: `linear-gradient(to right, transparent, ${TEAM_COLORS[team]}30)` }} />
+                      <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
+                      <span className="text-[11px] sm:text-xs font-bold tracking-[0.2em] sm:tracking-[0.25em] font-display" style={{ color: TEAM_COLORS[team] }}>
+                        {TEAM_NAMES[team]}
+                      </span>
+                      <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
+                      <div className="h-px flex-1 max-w-[60px] sm:max-w-[80px]" style={{ background: `linear-gradient(to left, transparent, ${TEAM_COLORS[team]}30)` }} />
+                    </div>
+                  </Reveal>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-2xl mx-auto">
+                    {teamUnits.map((u, i) => (
+                      <UnitCard key={u.id} unit={u} index={ti * 2 + i} onCustomize={handleCustomize} />
+                    ))}
                   </div>
-                </Reveal>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-2xl mx-auto">
-                  {teamUnits.map((u, i) => (
-                    <UnitCard key={u.id} unit={u} index={ti * 2 + i} />
-                  ))}
+                </div>
+              );
+            })}
+
+            {/* Customize hint */}
+            <Reveal delay={1600}>
+              <div className="text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/20 bg-card/30">
+                  <Settings className="w-3.5 h-3.5 text-muted-foreground/40" />
+                  <span className="text-[10px] text-muted-foreground/40">Click any unit to customize gear</span>
                 </div>
               </div>
-            );
-          })}
+            </Reveal>
+          </div>
+
+          {/* Betting Panel (WIP) */}
+          <Reveal delay={1200}>
+            <div className="lg:w-[300px] shrink-0">
+              <div className="glass-panel rounded-xl p-4 sm:p-5 relative overflow-hidden">
+                {/* WIP Overlay */}
+                <div className="absolute inset-0 z-10 bg-background/40 backdrop-blur-[1px] flex flex-col items-center justify-center rounded-xl">
+                  <Lock className="w-6 h-6 text-accent/40 mb-2" />
+                  <div className="text-xs font-display font-bold text-accent/50 tracking-[0.2em]">COMING SOON</div>
+                  <div className="text-[9px] text-muted-foreground/40 mt-1">Crypto betting in a future update</div>
+                </div>
+                <CryptoBettingPanel disabled />
+              </div>
+            </div>
+          </Reveal>
         </div>
 
         {/* Start Button */}
@@ -257,6 +303,16 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
           </div>
         </Reveal>
       </div>
+
+      {/* Customization Modal */}
+      {customizingUnit && (
+        <CustomizationModal
+          unit={customizingUnit}
+          onClose={() => setCustomizingUnit(null)}
+          customization={customizations[customizingUnit.id] || DEFAULT_CUSTOM}
+          onCustomizationChange={(c) => handleCustomizationChange(customizingUnit.id, c)}
+        />
+      )}
 
       <style>{`
         @keyframes float-particle {

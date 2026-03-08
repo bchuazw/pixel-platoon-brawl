@@ -1,10 +1,11 @@
 import { GameState, Unit, TEAM_COLORS, AbilityId, GRID_SIZE, Team } from '@/game/types';
 import { useEffect, useRef, useMemo, useState } from 'react';
-import { Play, Pause, RotateCcw, Heart, Shield, Crosshair, Home, Target, Skull } from 'lucide-react';
+import { Play, Pause, RotateCcw, Heart, Shield, Crosshair, Home, Target, Skull, Users, MessageSquare } from 'lucide-react';
 import { isInZone } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import { PreGameScreen } from './PreGameScreen';
 import { TacticalMinimap } from './TacticalMinimap';
+import { SponsorHUDPanel } from './SponsorHUDPanel';
 
 import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
 import portraitSoldierRed from '@/assets/portrait-soldier-red.png';
@@ -98,11 +99,13 @@ function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; 
 }
 
 /* ── Left Sidebar: Team Roster ── */
-function TeamRoster({ state, onUnitInspect }: { state: GameState; onUnitInspect?: (id: string) => void }) {
+function TeamRoster({ state, onUnitInspect, visible }: { state: GameState; onUnitInspect?: (id: string) => void; visible: boolean }) {
   const teams = (['blue', 'red', 'green', 'yellow'] as const);
 
   return (
-    <div className="pointer-events-auto absolute left-0 top-12 sm:top-14 bottom-8 w-44 sm:w-56 flex flex-col overflow-hidden"
+    <div className={`pointer-events-auto absolute left-0 top-12 sm:top-14 bottom-8 w-44 sm:w-56 flex flex-col overflow-hidden transition-transform duration-300 ${
+      visible ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'
+    }`}
       style={{
         background: 'linear-gradient(90deg, rgba(8,12,18,0.95) 0%, rgba(8,12,18,0.88) 75%, rgba(8,12,18,0) 100%)',
       }}>
@@ -142,7 +145,7 @@ function TeamRoster({ state, onUnitInspect }: { state: GameState; onUnitInspect?
 }
 
 /* ── Right Sidebar: Combat Feed ── */
-function CombatFeed({ log }: { log: string[] }) {
+function CombatFeed({ log, visible }: { log: string[]; visible: boolean }) {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -164,7 +167,9 @@ function CombatFeed({ log }: { log: string[] }) {
   };
 
   return (
-    <div className="pointer-events-auto absolute right-0 top-12 sm:top-14 bottom-8 w-48 sm:w-64 flex flex-col overflow-hidden"
+    <div className={`pointer-events-auto absolute right-0 top-12 sm:top-14 bottom-8 w-48 sm:w-64 flex flex-col overflow-hidden transition-transform duration-300 ${
+      visible ? 'translate-x-0' : 'translate-x-full sm:translate-x-0'
+    }`}
       style={{
         background: 'linear-gradient(270deg, rgba(8,12,18,0.95) 0%, rgba(8,12,18,0.88) 75%, rgba(8,12,18,0) 100%)',
       }}>
@@ -392,6 +397,8 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
   const isPreGame = state.phase === 'pre_game';
   const isGameOver = state.phase === 'game_over';
   const aliveUnits = state.units.filter(u => u.isAlive);
+  const [showRoster, setShowRoster] = useState(false);
+  const [showFeed, setShowFeed] = useState(false);
 
   const aliveByTeam = useMemo(() => {
     const counts: Record<Team, number> = { blue: 0, red: 0, green: 0, yellow: 0 };
@@ -471,17 +478,42 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
         </div>
       </div>
 
+      {/* ── Mobile toggle buttons ── */}
+      {!isPreGame && (
+        <>
+          <button
+            onClick={() => setShowRoster(v => !v)}
+            className={`pointer-events-auto sm:hidden absolute left-2 top-14 z-30 w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+              showRoster ? 'bg-primary/20 border border-primary/30' : 'bg-card/80 border border-border/20'
+            }`}
+          >
+            <Users className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => setShowFeed(v => !v)}
+            className={`pointer-events-auto sm:hidden absolute right-2 top-14 z-30 w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+              showFeed ? 'bg-primary/20 border border-primary/30' : 'bg-card/80 border border-border/20'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </>
+      )}
+
       {/* ── Sidebars ── */}
-      {!isPreGame && <TeamRoster state={state} onUnitInspect={onUnitInspect} />}
-      {!isPreGame && <CombatFeed log={state.log} />}
+      {!isPreGame && <TeamRoster state={state} onUnitInspect={onUnitInspect} visible={showRoster} />}
+      {!isPreGame && <CombatFeed log={state.log} visible={showFeed} />}
 
       {/* ── Tactical Minimap ── */}
       {!isPreGame && !isGameOver && (
         <TacticalMinimap state={state} inspectedUnitId={inspectedUnitId ?? null} />
       )}
 
+      {/* ── Sponsor HUD Panel (WIP) ── */}
+      {!isPreGame && !isGameOver && state.autoPlay && <SponsorHUDPanel />}
+
       {/* ── Kill Feed ── */}
-      <div className="absolute top-14 sm:top-16 right-[200px] sm:right-[280px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[200px] sm:max-w-[280px]">
+      <div className="absolute top-14 sm:top-16 right-[200px] sm:right-[280px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[200px] sm:max-w-[280px] hidden sm:flex">
         {state.combatEvents.filter(e => e.type === 'kill' && Date.now() - e.timestamp < 3500).map(e => (
           <div key={e.id} className="kill-notification rounded-md px-3 sm:px-4 py-1.5 flex items-center gap-2"
             style={{ background: 'rgba(8,12,18,0.9)', borderLeft: '3px solid hsl(0,75%,55%)' }}>

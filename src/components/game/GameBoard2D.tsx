@@ -32,14 +32,14 @@ function fromIso(sx: number, sy: number): { gx: number; gz: number } {
 }
 
 // ── Tile color palette — rich & warm FFT-inspired ──
-const TILE_PALETTE: Record<string, { top: string; left: string; right: string; detail: string }> = {
-  grass:  { top: '#5a9648', left: '#3a6830', right: '#4a8038', detail: '#6aaa55' },
-  dirt:   { top: '#a08858', left: '#786840', right: '#8a7848', detail: '#b09868' },
-  stone:  { top: '#8a8a92', left: '#606068', right: '#707078', detail: '#9a9aa2' },
-  water:  { top: '#3878b8', left: '#285898', right: '#3068a8', detail: '#4890d0' },
-  sand:   { top: '#d8b868', left: '#b09048', right: '#c0a058', detail: '#e8c878' },
-  wall:   { top: '#686870', left: '#484850', right: '#585860', detail: '#787880' },
-  trench: { top: '#6a5840', left: '#4a3c28', right: '#5a4830', detail: '#7a6850' },
+const TILE_PALETTE: Record<string, { top: string; left: string; right: string }> = {
+  grass:  { top: '#5d9e4a', left: '#3d6e30', right: '#4d8e3a' },
+  dirt:   { top: '#9a8458', left: '#7a6840', right: '#8a7448' },
+  stone:  { top: '#8a8a90', left: '#626268', right: '#727278' },
+  water:  { top: '#3a7ab8', left: '#2a5a98', right: '#306aa8' },
+  sand:   { top: '#d4b468', left: '#b09448', right: '#c0a458' },
+  wall:   { top: '#686870', left: '#4a4a52', right: '#5a5a62' },
+  trench: { top: '#6a5840', left: '#4a3c28', right: '#5a4830' },
 };
 
 // ── Noise for tile variation ──

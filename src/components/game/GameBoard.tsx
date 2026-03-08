@@ -198,6 +198,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
       >
         <CameraController angleIndex={angleIndex} />
         <KillCamController killCam={state.killCam} />
+        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay} />
         <color attach="background" args={['#0e1a2e']} />
         <Stars radius={80} depth={50} count={2500} factor={3} saturation={0.4} fade speed={0.3} />
 

@@ -204,8 +204,8 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
   const teams: Team[] = ['blue', 'red', 'green', 'yellow'];
   const [audioStarted, setAudioStarted] = useState(false);
 
-  // Start ambient on first user interaction (browsers require gesture)
-  const handleInteraction = useCallback(() => {
+  // Start ambient audio on any click within this overlay
+  const handleClick = useCallback(() => {
     if (!audioStarted) {
       startAmbientAudio();
       setAudioStarted(true);
@@ -216,13 +216,6 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
   useEffect(() => {
     return () => stopAmbientAudio();
   }, []);
-
-  // Also try starting on mount click
-  useEffect(() => {
-    const handler = () => handleInteraction();
-    window.addEventListener('click', handler, { once: true });
-    return () => window.removeEventListener('click', handler);
-  }, [handleInteraction]);
 
   return (
     <div className="absolute inset-0 z-30 pointer-events-auto overflow-y-auto">

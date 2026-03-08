@@ -222,9 +222,9 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
           <div className="absolute inset-0 bg-background/80" />
           <div className="relative z-10 text-center space-y-6">
             <div className="space-y-2">
-              <h1 className="text-[20px] text-primary glow-text tracking-[0.3em]">TACTICAL ROYALE</h1>
-              <p className="text-[9px] text-muted-foreground tracking-wider">4 WARRIORS • 4 CORNERS • 1 SURVIVOR</p>
-              <p className="text-[7px] text-accent tracking-wider">ALL START WITH PISTOL • FIND LOOT TO UPGRADE!</p>
+              <h1 className="text-[20px] text-primary glow-text tracking-[0.3em]">WARGAMING</h1>
+              <p className="text-[9px] text-muted-foreground tracking-wider">4 SQUADS • 8 COMBATANTS • 1 TEAM SURVIVES</p>
+              <p className="text-[7px] text-accent tracking-wider">EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE!</p>
             </div>
 
             {/* Unit previews */}

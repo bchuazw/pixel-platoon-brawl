@@ -1109,50 +1109,63 @@ function scoreTacticalPosition(pos: Position, unit: Unit, enemies: Unit[], state
   const tile = state.grid[pos.x]?.[pos.z];
   if (!tile) return -999;
 
-  // Cover value from adjacent tiles
+  // ── Cover is king — heavily prioritize being behind cover ──
+  let coverScore = 0;
   for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
     const nx = pos.x + dx, nz = pos.z + dz;
     if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
-      score += state.grid[nx][nz].coverValue * 4;
+      coverScore += state.grid[nx][nz].coverValue * 5;
     }
   }
-  // Tile's own cover
-  score += tile.coverValue * 3;
+  score += tile.coverValue * 4;
+  score += coverScore;
+
   // Elevation advantage
   score += tile.elevation * 5;
 
-  // Enemy proximity scoring based on weapon
+  // Enemy proximity — RANGED combat: maintain optimal distance
   const visibleEnemies = enemies.filter(e => getManhattanDistance(pos, e.position) <= unit.visionRange);
   const inAttackRange = visibleEnemies.filter(e => getManhattanDistance(pos, e.position) <= unit.attackRange);
+  const weaponRange = unit.weapon.range;
 
   if (inAttackRange.length > 0) {
-    score += 20; // Can attack from here
-    // Prefer positions where we can hit low-HP enemies
+    score += 25; // Can attack from here
     const weakest = inAttackRange.reduce((a, b) => a.hp < b.hp ? a : b);
-    if (weakest.hp < 30) score += 15; // Kill potential
+    if (weakest.hp < 30) score += 15;
+  }
+
+  // ── Maintain optimal engagement distance — don't rush in ──
+  for (const enemy of visibleEnemies) {
+    const dist = getManhattanDistance(pos, enemy.position);
+    // Too close — penalize heavily (ranged units shouldn't melee)
+    if (dist <= 1) score -= 25;
+    else if (dist === 2 && unit.weapon.id !== 'shotgun') score -= 10;
+    // Sweet spot: at weapon range
+    if (dist >= Math.max(2, Math.ceil(weaponRange * 0.6)) && dist <= weaponRange) score += 12;
   }
 
   // Weapon-specific positioning
   if (unit.weapon.id === 'sniper_rifle') {
-    score += tile.elevation * 10; // Snipers love high ground
+    score += tile.elevation * 10;
     const nearestEnemy = visibleEnemies[0];
     if (nearestEnemy) {
       const dist = getManhattanDistance(pos, nearestEnemy.position);
-      if (dist >= 4 && dist <= unit.attackRange) score += 15; // Ideal sniper range
-      if (dist < 3) score -= 20; // Too close for comfort
+      if (dist >= 4 && dist <= weaponRange) score += 20;
+      if (dist < 3) score -= 30;
     }
   } else if (unit.weapon.id === 'shotgun') {
     const nearestEnemy = visibleEnemies[0];
     if (nearestEnemy) {
       const dist = getManhattanDistance(pos, nearestEnemy.position);
-      if (dist <= 2) score += 15; // Shotgun sweet spot
+      if (dist <= 2) score += 15;
       else score -= dist * 3;
     }
   }
 
-  // Loot bonus
+  // ── Loot seeking — higher priority when no enemies visible ──
   if (tile.loot) {
-    score += 12;
+    const lootBonus = visibleEnemies.length === 0 ? 30 : 12;
+    score += lootBonus;
     if (tile.loot.type === 'weapon') score += 10;
     if (tile.loot.type === 'killstreak') score += 15;
   }
@@ -1160,7 +1173,7 @@ function scoreTacticalPosition(pos: Position, unit: Unit, enemies: Unit[], state
   // Don't cluster with allies
   const allyNear = state.units.filter(u => u.isAlive && u.team === unit.team && u.id !== unit.id)
     .some(u => getManhattanDistance(pos, u.position) <= 1);
-  if (allyNear) score -= 5; // Avoid grenade fodder
+  if (allyNear) score -= 8;
 
   return score;
 }

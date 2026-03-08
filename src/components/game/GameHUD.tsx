@@ -1,6 +1,6 @@
 import { GameState, Unit, TEAM_COLORS, AbilityId, GRID_SIZE, Team } from '@/game/types';
 import { useEffect, useRef, useMemo, useState } from 'react';
-import { Play, Pause, RotateCcw, Heart, Shield, Crosshair, Home, Target, Skull, Users, MessageSquare } from 'lucide-react';
+import { Play, Pause, RotateCcw, Heart, Shield, Crosshair, Home, Target, Skull, Users, MessageSquare, LogOut } from 'lucide-react';
 import { isInZone } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import { PreGameScreen } from './PreGameScreen';
@@ -474,6 +474,18 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
               className="text-xs px-3 sm:px-4 py-1.5 bg-primary/80 text-primary-foreground rounded-md hover:opacity-90 transition-all tracking-wider font-bold font-display flex items-center gap-1.5">
               <Play className="w-3.5 h-3.5" /> PLAY
             </button>
+          )}
+          {/* Exit button */}
+          {onMainMenu && !isGameOver && (
+            <>
+              <div className="h-5 w-px bg-border/15" />
+              <button onClick={onMainMenu}
+                className="text-xs px-2 sm:px-3 py-1.5 bg-muted/40 hover:bg-muted/70 text-muted-foreground rounded-md transition-all tracking-wider font-bold font-display flex items-center gap-1.5 border border-border/20"
+                title="Exit to menu">
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">EXIT</span>
+              </button>
+            </>
           )}
         </div>
       </div>

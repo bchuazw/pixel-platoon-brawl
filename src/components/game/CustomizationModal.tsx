@@ -9,17 +9,17 @@ import * as THREE from 'three';
 export type HelmetStyle = 'standard' | 'tactical' | 'beret' | 'bandana';
 export type VestStyle = 'light' | 'heavy' | 'tactical' | 'medic';
 export type BootStyle = 'standard' | 'combat' | 'sneakers';
-export type CamoPattern = 'solid' | 'woodland' | 'desert' | 'urban';
+export type ShoulderStyle = 'standard' | 'heavy' | 'spikes' | 'radio';
 
 export interface UnitCustomization {
   helmet: HelmetStyle;
   vest: VestStyle;
   boots: BootStyle;
-  camo: CamoPattern;
+  shoulder: ShoulderStyle;
 }
 
 const DEFAULT_CUSTOM: UnitCustomization = {
-  helmet: 'standard', vest: 'light', boots: 'standard', camo: 'solid',
+  helmet: 'standard', vest: 'light', boots: 'standard', shoulder: 'standard',
 };
 
 const HELMET_OPTIONS: { id: HelmetStyle; name: string; desc: string }[] = [
@@ -42,11 +42,11 @@ const BOOT_OPTIONS: { id: BootStyle; name: string; desc: string }[] = [
   { id: 'sneakers', name: 'Tactical Sneakers', desc: 'Lightweight & quiet' },
 ];
 
-const CAMO_OPTIONS: { id: CamoPattern; name: string; colors: [string, string] }[] = [
-  { id: 'solid', name: 'Solid', colors: ['#556B2F', '#4a5f28'] },
-  { id: 'woodland', name: 'Woodland', colors: ['#2d4a1e', '#5c3d1a'] },
-  { id: 'desert', name: 'Desert', colors: ['#c4a76c', '#8b7355'] },
-  { id: 'urban', name: 'Urban', colors: ['#6b6b6b', '#3d3d3d'] },
+const SHOULDER_OPTIONS: { id: ShoulderStyle; name: string; desc: string }[] = [
+  { id: 'standard', name: 'Standard Pads', desc: 'Basic shoulder armor' },
+  { id: 'heavy', name: 'Heavy Pads', desc: 'Extra-thick shoulder plates' },
+  { id: 'spikes', name: 'Spiked Pads', desc: 'Intimidating spiked shoulders' },
+  { id: 'radio', name: 'Radio Gear', desc: 'Antenna + comms equipment' },
 ];
 
 // ── Material helper (matching GameUnits.tsx) ──
@@ -263,13 +263,84 @@ function GameSoldierPreview({ teamColor, isMedic, customization }: { teamColor: 
         <boxGeometry args={[0.18, 0.18, 0.08]} />
       </mesh>
 
-      {/* ── SHOULDER PADS (team colored) ── */}
-      <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
-        <boxGeometry args={[0.06, 0.07, 0.12]} />
-      </mesh>
-      <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
-        <boxGeometry args={[0.06, 0.07, 0.12]} />
-      </mesh>
+      {/* ── SHOULDER PAD VARIANTS ── */}
+      {customization.shoulder === 'standard' && (
+        <>
+          <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+        </>
+      )}
+      {customization.shoulder === 'heavy' && (
+        <>
+          <mesh position={[-0.18, 0.53, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.08, 0.09, 0.14]} />
+          </mesh>
+          <mesh position={[0.18, 0.53, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.08, 0.09, 0.14]} />
+          </mesh>
+          {/* Extra plate */}
+          <mesh position={[-0.2, 0.54, 0]} material={gearMat}>
+            <boxGeometry args={[0.02, 0.06, 0.1]} />
+          </mesh>
+          <mesh position={[0.2, 0.54, 0]} material={gearMat}>
+            <boxGeometry args={[0.02, 0.06, 0.1]} />
+          </mesh>
+        </>
+      )}
+      {customization.shoulder === 'spikes' && (
+        <>
+          <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          {/* Spikes */}
+          <mesh position={[-0.2, 0.58, 0]}>
+            <coneGeometry args={[0.015, 0.06, 4]} />
+            <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[-0.2, 0.58, 0.04]}>
+            <coneGeometry args={[0.012, 0.05, 4]} />
+            <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[0.2, 0.58, 0]}>
+            <coneGeometry args={[0.015, 0.06, 4]} />
+            <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[0.2, 0.58, 0.04]}>
+            <coneGeometry args={[0.012, 0.05, 4]} />
+            <meshStandardMaterial color="#333333" metalness={0.7} roughness={0.3} />
+          </mesh>
+        </>
+      )}
+      {customization.shoulder === 'radio' && (
+        <>
+          <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
+            <boxGeometry args={[0.06, 0.07, 0.12]} />
+          </mesh>
+          {/* Radio box on left shoulder */}
+          <mesh position={[-0.2, 0.56, -0.02]} material={gearMat}>
+            <boxGeometry args={[0.04, 0.04, 0.04]} />
+          </mesh>
+          {/* Antenna */}
+          <mesh position={[-0.2, 0.64, -0.02]}>
+            <cylinderGeometry args={[0.003, 0.003, 0.14, 4]} />
+            <meshStandardMaterial color="#222222" metalness={0.6} roughness={0.3} />
+          </mesh>
+          <mesh position={[-0.2, 0.72, -0.02]}>
+            <sphereGeometry args={[0.008, 4, 4]} />
+            <meshStandardMaterial color={teamColor} emissive={teamColor} emissiveIntensity={0.6} />
+          </mesh>
+        </>
+      )}
 
       {/* ── ARMS ── */}
       <group position={[-0.19, 0.44, 0]}>
@@ -281,16 +352,21 @@ function GameSoldierPreview({ teamColor, isMedic, customization }: { teamColor: 
         <mesh position={[0, -0.12, 0]} material={skinMat}><boxGeometry args={[0.05, 0.05, 0.05]} /></mesh>
       </group>
 
-      {/* ── Medic cross (game-accurate) ── */}
+      {/* ── Medic red cross (game-accurate) ── */}
       {isMedic && (
         <>
           <mesh position={[0, 0.48, 0.069]}>
-            <boxGeometry args={[0.06, 0.02, 0.002]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+            <boxGeometry args={[0.08, 0.025, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.5} />
           </mesh>
           <mesh position={[0, 0.48, 0.069]}>
-            <boxGeometry args={[0.02, 0.06, 0.002]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+            <boxGeometry args={[0.025, 0.08, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.5} />
+          </mesh>
+          {/* White background */}
+          <mesh position={[0, 0.48, 0.067]}>
+            <boxGeometry args={[0.1, 0.1, 0.002]} />
+            <meshStandardMaterial color="#dddddd" />
           </mesh>
         </>
       )}
@@ -362,6 +438,9 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
     onCustomizationChange(updated);
   };
 
+  // Replace camo with shoulder
+  const handleShoulderChange = (v: ShoulderStyle) => updateField('shoulder', v);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-auto" onClick={onClose}>
       <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />
@@ -376,7 +455,7 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
           <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
             style={{ background: `linear-gradient(180deg, ${teamColor}15, transparent)` }} />
 
-          <Canvas camera={{ position: [0, 0.5, 2.8], fov: 45 }}>
+          <Canvas camera={{ position: [0, 0.6, 3.5], fov: 40 }}>
             <ambientLight intensity={0.5} />
             <directionalLight position={[3, 5, 3]} intensity={1} />
             <directionalLight position={[-2, 3, -1]} intensity={0.3} />
@@ -439,28 +518,12 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
               value={localCustom.boots}
               onChange={v => updateField('boots', v)}
             />
-
-            {/* Camo Pattern - visual grid */}
-            <div>
-              <div className="text-[10px] text-muted-foreground tracking-[0.15em] font-display mb-2">CAMO PATTERN</div>
-              <div className="grid grid-cols-4 gap-2">
-                {CAMO_OPTIONS.map(camo => (
-                  <button
-                    key={camo.id}
-                    onClick={() => updateField('camo', camo.id)}
-                    className={`rounded-lg border-2 p-2 transition-all ${
-                      localCustom.camo === camo.id
-                        ? 'border-primary scale-105 shadow-[0_0_12px_hsl(142_70%_45%/0.2)]'
-                        : 'border-border/20 hover:border-border/40'
-                    }`}
-                  >
-                    <div className="w-full h-6 rounded-sm mb-1"
-                      style={{ background: `linear-gradient(135deg, ${camo.colors[0]}, ${camo.colors[1]})` }} />
-                    <div className="text-[9px] text-center text-muted-foreground">{camo.name}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <GearSelector
+              label="SHOULDER"
+              options={SHOULDER_OPTIONS}
+              value={localCustom.shoulder}
+              onChange={handleShoulderChange}
+            />
           </div>
 
           {/* Footer */}

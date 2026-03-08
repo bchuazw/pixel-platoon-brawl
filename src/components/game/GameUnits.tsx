@@ -112,16 +112,40 @@ function SoldierBody({ teamColor, isMedic }: { teamColor: string; isMedic: boole
         <boxGeometry args={[0.06, 0.07, 0.12]} />
       </mesh>
 
-      {/* ── Medic cross ── */}
+      {/* ── Medic red cross (front) ── */}
       {isMedic && (
         <>
+          {/* Front cross */}
           <mesh position={[0, 0.48, 0.069]}>
-            <boxGeometry args={[0.06, 0.02, 0.002]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+            <boxGeometry args={[0.08, 0.025, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.5} />
           </mesh>
           <mesh position={[0, 0.48, 0.069]}>
+            <boxGeometry args={[0.025, 0.08, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.5} />
+          </mesh>
+          {/* White background patch */}
+          <mesh position={[0, 0.48, 0.067]}>
+            <boxGeometry args={[0.1, 0.1, 0.002]} />
+            <meshStandardMaterial color="#dddddd" />
+          </mesh>
+          {/* Back cross on backpack */}
+          <mesh position={[0, 0.48, -0.163]}>
+            <boxGeometry args={[0.06, 0.02, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.4} />
+          </mesh>
+          <mesh position={[0, 0.48, -0.163]}>
             <boxGeometry args={[0.02, 0.06, 0.002]} />
-            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.4} />
+          </mesh>
+          {/* Arm band cross (left) */}
+          <mesh position={[-0.17, 0.52, 0.065]}>
+            <boxGeometry args={[0.002, 0.04, 0.015]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.3} />
+          </mesh>
+          <mesh position={[-0.17, 0.52, 0.065]}>
+            <boxGeometry args={[0.002, 0.015, 0.04]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.3} />
           </mesh>
         </>
       )}
@@ -504,7 +528,50 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.45).getHexString();
   }, [color]);
 
-  if (!unit.isAlive && deathTimer.current >= 5) return null;
+  // Show tombstone after death animation completes
+  if (!unit.isAlive && deathTimer.current >= 5) {
+    const unitBaseY = getUnitBaseY(grid, unit.position.x, unit.position.z);
+    return (
+      <group position={[unit.position.x, unitBaseY, unit.position.z]}>
+        {/* Tombstone base */}
+        <mesh position={[0, 0.06, 0]} castShadow>
+          <boxGeometry args={[0.2, 0.12, 0.06]} />
+          <meshStandardMaterial color="#555555" roughness={0.9} metalness={0.05} />
+        </mesh>
+        {/* Tombstone headstone */}
+        <mesh position={[0, 0.18, 0]} castShadow>
+          <boxGeometry args={[0.16, 0.14, 0.04]} />
+          <meshStandardMaterial color="#666666" roughness={0.85} />
+        </mesh>
+        {/* Rounded top */}
+        <mesh position={[0, 0.27, 0]} castShadow>
+          <cylinderGeometry args={[0.08, 0.08, 0.04, 6, 1, false, 0, Math.PI]} />
+          <meshStandardMaterial color="#666666" roughness={0.85} />
+        </mesh>
+        {/* Team color cross/emblem */}
+        <mesh position={[0, 0.2, 0.022]}>
+          <boxGeometry args={[0.04, 0.012, 0.002]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
+        </mesh>
+        <mesh position={[0, 0.2, 0.022]}>
+          <boxGeometry args={[0.012, 0.04, 0.002]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} />
+        </mesh>
+        {/* Ground mound */}
+        <mesh position={[0, 0.02, 0.08]} rotation={[-0.3, 0, 0]}>
+          <boxGeometry args={[0.22, 0.04, 0.15]} />
+          <meshStandardMaterial color="#3a3520" roughness={1} />
+        </mesh>
+        {/* Name */}
+        <Billboard position={[0, 0.38, 0]}>
+          <Text fontSize={0.055} color="#888888" anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.01} outlineColor="#000000">
+            {unit.name}
+          </Text>
+        </Billboard>
+      </group>
+    );
+  }
 
   const hpPercent = unit.hp / unit.maxHp;
 

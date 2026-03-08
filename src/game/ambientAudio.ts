@@ -132,5 +132,6 @@ export function stopAmbientAudio() {
     try { ctx.close(); } catch {}
     ambientCtx = null;
     ambientGain = null;
+    console.log('Ambient audio stopped');
   }, 2000);
 }

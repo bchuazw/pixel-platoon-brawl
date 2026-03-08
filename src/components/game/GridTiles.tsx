@@ -92,6 +92,7 @@ function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isO
   if (isOutOfZone) { emissive = '#cc2222'; emI = 0.25; }
   if (isMovable) { emissive = '#2299ff'; emI = 0.3; }
   if (isOnPath) { emissive = '#44ddff'; emI = 0.45; }
+  if (isWeaponRange && !isMovable && !isAttackable) { emissive = '#ff8800'; emI = 0.18; }
   if (isAttackable) { emissive = '#ff3333'; emI = 0.4; }
   if (isAbilityTarget) { emissive = '#ffaa00'; emI = 0.35; }
 

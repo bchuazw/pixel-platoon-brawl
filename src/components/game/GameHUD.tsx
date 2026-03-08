@@ -304,7 +304,7 @@ function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, colle
             🏆
           </div>
           <h1
-            className="text-[28px] font-bold tracking-[0.4em] mb-2"
+            className="text-3xl font-display font-black tracking-[0.4em] mb-2"
             style={{ color: winnerColor, textShadow: `0 0 30px ${winnerColor}88, 0 0 60px ${winnerColor}44` }}
           >
             VICTORY

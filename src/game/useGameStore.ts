@@ -410,8 +410,17 @@ export function useGameStore() {
       const hasQueue = unitQueueRef.current.length > 0;
       const isKillCam = state.killCam !== null;
 
-      // If there's a pending combat, don't use a timer — wait for onMoveComplete callback
-      if (hasPendingCombat) return;
+      // If there's a pending combat, add a safety timeout in case onMoveComplete doesn't fire
+      if (hasPendingCombat) {
+        const safetyTimer = setTimeout(() => {
+          if (autoPlayRef.current && pendingCombatUnitRef.current) {
+            // Force-clear the pending state and proceed
+            setState(prev => ({ ...prev, movePath: null, movingUnitId: null }));
+            runSingleUnitStep();
+          }
+        }, 2500);
+        return () => clearTimeout(safetyTimer);
+      }
 
       // Delays: killcam 3s, normal unit 1.2s, team switch 0.6s
       const delay = isKillCam ? 3000 : hasQueue ? 1200 : 600;

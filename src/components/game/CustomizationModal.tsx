@@ -119,23 +119,96 @@ function GameSoldierPreview({ teamColor, isMedic, customization, hasBeard }: { t
       {/* ── BOOTS ── */}
       {customization.boots === 'combat' ? (
         <>
-          <mesh position={[-0.065, 0.04, 0.01]} material={bootMat}>
-            <boxGeometry args={[0.09, 0.1, 0.11]} />
+          {/* Tall combat boots with buckles */}
+          <mesh position={[-0.065, 0.06, 0.01]} material={bootMat}>
+            <boxGeometry args={[0.095, 0.14, 0.12]} />
           </mesh>
-          <mesh position={[0.065, 0.04, 0.01]} material={bootMat}>
-            <boxGeometry args={[0.09, 0.1, 0.11]} />
+          <mesh position={[0.065, 0.06, 0.01]} material={bootMat}>
+            <boxGeometry args={[0.095, 0.14, 0.12]} />
+          </mesh>
+          {/* Buckle straps */}
+          <mesh position={[-0.065, 0.1, 0.075]}>
+            <boxGeometry args={[0.097, 0.015, 0.01]} />
+            <meshStandardMaterial color="#555544" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0.065, 0.1, 0.075]}>
+            <boxGeometry args={[0.097, 0.015, 0.01]} />
+            <meshStandardMaterial color="#555544" metalness={0.5} roughness={0.4} />
           </mesh>
         </>
       ) : customization.boots === 'sneakers' ? (
         <>
+          {/* Low-profile sneakers with colored sole */}
           <mesh position={[-0.065, 0.015, 0.01]}>
-            <boxGeometry args={[0.085, 0.04, 0.1]} />
+            <boxGeometry args={[0.085, 0.04, 0.11]} />
             <meshStandardMaterial color="#333344" />
           </mesh>
           <mesh position={[0.065, 0.015, 0.01]}>
-            <boxGeometry args={[0.085, 0.04, 0.1]} />
+            <boxGeometry args={[0.085, 0.04, 0.11]} />
             <meshStandardMaterial color="#333344" />
           </mesh>
+          {/* White sole */}
+          <mesh position={[-0.065, -0.003, 0.01]}>
+            <boxGeometry args={[0.088, 0.012, 0.115]} />
+            <meshStandardMaterial color="#cccccc" />
+          </mesh>
+          <mesh position={[0.065, -0.003, 0.01]}>
+            <boxGeometry args={[0.088, 0.012, 0.115]} />
+            <meshStandardMaterial color="#cccccc" />
+          </mesh>
+        </>
+      ) : customization.boots === 'armored' ? (
+        <>
+          {/* Armored greaves covering shins + boots */}
+          <mesh position={[-0.065, 0.03, 0.01]} material={bootMat}>
+            <boxGeometry args={[0.085, 0.07, 0.1]} />
+          </mesh>
+          <mesh position={[0.065, 0.03, 0.01]} material={bootMat}>
+            <boxGeometry args={[0.085, 0.07, 0.1]} />
+          </mesh>
+          {/* Shin armor plates */}
+          <mesh position={[-0.065, 0.14, 0.04]}>
+            <boxGeometry args={[0.09, 0.16, 0.04]} />
+            <meshStandardMaterial color={armorColor} metalness={0.4} roughness={0.35} />
+          </mesh>
+          <mesh position={[0.065, 0.14, 0.04]}>
+            <boxGeometry args={[0.09, 0.16, 0.04]} />
+            <meshStandardMaterial color={armorColor} metalness={0.4} roughness={0.35} />
+          </mesh>
+          {/* Knee caps */}
+          <mesh position={[-0.065, 0.22, 0.05]}>
+            <sphereGeometry args={[0.03, 6, 4]} />
+            <meshStandardMaterial color={armorColor} metalness={0.5} roughness={0.3} />
+          </mesh>
+          <mesh position={[0.065, 0.22, 0.05]}>
+            <sphereGeometry args={[0.03, 6, 4]} />
+            <meshStandardMaterial color={armorColor} metalness={0.5} roughness={0.3} />
+          </mesh>
+        </>
+      ) : customization.boots === 'wrapped' ? (
+        <>
+          {/* Desert wrapped boots */}
+          <mesh position={[-0.065, 0.03, 0.01]}>
+            <boxGeometry args={[0.085, 0.07, 0.1]} />
+            <meshStandardMaterial color="#8b7355" roughness={0.9} />
+          </mesh>
+          <mesh position={[0.065, 0.03, 0.01]}>
+            <boxGeometry args={[0.085, 0.07, 0.1]} />
+            <meshStandardMaterial color="#8b7355" roughness={0.9} />
+          </mesh>
+          {/* Wrapping bands on legs */}
+          {[0.08, 0.12, 0.16].map(y => (
+            <group key={y}>
+              <mesh position={[-0.065, y, 0]}>
+                <boxGeometry args={[0.088, 0.015, 0.09]} />
+                <meshStandardMaterial color="#a09070" roughness={0.95} />
+              </mesh>
+              <mesh position={[0.065, y, 0]}>
+                <boxGeometry args={[0.088, 0.015, 0.09]} />
+                <meshStandardMaterial color="#a09070" roughness={0.95} />
+              </mesh>
+            </group>
+          ))}
         </>
       ) : (
         <>

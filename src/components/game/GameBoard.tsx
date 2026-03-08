@@ -1,5 +1,5 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Stars, Cloud } from '@react-three/drei';
+import { OrbitControls, Stars } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
 import { Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';

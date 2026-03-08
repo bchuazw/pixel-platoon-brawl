@@ -548,7 +548,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
             <meshStandardMaterial color="#1a1a14" roughness={0.6} />
           </mesh>
           <group ref={weaponGroupRef} position={[0, -0.12, 0.05]}>
-            <Weapon unitClass={unit.unitClass} />
+            <Weapon weaponId={unit.weapon.id} />
           </group>
         </group>
 

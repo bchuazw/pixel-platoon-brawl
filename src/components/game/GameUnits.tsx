@@ -202,6 +202,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       animState.current = 'dying';
       animTimer.current = 0;
       deathTimer.current = 0;
+      currentFrame.current = 0;
     }
     prevAlive.current = unit.isAlive;
   }, [unit.isAlive]);

@@ -10,6 +10,12 @@ export function startAmbientAudio() {
   try {
     const ctx = new AudioContext();
     ambientCtx = ctx;
+
+    // Resume context if suspended (browser autoplay policy)
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
     const master = ctx.createGain();
     master.gain.setValueAtTime(0, ctx.currentTime);
     master.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 3);

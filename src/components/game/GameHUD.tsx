@@ -17,6 +17,10 @@ interface GameHUDProps {
   onMainMenu?: () => void;
   sponsorPoints?: number;
   onUnitInspect?: (unitId: string) => void;
+  onPlaceBet?: (team: Team, amount: number) => void;
+  betTeam?: Team | null;
+  betAmount?: number;
+  collectBetPayout?: () => number;
 }
 
 const CLASS_ICONS: Record<string, typeof Swords> = {

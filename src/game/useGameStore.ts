@@ -208,9 +208,27 @@ export function useGameStore() {
       let newState = result.state;
       const allEvents = [...result.events];
 
+      // ── KILL CAM: detect kill events ──
+      const killEvent = allEvents.find(e => e.type === 'kill');
+      let killCam: KillCamData | null = null;
+      if (killEvent) {
+        const killer = prev.units.find(u => u.id === nextUnitId);
+        // Find victim by position match
+        const victim = prev.units.find(u =>
+          u.position.x === killEvent.targetPos.x && u.position.z === killEvent.targetPos.z && u.id !== nextUnitId
+        );
+        killCam = {
+          targetPos: killEvent.targetPos,
+          attackerPos: killEvent.attackerPos,
+          victimName: victim?.name || 'Unknown',
+          killerName: killer?.name || 'Unknown',
+          timestamp: Date.now(),
+        };
+      }
+
       // Highlight the next unit that will act
       const nextInQueue = unitQueueRef.current[0] || null;
-      newState = { ...newState, selectedUnitId: nextInQueue };
+      newState = { ...newState, selectedUnitId: nextInQueue, killCam };
 
       // Check for game over
       const alive = getAliveTeams(newState.units);

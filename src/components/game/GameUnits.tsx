@@ -608,12 +608,40 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
           <meshBasicMaterial color={color} />
         </mesh>
 
-        {/* Overwatch range */}
+        {/* Fog of War vision ring */}
+        {unit.isAlive && (
+          <>
+            <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[unit.visionRange - 0.08, unit.visionRange + 0.08, 48]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.08} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Subtle filled vision area */}
+            <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[unit.visionRange, 48]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.02} side={THREE.DoubleSide} />
+            </mesh>
+          </>
+        )}
+
+        {/* Overwatch range indicator */}
         {unit.isOnOverwatch && (
-          <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[unit.attackRange - 0.1, unit.attackRange + 0.1, 24]} />
-            <meshBasicMaterial color="#44aaff" transparent opacity={0.12} side={THREE.DoubleSide} />
-          </mesh>
+          <>
+            {/* Filled overwatch area */}
+            <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[unit.attackRange, 32]} />
+              <meshBasicMaterial color="#44aaff" transparent opacity={0.06} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Overwatch ring border */}
+            <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[unit.attackRange - 0.12, unit.attackRange + 0.12, 32]} />
+              <meshBasicMaterial color="#44aaff" transparent opacity={0.25} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Dashed inner ring */}
+            <mesh position={[0, 0.028, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[unit.attackRange * 0.5 - 0.05, unit.attackRange * 0.5 + 0.05, 32]} />
+              <meshBasicMaterial color="#44aaff" transparent opacity={0.1} side={THREE.DoubleSide} />
+            </mesh>
+          </>
         )}
       </group>
     </group>

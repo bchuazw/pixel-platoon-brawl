@@ -12,6 +12,7 @@ import { EmberParticles, LightShafts, GroundFog, DistantTrees } from './Environm
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw } from 'lucide-react';
 import * as THREE from 'three';
+import { AutoFollowCamera } from './AutoFollowCamera';
 
 interface GameBoardProps {
   state: GameState;

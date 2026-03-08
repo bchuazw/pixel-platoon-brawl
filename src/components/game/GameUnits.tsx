@@ -6,10 +6,10 @@ import { getTileY } from './GridTiles';
 import { playMove } from '@/game/sounds';
 import * as THREE from 'three';
 
-import soldierBlueImg from '@/assets/soldier-blue.png';
-import sniperRedImg from '@/assets/sniper-red.png';
-import heavyGreenImg from '@/assets/heavy-green.png';
-import medicYellowImg from '@/assets/medic-yellow.png';
+import spriteSoldierImg from '@/assets/sprite-soldier.png';
+import spriteSniperImg from '@/assets/sprite-sniper.png';
+import spriteHeavyImg from '@/assets/sprite-heavy.png';
+import spriteMedicImg from '@/assets/sprite-medic.png';
 
 interface GameUnitsProps {
   units: Unit[];
@@ -22,11 +22,42 @@ interface GameUnitsProps {
   onMoveComplete?: () => void;
 }
 
+// Sprite sheet layout: 4 columns x 4 rows
+// Row 0: idle (4 frames), Row 1: walk (4 frames), Row 2: shoot (4 frames), Row 3: death (4 frames)
+const SPRITE_COLS = 4;
+const SPRITE_ROWS = 4;
+const FRAME_W = 1 / SPRITE_COLS;
+const FRAME_H = 1 / SPRITE_ROWS;
+
+// Animation row mapping
+const ANIM_ROW: Record<string, number> = {
+  idle: 0,
+  walking: 1,
+  aiming: 2,
+  shooting: 2,
+  recoil: 2,
+  hit: 0,
+  dying: 3,
+  healing: 0,
+};
+
+// Frames per second for each animation
+const ANIM_FPS: Record<string, number> = {
+  idle: 3,
+  walking: 8,
+  aiming: 6,
+  shooting: 10,
+  recoil: 6,
+  hit: 8,
+  dying: 4,
+  healing: 4,
+};
+
 const SPRITE_MAP: Record<string, string> = {
-  blue: soldierBlueImg,
-  red: sniperRedImg,
-  green: heavyGreenImg,
-  yellow: medicYellowImg,
+  blue: spriteSoldierImg,
+  red: spriteSniperImg,
+  green: spriteHeavyImg,
+  yellow: spriteMedicImg,
 };
 
 type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';
@@ -97,11 +128,20 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
   const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
   const moveCompleted = useRef(false);
 
+  // Sprite sheet frame tracking
+  const frameTimer = useRef(0);
+  const currentFrame = useRef(0);
+
   const texture = useLoader(THREE.TextureLoader, SPRITE_MAP[unit.team]);
   const processedTexture = useMemo(() => {
     const tex = texture.clone();
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    // Set initial UV to show first frame (top-left)
+    tex.repeat.set(FRAME_W, FRAME_H);
+    tex.offset.set(0, 1 - FRAME_H); // Row 0, Col 0 (UV origin is bottom-left)
     tex.needsUpdate = true;
     return tex;
   }, [texture]);
@@ -115,6 +155,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       moveCompleted.current = false;
       animState.current = 'walking';
       animTimer.current = 0;
+      currentFrame.current = 0;
 
       // Set initial walk segment
       const fromElev = grid[prevPos.current.x]?.[prevPos.current.z]?.elevation || 0;
@@ -140,15 +181,18 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
         ).normalize();
         animState.current = 'aiming';
         animTimer.current = 0;
+        currentFrame.current = 0;
       }
       if (e.targetPos.x === unit.position.x && e.targetPos.z === unit.position.z &&
           (e.type === 'damage' || e.type === 'crit')) {
         animState.current = 'hit';
         animTimer.current = 0;
+        currentFrame.current = 0;
       }
       if (e.targetPos.x === unit.position.x && e.targetPos.z === unit.position.z && e.type === 'heal') {
         animState.current = 'healing';
         animTimer.current = 0;
+        currentFrame.current = 0;
       }
     }
   }, [combatEvents, unit.position.x, unit.position.z]);
@@ -159,6 +203,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       animState.current = 'dying';
       animTimer.current = 0;
       deathTimer.current = 0;
+      currentFrame.current = 0;
     }
     prevAlive.current = unit.isAlive;
   }, [unit.isAlive]);
@@ -195,6 +240,17 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       const dt = deathTimer.current;
       innerRef.current.rotation.z = Math.min(Math.PI / 2, dt * 4);
       innerRef.current.position.y = -dt * 0.3;
+
+      // Animate death sprite row
+      const deathFps = ANIM_FPS['dying'];
+      frameTimer.current += delta;
+      if (frameTimer.current >= 1 / deathFps) {
+        frameTimer.current = 0;
+        currentFrame.current = Math.min(currentFrame.current + 1, SPRITE_COLS - 1);
+      }
+      const deathRow = ANIM_ROW['dying'];
+      processedTexture.offset.set(currentFrame.current * FRAME_W, 1 - (deathRow + 1) * FRAME_H);
+
       if (spriteRef.current) {
         const mat = spriteRef.current.material as THREE.MeshBasicMaterial;
         mat.opacity = Math.max(0, 1 - dt * 0.8);
@@ -351,7 +407,27 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       }
     }
 
-    // ── Flash overlay ──
+    // ── Sprite sheet frame animation ──
+    const animRow = ANIM_ROW[animState.current] ?? 0;
+    const fps = ANIM_FPS[animState.current] ?? 4;
+    frameTimer.current += delta;
+    if (frameTimer.current >= 1 / fps) {
+      frameTimer.current = 0;
+      // For death animation, don't loop - stay on last frame
+      const currentAnim = animState.current as string;
+      if (currentAnim === 'dying') {
+        currentFrame.current = Math.min(currentFrame.current + 1, SPRITE_COLS - 1);
+      } else {
+        currentFrame.current = (currentFrame.current + 1) % SPRITE_COLS;
+      }
+    }
+    // Update texture UV offset
+    const col = currentFrame.current;
+    // UV origin is bottom-left, so row 0 = top = offset Y = 1 - FRAME_H
+    const uvX = col * FRAME_W;
+    const uvY = 1 - (animRow + 1) * FRAME_H;
+    processedTexture.offset.set(uvX, uvY);
+
     if (spriteRef.current) {
       const mat = spriteRef.current.material as THREE.MeshBasicMaterial;
       if (flashIntensity.current > 0) {

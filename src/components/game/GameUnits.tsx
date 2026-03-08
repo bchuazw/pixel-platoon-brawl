@@ -280,8 +280,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     const t = clock.getElapsedTime();
     animTimer.current += delta;
 
-    const unitElev = grid[unit.position.x]?.[unit.position.z]?.elevation || 0;
-    const unitBaseY = getTileY(unitElev) + 0.01;
+    const unitBaseY = getUnitBaseY(grid, unit.position.x, unit.position.z);
 
     // Reset limb rotations each frame
     const resetLimbs = () => {

@@ -12,6 +12,8 @@ interface GameHUDProps {
   onUseAbility: (id: AbilityId) => void;
   onStartAutoPlay: () => void;
   onStopAutoPlay: () => void;
+  sponsorPoints?: number;
+  onUnitInspect?: (unitId: string) => void;
 }
 
 const CLASS_ICONS: Record<string, typeof Swords> = {

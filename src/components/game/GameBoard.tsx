@@ -60,14 +60,6 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
         <hemisphereLight intensity={0.35} color="#aaddff" groundColor="#2a4a1a" />
         <fog attach="fog" args={['#0a1510', 28, 55]} />
 
-        {/* Camera looks at center */}
-        <group ref={(group) => {
-          if (group) {
-            const camera = (group as any).__r3f?.root?.getState()?.camera;
-            if (camera) camera.lookAt(...CENTER);
-          }
-        }} />
-
         <Suspense fallback={<LoadingFallback />}>
           <GridTiles
             grid={state.grid}

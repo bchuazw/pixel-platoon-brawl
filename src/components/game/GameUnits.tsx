@@ -212,11 +212,10 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       animTimer.current = 0;
 
       const fromElev = grid[prevPos.current.x]?.[prevPos.current.z]?.elevation || 0;
-      walkFrom.current.set(prevPos.current.x, getTileY(fromElev) + 0.01, prevPos.current.z);
+      walkFrom.current.set(prevPos.current.x, getUnitBaseY(grid, prevPos.current.x, prevPos.current.z), prevPos.current.z);
 
       const firstTarget = movePath[0];
-      const toElev = grid[firstTarget.x]?.[firstTarget.z]?.elevation || 0;
-      walkTo.current.set(firstTarget.x, getTileY(toElev) + 0.01, firstTarget.z);
+      walkTo.current.set(firstTarget.x, getUnitBaseY(grid, firstTarget.x, firstTarget.z), firstTarget.z);
 
       playMove();
     }

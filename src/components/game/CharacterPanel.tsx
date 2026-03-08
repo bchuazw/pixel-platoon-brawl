@@ -51,7 +51,7 @@ interface CharacterPanelProps {
 
 export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: CharacterPanelProps) {
   const teamColor = TEAM_COLORS[unit.team];
-  const portrait = PORTRAITS[unit.unitClass];
+  const portrait = PORTRAITS[unit.id] || PORTRAITS[`${unit.team}-${unit.unitClass}`];
   const hpPercent = (unit.hp / unit.maxHp) * 100;
 
   const statRows = [

@@ -518,28 +518,12 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
               value={localCustom.boots}
               onChange={v => updateField('boots', v)}
             />
-
-            {/* Camo Pattern - visual grid */}
-            <div>
-              <div className="text-[10px] text-muted-foreground tracking-[0.15em] font-display mb-2">CAMO PATTERN</div>
-              <div className="grid grid-cols-4 gap-2">
-                {CAMO_OPTIONS.map(camo => (
-                  <button
-                    key={camo.id}
-                    onClick={() => updateField('camo', camo.id)}
-                    className={`rounded-lg border-2 p-2 transition-all ${
-                      localCustom.camo === camo.id
-                        ? 'border-primary scale-105 shadow-[0_0_12px_hsl(142_70%_45%/0.2)]'
-                        : 'border-border/20 hover:border-border/40'
-                    }`}
-                  >
-                    <div className="w-full h-6 rounded-sm mb-1"
-                      style={{ background: `linear-gradient(135deg, ${camo.colors[0]}, ${camo.colors[1]})` }} />
-                    <div className="text-[9px] text-center text-muted-foreground">{camo.name}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <GearSelector
+              label="SHOULDER"
+              options={SHOULDER_OPTIONS}
+              value={localCustom.shoulder}
+              onChange={handleShoulderChange}
+            />
           </div>
 
           {/* Footer */}

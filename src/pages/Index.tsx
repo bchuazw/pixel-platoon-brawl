@@ -62,9 +62,6 @@ const Index = () => {
     clearMovePath();
   }, [clearMovePath]);
 
-  const handlePlaceBet = useCallback((team: Team, amount: number) => {
-    placeBet(team, amount);
-  }, [placeBet]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

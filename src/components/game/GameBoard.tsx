@@ -1,10 +1,14 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Stars } from '@react-three/drei';
+import { OrbitControls, Stars, Cloud } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
+import { BlendFunction } from 'postprocessing';
 import { Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GridTiles } from './GridTiles';
 import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
+import { ScreenShake } from './ScreenShake';
+import { EmberParticles, LightShafts, GroundFog, DistantTrees } from './EnvironmentVFX';
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw } from 'lucide-react';
 import * as THREE from 'three';

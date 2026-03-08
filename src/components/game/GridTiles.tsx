@@ -73,9 +73,9 @@ function darkenColor(hex: string, amount: number): string {
 }
 
 // ── Tile Component ──
-function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isOnPath, hasSmoke, onClick, onHover }: {
+function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isOnPath, hasSmoke, isWeaponRange, onClick, onHover }: {
   tile: TileData; isMovable: boolean; isAttackable: boolean; isAbilityTarget: boolean;
-  isOutOfZone: boolean; isOnPath: boolean; hasSmoke: boolean; onClick: () => void; onHover: (hover: boolean) => void;
+  isOutOfZone: boolean; isOnPath: boolean; hasSmoke: boolean; isWeaponRange: boolean; onClick: () => void; onHover: (hover: boolean) => void;
 }) {
   const topRef = useRef<THREE.Mesh>(null);
   const t = TERRAIN[tile.type] || TERRAIN.grass;

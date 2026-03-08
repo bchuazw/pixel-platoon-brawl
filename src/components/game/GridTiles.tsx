@@ -281,7 +281,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Wooden supply crate — waist height (~0.35)
     case 'crate':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * 0.4, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * 0.4 + rotVar * 2, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           <mesh position={[0, 0.175, 0]} castShadow>
             <boxGeometry args={[0.42, 0.35, 0.42]} />
             <meshStandardMaterial color="#8a6a30" roughness={0.9} />

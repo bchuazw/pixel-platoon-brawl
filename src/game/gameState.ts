@@ -997,7 +997,7 @@ export function applyEnvironmentalDamage(grid: TileData[][], pos: Position, inte
 
   // Destroy cover objects on direct hit
   if (tile.prop && intensity >= 2) {
-    const destructible = ['crate', 'barrel', 'bush', 'wire', 'sandbag', 'foxhole'];
+    const destructible = ['crate', 'barrel', 'bush', 'wire', 'sandbag', 'foxhole', 'rubble_pile'];
     if (destructible.includes(tile.prop)) {
       tile.prop = null;
       tile.isBlocked = false;

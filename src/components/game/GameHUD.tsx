@@ -355,27 +355,6 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
           </div>
           </div>
 
-          {/* Bet result */}
-          {betTeam && (
-            <div
-              className="bg-card/90 border rounded-xl p-4 min-w-[140px] text-center transition-all duration-700"
-              style={{
-                opacity: showStats ? 1 : 0,
-                borderColor: betPayout > 0 ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)',
-                boxShadow: betPayout > 0 ? '0 0 20px hsl(142 70% 45% / 0.2)' : undefined,
-              }}
-            >
-              <div className="text-[7px] tracking-[0.2em] mb-1" style={{ color: betPayout > 0 ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }}>
-                {betPayout > 0 ? '🎰 BET WON!' : '🎰 BET LOST'}
-              </div>
-              <div className="text-[9px] text-foreground">
-                Bet ⭐{betAmount} on <span className="font-bold uppercase" style={{ color: TEAM_COLORS[betTeam] }}>{betTeam}</span>
-              </div>
-              <div className="text-[16px] font-bold mt-1" style={{ color: betPayout > 0 ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }}>
-                {betPayout > 0 ? `+⭐${betPayout}` : `-⭐${betAmount}`}
-              </div>
-            </div>
-          )}
 
         {/* Buttons */}
         <div

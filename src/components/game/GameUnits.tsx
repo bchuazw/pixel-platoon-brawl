@@ -384,7 +384,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     const unitBaseY = getUnitBaseY(grid, unit.position.x, unit.position.z);
 
     // ── DEATH ──
-    if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 5)) {
+    if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 1.5)) {
       deathTimer.current += delta;
       const dt = deathTimer.current;
       if (dt < 0.3) {
@@ -402,10 +402,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
         if (rightLegRef.current) rightLegRef.current.rotation.x = e * 0.3;
       } else {
         bodyRef.current.rotation.x = Math.PI / 2;
-        const s = dt - 1.2;
-        bodyRef.current.position.y = -0.3 + Math.exp(-s * 4) * Math.sin(s * 8) * 0.03;
-        if (leftArmRef.current) leftArmRef.current.rotation.z = -Math.PI / 2.5;
-        if (rightArmRef.current) rightArmRef.current.rotation.z = Math.PI / 2.5;
+        bodyRef.current.position.y = -0.3;
       }
       rootRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       return;

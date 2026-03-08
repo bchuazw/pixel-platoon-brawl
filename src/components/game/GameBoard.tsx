@@ -14,6 +14,41 @@ import { GameState, Position, GRID_SIZE, KillCamData, AirdropData } from '@/game
 import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
 
+// ── WASD Camera Panning ──
+function WASDControls({ orbitRef }: { orbitRef: React.RefObject<any> }) {
+  const keys = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => keys.current.add(e.key.toLowerCase());
+    const onUp = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
+  }, []);
+
+  useFrame(() => {
+    if (!orbitRef.current) return;
+    const speed = 0.15;
+    const target = orbitRef.current.target;
+    const camera = orbitRef.current.object;
+    // Get forward/right vectors projected on xz plane
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+    let moved = false;
+    if (keys.current.has('w') || keys.current.has('arrowup')) { target.addScaledVector(forward, speed); camera.position.addScaledVector(forward, speed); moved = true; }
+    if (keys.current.has('s') || keys.current.has('arrowdown')) { target.addScaledVector(forward, -speed); camera.position.addScaledVector(forward, -speed); moved = true; }
+    if (keys.current.has('a') || keys.current.has('arrowleft')) { target.addScaledVector(right, -speed); camera.position.addScaledVector(right, -speed); moved = true; }
+    if (keys.current.has('d') || keys.current.has('arrowright')) { target.addScaledVector(right, speed); camera.position.addScaledVector(right, speed); moved = true; }
+    if (moved) orbitRef.current.update();
+  });
+
+  return null;
+}
+
 interface GameBoardProps {
   state: GameState;
   onTileClick: (pos: Position) => void;
@@ -62,7 +97,7 @@ function CameraController({ angleIndex, orbitRef }: { angleIndex: number; orbitR
   return null;
 }
 
-// ── Kill Cam ──
+// ── Kill Cam — optimized: no per-frame allocations, capped delta ──
 function KillCamController({ killCam }: { killCam: KillCamData | null }) {
   const { camera } = useThree();
   const savedPos = useRef(new THREE.Vector3());
@@ -72,6 +107,7 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
   const targetLook = useRef(new THREE.Vector3());
   const targetCamPos = useRef(new THREE.Vector3());
   const startLook = useRef(new THREE.Vector3());
+  const lerpTemp = useRef(new THREE.Vector3()); // reusable vector
 
   useEffect(() => {
     if (killCam && !isActive.current) {
@@ -98,16 +134,18 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
     }
   }, [killCam, camera]);
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
     if (!isActive.current) return;
-    const speed = phase.current === 'zoom_in' ? 0.6 : phase.current === 'hold' ? 0 : 1.2;
+    // Cap delta to prevent frame-skip jank
+    const delta = Math.min(rawDelta, 0.05);
+    const speed = phase.current === 'zoom_in' ? 0.8 : phase.current === 'hold' ? 0 : 1.5;
     progress.current = Math.min(1, progress.current + delta * speed);
     const t = 1 - Math.pow(1 - progress.current, 3);
 
     if (phase.current === 'zoom_in') {
       camera.position.lerpVectors(savedPos.current, targetCamPos.current, t);
-      const lookTarget = new THREE.Vector3().lerpVectors(startLook.current, targetLook.current, t);
-      camera.lookAt(lookTarget);
+      lerpTemp.current.lerpVectors(startLook.current, targetLook.current, t);
+      camera.lookAt(lerpTemp.current);
       if (camera instanceof THREE.PerspectiveCamera) {
         camera.fov = THREE.MathUtils.lerp(40, 30, t);
         camera.updateProjectionMatrix();
@@ -134,12 +172,10 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
 
   return killCam ? (
     <group>
-      <spotLight position={[killCam.targetPos.x, 8, killCam.targetPos.z]} angle={0.4} penumbra={0.8} intensity={3} color="#ff6633" distance={15} castShadow />
-      <pointLight position={[killCam.attackerPos.x, 3, killCam.attackerPos.z]} intensity={1.5} color="#4488ff" distance={8} />
+      <pointLight position={[killCam.targetPos.x, 4, killCam.targetPos.z]} intensity={2} color="#ff6633" distance={10} />
     </group>
   ) : null;
 }
-
 function LoadingFallback() {
   return (
     <mesh position={[10, 0, 10]}>
@@ -174,6 +210,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         dpr={[1, 1.5]}
       >
         <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
+        <WASDControls orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />
         <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} cameraAngleIndex={angleIndex} />
 

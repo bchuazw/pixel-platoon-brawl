@@ -1,14 +1,14 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
-import { BlendFunction } from 'postprocessing';
+import { EffectComposer, Bloom, Vignette, ChromaticAberration, SSAO, ToneMapping } from '@react-three/postprocessing';
+import { BlendFunction, ToneMappingMode } from 'postprocessing';
 import { Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GridTiles } from './GridTiles';
 import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
 import { ScreenShake } from './ScreenShake';
-import { EmberParticles, LightShafts, GroundFog, DistantTrees } from './EnvironmentVFX';
+import { EmberParticles, LightShafts, GroundFog, DistantTrees, RainParticles, CloudLayer, RainPuddles } from './EnvironmentVFX';
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
@@ -72,12 +72,10 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
 
   useEffect(() => {
     if (killCam && !isActive.current) {
-      // Save current camera position
       savedPos.current.copy(camera.position);
       isActive.current = true;
       progress.current = 0;
 
-      // Compute kill cam position: look from attacker toward target, offset up and to side
       const midX = (killCam.attackerPos.x + killCam.targetPos.x) / 2;
       const midZ = (killCam.attackerPos.z + killCam.targetPos.z) / 2;
       targetLook.current.set(killCam.targetPos.x, 0.5, killCam.targetPos.z);
@@ -85,14 +83,9 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
       const dx = killCam.targetPos.x - killCam.attackerPos.x;
       const dz = killCam.targetPos.z - killCam.attackerPos.z;
       const len = Math.sqrt(dx * dx + dz * dz) || 1;
-      // Position camera perpendicular to attack direction, elevated
       const perpX = -dz / len;
       const perpZ = dx / len;
-      targetCamPos.current.set(
-        midX + perpX * 3,
-        4,
-        midZ + perpZ * 3
-      );
+      targetCamPos.current.set(midX + perpX * 3, 4, midZ + perpZ * 3);
     } else if (!killCam && isActive.current) {
       isActive.current = false;
       progress.current = 0;
@@ -102,24 +95,15 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
   useFrame(() => {
     if (!isActive.current || !killCam) return;
     progress.current = Math.min(1, progress.current + 0.04);
-    const t = 1 - Math.pow(1 - progress.current, 3); // ease out cubic
-
-    camera.position.lerp(targetCamPos.current, t > 0.95 ? 1 : 0.1);
+    camera.position.lerp(targetCamPos.current, progress.current > 0.95 ? 1 : 0.1);
     camera.lookAt(targetLook.current);
   });
-
-  // Restore camera when killcam ends
-  useEffect(() => {
-    if (!killCam && savedPos.current.lengthSq() > 0) {
-      // Will be naturally overridden by CameraController lerp
-    }
-  }, [killCam]);
 
   return null;
 }
 
 function DustParticles() {
-  const count = 60;
+  const count = 100;
   const ref = useRef<THREE.Points>(null);
   
   const positions = useMemo(() => {
@@ -138,9 +122,9 @@ function DustParticles() {
     const t = clock.getElapsedTime();
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
-      pos.array[i3] += Math.sin(t * 0.3 + i) * 0.003;
+      pos.array[i3] += Math.sin(t * 0.3 + i) * 0.004;
       pos.array[i3 + 1] += Math.sin(t * 0.2 + i * 0.5) * 0.002;
-      pos.array[i3 + 2] += Math.cos(t * 0.25 + i) * 0.003;
+      pos.array[i3 + 2] += Math.cos(t * 0.25 + i) * 0.004;
       if (pos.array[i3 + 1] > 7) pos.array[i3 + 1] = 0.5;
     }
     pos.needsUpdate = true;
@@ -149,14 +133,9 @@ function DustParticles() {
   return (
     <points ref={ref}>
       <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={count}
-          array={positions}
-          itemSize={3}
-        />
+        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
       </bufferGeometry>
-      <pointsMaterial color="#bbaa88" size={0.06} transparent opacity={0.4} sizeAttenuation />
+      <pointsMaterial color="#aa9977" size={0.04} transparent opacity={0.3} sizeAttenuation depthWrite={false} />
     </points>
   );
 }
@@ -190,80 +169,141 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           near: 0.1,
           far: 200,
         }}
-        shadows
+        shadows="soft"
+        gl={{
+          antialias: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.1,
+        }}
+        dpr={[1, 1.5]}
       >
         <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />
         <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} />
-        <color attach="background" args={['#0e1a2e']} />
-        <Stars radius={80} depth={50} count={2500} factor={3} saturation={0.4} fade speed={0.3} />
+        <color attach="background" args={['#080e1a']} />
+        <Stars radius={100} depth={60} count={4000} factor={3} saturation={0.3} fade speed={0.2} />
 
-        {/* Sky dome with gradient */}
+        {/* Sky dome */}
         <mesh scale={[-1, 1, 1]}>
-          <sphereGeometry args={[90, 32, 16]} />
+          <sphereGeometry args={[95, 32, 16]} />
           <meshBasicMaterial side={THREE.BackSide}>
-            <color attach="color" args={['#0e1a2e']} />
+            <color attach="color" args={['#0a101e']} />
           </meshBasicMaterial>
         </mesh>
 
-        {/* Moon */}
-        <mesh position={[-40, 45, -30]}>
-          <sphereGeometry args={[4, 16, 16]} />
-          <meshBasicMaterial color="#e8e0d0" />
-        </mesh>
-        <pointLight position={[-40, 45, -30]} color="#ccd8ee" intensity={0.5} distance={120} />
+        {/* Moon with glow */}
+        <group position={[-40, 48, -35]}>
+          <mesh>
+            <sphereGeometry args={[4.5, 24, 24]} />
+            <meshBasicMaterial color="#e8e0d0" />
+          </mesh>
+          {/* Moon glow */}
+          <mesh>
+            <sphereGeometry args={[7, 16, 16]} />
+            <meshBasicMaterial color="#ccd8ee" transparent opacity={0.08} depthWrite={false} blending={THREE.AdditiveBlending} />
+          </mesh>
+          <pointLight color="#b8c8dd" intensity={0.6} distance={150} />
+        </group>
 
-        {/* Ground plane */}
+        {/* Extended ground plane with subtle gradient */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRID_SIZE / 2 - 0.5, -0.15, GRID_SIZE / 2 - 0.5]}>
-          <planeGeometry args={[140, 140]} />
-          <meshStandardMaterial color="#141f14" roughness={1} metalness={0} />
+          <planeGeometry args={[160, 160]} />
+          <meshStandardMaterial color="#0c160c" roughness={1} metalness={0} />
         </mesh>
 
-        {/* Mountains */}
-        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => {
-          const angle = (i / 9) * Math.PI * 2;
-          const dist = 38 + Math.sin(i * 2.7) * 10;
-          const height = 8 + Math.sin(i * 1.3) * 5;
+        {/* Mountains - more variety */}
+        {Array.from({ length: 14 }, (_, i) => {
+          const angle = (i / 14) * Math.PI * 2;
+          const dist = 35 + Math.sin(i * 2.7) * 12;
+          const height = 6 + Math.sin(i * 1.3) * 5 + Math.cos(i * 0.7) * 3;
           return (
-            <mesh key={i} position={[
-              GRID_SIZE / 2 + Math.cos(angle) * dist,
-              height * 0.35,
-              GRID_SIZE / 2 + Math.sin(angle) * dist
-            ]}>
-              <coneGeometry args={[10 + i * 1.2, height, 6]} />
-              <meshStandardMaterial color="#0a1208" roughness={1} />
-            </mesh>
+            <group key={i}>
+              <mesh position={[
+                GRID_SIZE / 2 + Math.cos(angle) * dist,
+                height * 0.35,
+                GRID_SIZE / 2 + Math.sin(angle) * dist
+              ]}>
+                <coneGeometry args={[8 + i * 1.1, height, 7]} />
+                <meshStandardMaterial color="#08100a" roughness={1} />
+              </mesh>
+              {/* Secondary peak */}
+              <mesh position={[
+                GRID_SIZE / 2 + Math.cos(angle + 0.15) * (dist - 3),
+                height * 0.25,
+                GRID_SIZE / 2 + Math.sin(angle + 0.15) * (dist - 3)
+              ]}>
+                <coneGeometry args={[5 + i * 0.5, height * 0.7, 5]} />
+                <meshStandardMaterial color="#0a120c" roughness={1} />
+              </mesh>
+            </group>
           );
         })}
 
         <DistantTrees />
+        <CloudLayer />
 
-        <ambientLight intensity={0.5} color="#8899bb" />
-        <directionalLight position={[15, 25, 15]} intensity={1.0} castShadow color="#ffe0b0"
-          shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-        <directionalLight position={[-10, 15, -10]} intensity={0.25} color="#6688cc" />
-        <hemisphereLight intensity={0.4} color="#667799" groundColor="#1a2a12" />
-        <fog attach="fog" args={['#0e1a2e', 40, 85]} />
+        {/* ── Lighting Setup (cinematic) ── */}
+        <ambientLight intensity={0.35} color="#6677aa" />
+        
+        {/* Main directional (moon-like key light) */}
+        <directionalLight
+          position={[20, 30, 15]}
+          intensity={1.2}
+          castShadow
+          color="#ffe0b0"
+          shadow-mapSize-width={4096}
+          shadow-mapSize-height={4096}
+          shadow-camera-near={0.5}
+          shadow-camera-far={80}
+          shadow-camera-left={-25}
+          shadow-camera-right={25}
+          shadow-camera-top={25}
+          shadow-camera-bottom={-25}
+          shadow-bias={-0.0003}
+          shadow-normalBias={0.02}
+        />
+        
+        {/* Fill light (cool blue) */}
+        <directionalLight position={[-15, 18, -12]} intensity={0.3} color="#4466aa" />
+        
+        {/* Rim light (warm orange from behind) */}
+        <directionalLight position={[-8, 12, 25]} intensity={0.2} color="#cc8844" />
+        
+        {/* Hemisphere for ambient color variety */}
+        <hemisphereLight intensity={0.35} color="#556688" groundColor="#1a2a12" />
+        
+        {/* Fog */}
+        <fog attach="fog" args={['#0a101e', 35, 80]} />
 
+        {/* Atmospheric particles */}
         <DustParticles />
         <EmberParticles />
         <LightShafts />
         <GroundFog />
+        <RainParticles />
+        <RainPuddles />
         <ScreenShake events={state.combatEvents} />
 
-        {/* Post-processing */}
-        <EffectComposer>
+        {/* ── Post-processing pipeline ── */}
+        <EffectComposer multisampling={4}>
           <Bloom
-            intensity={0.4}
-            luminanceThreshold={0.6}
-            luminanceSmoothing={0.9}
+            intensity={0.5}
+            luminanceThreshold={0.5}
+            luminanceSmoothing={0.8}
             mipmapBlur
           />
-          <Vignette
-            offset={0.3}
-            darkness={0.7}
+          <ChromaticAberration
+            offset={new THREE.Vector2(0.0004, 0.0004)}
+            radialModulation={true}
+            modulationOffset={0.5}
             blendFunction={BlendFunction.NORMAL}
           />
+          <Vignette
+            offset={0.25}
+            darkness={0.75}
+            blendFunction={BlendFunction.NORMAL}
+          />
+          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         </EffectComposer>
 
         <Suspense fallback={<LoadingFallback />}>
@@ -298,15 +338,15 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           enableRotate={true}
           enablePan={true}
           enableZoom={true}
-          minDistance={10}
-          maxDistance={45}
-          maxPolarAngle={Math.PI / 2.5}
-          minPolarAngle={Math.PI / 6}
+          minDistance={8}
+          maxDistance={50}
+          maxPolarAngle={Math.PI / 2.3}
+          minPolarAngle={Math.PI / 7}
           rotateSpeed={0.5}
           panSpeed={0.8}
           zoomSpeed={0.8}
           enableDamping={true}
-          dampingFactor={0.08}
+          dampingFactor={0.06}
           screenSpacePanning={false}
           mouseButtons={{
             LEFT: THREE.MOUSE.PAN,
@@ -320,6 +360,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         />
       </Canvas>
 
+      {/* Camera controls overlay */}
       <div className="absolute bottom-36 right-4 z-20 pointer-events-auto flex flex-col gap-1.5">
         <button
           onClick={() => setAutoFollow(prev => !prev)}
@@ -341,28 +382,28 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
       {state.killCam && (
         <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
           {/* Letterbox bars */}
-          <div className="absolute top-0 left-0 right-0 h-16 bg-black/80" />
-          <div className="absolute bottom-0 left-0 right-0 h-16 bg-black/80" />
+          <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black to-transparent" />
           {/* Vignette */}
           <div className="absolute inset-0" style={{
-            background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%)',
+            background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 100%)',
           }} />
           {/* Kill info */}
-          <div className="animate-fade-in flex flex-col items-center gap-2">
-            <div className="text-[10px] tracking-[0.3em] text-red-400/80 font-mono uppercase">
+          <div className="animate-fade-in flex flex-col items-center gap-3">
+            <div className="text-[10px] tracking-[0.4em] text-red-400/80 font-mono uppercase">
               Eliminated
             </div>
-            <div className="text-3xl font-black text-red-500 tracking-wider drop-shadow-[0_0_20px_rgba(255,0,0,0.5)]"
-              style={{ fontFamily: "'Share Tech Mono', monospace", textShadow: '0 0 30px rgba(255,50,50,0.6)' }}>
+            <div className="text-4xl font-black text-red-500 tracking-wider"
+              style={{ fontFamily: "'Share Tech Mono', monospace", textShadow: '0 0 40px rgba(255,50,50,0.6), 0 0 80px rgba(255,0,0,0.3)' }}>
               ☠ {state.killCam.victimName}
             </div>
-            <div className="text-[9px] tracking-[0.2em] text-muted-foreground/70 font-mono">
+            <div className="text-[9px] tracking-[0.25em] text-muted-foreground/70 font-mono">
               by {state.killCam.killerName}
             </div>
           </div>
-          {/* Scan lines effect */}
-          <div className="absolute inset-0 opacity-10" style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.03) 2px, rgba(255,255,255,0.03) 4px)',
+          {/* Film grain */}
+          <div className="absolute inset-0 opacity-[0.06]" style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)',
           }} />
         </div>
       )}

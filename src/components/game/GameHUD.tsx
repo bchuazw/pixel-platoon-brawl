@@ -304,7 +304,7 @@ function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, colle
             🏆
           </div>
           <h1
-            className="text-[28px] font-bold tracking-[0.4em] mb-2"
+            className="text-3xl font-display font-black tracking-[0.4em] mb-2"
             style={{ color: winnerColor, textShadow: `0 0 30px ${winnerColor}88, 0 0 60px ${winnerColor}44` }}
           >
             VICTORY
@@ -462,10 +462,10 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
           <div className="relative z-10 flex items-start justify-center gap-8 w-full max-w-4xl px-6">
             {/* Main content (center) */}
             <div className="text-center space-y-6 flex-1">
-              <div className="space-y-2">
-                <h1 className="text-[20px] text-primary glow-text tracking-[0.3em]">WARGAMING</h1>
-                <p className="text-[9px] text-muted-foreground tracking-wider">4 SQUADS • 8 COMBATANTS • 1 TEAM SURVIVES</p>
-                <p className="text-[7px] text-accent tracking-wider">EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE!</p>
+            <div className="space-y-3">
+                <h1 className="text-2xl font-display font-bold text-primary glow-text tracking-[0.3em]">WARGAMING</h1>
+                <p className="text-xs text-muted-foreground tracking-wider font-mono-game">4 SQUADS • 8 COMBATANTS • 1 TEAM SURVIVES</p>
+                <p className="text-[10px] text-accent tracking-wider font-mono-game">EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE!</p>
               </div>
 
               {/* Unit previews */}
@@ -525,9 +525,9 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       )}
 
       {/* Top bar */}
-      <div className="pointer-events-auto flex items-center justify-between px-4 py-2 glass-panel border-b border-border/40">
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] text-primary glow-text tracking-[0.15em]">⚔ WARGAMING</span>
+      <div className="pointer-events-auto flex items-center justify-between px-5 py-2.5 glass-panel border-b border-border/30">
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-display font-bold text-primary glow-text tracking-[0.2em]">WARGAMING</span>
           <div className="h-4 w-px bg-border/30" />
           <span className="text-[8px] text-muted-foreground">TURN {state.turn}</span>
           {!isPreGame && (

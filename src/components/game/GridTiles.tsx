@@ -823,6 +823,7 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
             isOutOfZone={!isInZone(x, z, shrinkLevel) && shrinkLevel > 0}
             isOnPath={pathSet.has(key)}
             hasSmoke={tile.hasSmoke}
+            isWeaponRange={weaponRangeSet.has(key)}
             onClick={() => onTileClick({ x, z })}
             onHover={(hover) => onTileHover(hover ? { x, z } : null)}
           />

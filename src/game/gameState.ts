@@ -1340,6 +1340,7 @@ export function runAiUnitStep(
           }
         }
         newState.log = [...newState.log, `💣 ${unit.name} throws GRENADE! ${damaged.join(', ')}`];
+        applyExplosionDamage(newState.grid, bestGrenadePos, radius);
         unit.ap -= grenadeAbility.apCost;
         unit.cooldowns['grenade'] = grenadeAbility.cooldown;
       }

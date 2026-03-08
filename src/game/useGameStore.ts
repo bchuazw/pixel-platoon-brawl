@@ -635,8 +635,17 @@ export function useGameStore() {
               });
             }
           }
+          // Environmental destruction
+          const grid = prev.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null })));
+          applyExplosionDamage(grid, pos, radius);
           log.push(`💣 ${unit.name} throws GRENADE! ${damaged.join(', ')}`);
-          break;
+          return {
+            ...prev, units, log, grid,
+            combatEvents: [...prev.combatEvents, ...events],
+            phase: 'select' as const, activeAbility: null,
+            movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+            selectedUnitId: null,
+          };
         }
         case 'first_aid':
         case 'heal': {

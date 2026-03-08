@@ -195,9 +195,9 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
   const pathRef = useRef<Position[] | null>(null);
   const pathIndex = useRef(0);
   const walkProgress = useRef(1);
-  const walkFrom = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
-  const walkTo = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
-  const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
+  const walkFrom = useRef(new THREE.Vector3(unit.position.x, getUnitBaseY(grid, unit.position.x, unit.position.z), unit.position.z));
+  const walkTo = useRef(new THREE.Vector3(unit.position.x, getUnitBaseY(grid, unit.position.x, unit.position.z), unit.position.z));
+  const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, getUnitBaseY(grid, unit.position.x, unit.position.z), unit.position.z));
   const moveCompleted = useRef(false);
   const prevPos = useRef({ x: unit.position.x, z: unit.position.z });
 

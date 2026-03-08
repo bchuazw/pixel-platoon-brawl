@@ -353,6 +353,15 @@ export function useGameStore() {
           log.push(`═══════════════════════════`);
           log.push(`» ROUND ${turn}`);
           log.push(`» ${newState.units.filter(u => u.isAlive).length} combatants remaining`);
+
+          // Trigger supply airdrops every 3 rounds starting from round 3
+          if (turn >= 3 && turn % 3 === 0) {
+            const newDrops = generateAirdrops(newState.grid);
+            if (newDrops.length > 0) {
+              newState.airdrops = [...(newState.airdrops || []), ...newDrops];
+              log.push(`✈️ INCOMING SUPPLY DROP! ${newDrops.length} crate${newDrops.length > 1 ? 's' : ''} inbound!`);
+            }
+          }
         }
 
         // Tick killstreak effects at start of each new round

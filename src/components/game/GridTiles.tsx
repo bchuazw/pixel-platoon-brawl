@@ -344,9 +344,10 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Bush — knee height, wide spread
-    case 'bush':
+    case 'bush': {
+      const bushColor = h > 0.5 ? '#3a7a28' : '#2e7020';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]} scale={[scaleVar * (0.9 + h * 0.3), scaleVar, scaleVar * (0.9 + h * 0.3)]}>
           <mesh position={[0, 0.15, 0]} castShadow>
             <sphereGeometry args={[0.28, 8, 6]} />
             <meshStandardMaterial color="#3a7a28" roughness={0.95} />

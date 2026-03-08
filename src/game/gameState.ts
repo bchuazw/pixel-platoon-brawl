@@ -301,6 +301,9 @@ function createUnit(id: string, name: string, unitClass: UnitClass, team: Team, 
     weapon: pistol,
     visionRange: VISION_RANGE,
     armor: 0,
+    killstreak: null,
+    uavTurnsLeft: 0,
+    empTurnsLeft: 0,
   };
 }
 

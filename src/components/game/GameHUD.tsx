@@ -402,7 +402,7 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
 }
 
 /* ── Main HUD ── */
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, inspectedUnitId }: GameHUDProps) {
   const isPreGame = state.phase === 'pre_game';
   const isGameOver = state.phase === 'game_over';
   const aliveUnits = state.units.filter(u => u.isAlive);

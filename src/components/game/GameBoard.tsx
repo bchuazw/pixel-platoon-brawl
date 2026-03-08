@@ -8,7 +8,7 @@ import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
 import { ScreenShake } from './ScreenShake';
-import { EmberParticles, LightShafts, GroundFog, DistantTrees, RainParticles, CloudLayer, RainPuddles } from './EnvironmentVFX';
+import { EmberParticles, DistantTrees, CloudLayer } from './EnvironmentVFX';
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';

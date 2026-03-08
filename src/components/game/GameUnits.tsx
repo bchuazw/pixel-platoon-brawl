@@ -155,6 +155,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       moveCompleted.current = false;
       animState.current = 'walking';
       animTimer.current = 0;
+      currentFrame.current = 0;
 
       // Set initial walk segment
       const fromElev = grid[prevPos.current.x]?.[prevPos.current.z]?.elevation || 0;

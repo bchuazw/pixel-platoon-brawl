@@ -179,6 +179,7 @@ export interface GameState {
   movingUnitId: string | null;
   killCam: KillCamData | null;
   airdrops: AirdropData[];
+  nextAirdropRound: number;
 }
 
 export const GRID_SIZE = 24;

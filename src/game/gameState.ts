@@ -718,6 +718,7 @@ export function createInitialState(): GameState {
     movingUnitId: null,
     killCam: null,
     airdrops: [],
+    nextAirdropRound: 7 + Math.floor(Math.random() * 4),
   };
 }
 

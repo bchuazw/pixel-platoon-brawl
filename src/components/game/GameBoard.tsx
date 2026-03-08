@@ -212,31 +212,20 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           <meshStandardMaterial color="#0c160c" roughness={1} metalness={0} />
         </mesh>
 
-        {/* Mountains - more variety */}
-        {Array.from({ length: 14 }, (_, i) => {
-          const angle = (i / 14) * Math.PI * 2;
+        {/* Mountains - reduced count */}
+        {Array.from({ length: 8 }, (_, i) => {
+          const angle = (i / 8) * Math.PI * 2;
           const dist = 35 + Math.sin(i * 2.7) * 12;
-          const height = 6 + Math.sin(i * 1.3) * 5 + Math.cos(i * 0.7) * 3;
+          const height = 6 + Math.sin(i * 1.3) * 5;
           return (
-            <group key={i}>
-              <mesh position={[
-                GRID_SIZE / 2 + Math.cos(angle) * dist,
-                height * 0.35,
-                GRID_SIZE / 2 + Math.sin(angle) * dist
-              ]}>
-                <coneGeometry args={[8 + i * 1.1, height, 7]} />
-                <meshStandardMaterial color="#08100a" roughness={1} />
-              </mesh>
-              {/* Secondary peak */}
-              <mesh position={[
-                GRID_SIZE / 2 + Math.cos(angle + 0.15) * (dist - 3),
-                height * 0.25,
-                GRID_SIZE / 2 + Math.sin(angle + 0.15) * (dist - 3)
-              ]}>
-                <coneGeometry args={[5 + i * 0.5, height * 0.7, 5]} />
-                <meshStandardMaterial color="#0a120c" roughness={1} />
-              </mesh>
-            </group>
+            <mesh key={i} position={[
+              GRID_SIZE / 2 + Math.cos(angle) * dist,
+              height * 0.35,
+              GRID_SIZE / 2 + Math.sin(angle) * dist
+            ]}>
+              <coneGeometry args={[8 + i * 1.1, height, 5]} />
+              <meshStandardMaterial color="#08100a" roughness={1} />
+            </mesh>
           );
         })}
 

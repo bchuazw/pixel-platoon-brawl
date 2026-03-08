@@ -298,7 +298,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Oil drum / barrel — chest height (~0.45)
     case 'barrel':
       return (
-        <group position={[tile.x, baseY, tile.z]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.2, h * Math.PI, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           <mesh position={[0, 0.225, 0]} castShadow>
             <cylinderGeometry args={[0.18, 0.20, 0.45, 10]} />
             <meshStandardMaterial color="#4a6848" roughness={0.6} metalness={0.3} />

@@ -212,7 +212,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         type = 'water'; elevation = -0.15;
       }
 
-      grid[x][z] = { x, z, elevation, type, prop: null, isBlocked: false, coverValue: 0, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null };
+      grid[x][z] = { x, z, elevation, type, prop: null, isBlocked: false, coverValue: 0, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null, damaged: false, scorchMark: false };
     }
   }
 

@@ -190,11 +190,13 @@ function LootObject({ tile }: { tile: TileData }) {
   const color = tile.loot.type === 'weapon' ? '#ffaa22' :
                 tile.loot.type === 'medkit' ? '#ff4466' :
                 tile.loot.type === 'armor' ? '#4488ff' :
+                tile.loot.type === 'killstreak' ? '#cc44ff' :
                 '#88cc44';
 
   const glowColor = tile.loot.type === 'weapon' ? '#ffcc44' :
                     tile.loot.type === 'medkit' ? '#ff6688' :
                     tile.loot.type === 'armor' ? '#66aaff' :
+                    tile.loot.type === 'killstreak' ? '#ee88ff' :
                     '#aaee66';
 
   return (

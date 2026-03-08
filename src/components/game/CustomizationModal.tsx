@@ -347,8 +347,6 @@ function GameSoldierPreview({ teamColor, isMedic, customization, hasBeard }: { t
           </mesh>
         </>
       )}
-        </>
-      )}
 
       {/* Belt */}
       <mesh position={[0, 0.32, 0]} material={bootMat}>

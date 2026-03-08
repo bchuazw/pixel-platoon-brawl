@@ -14,32 +14,307 @@ interface GameBoard2DProps {
 const TILE_SIZE = 28;
 const BOARD_PX = GRID_SIZE * TILE_SIZE;
 
-// ── Pixel art color palette — Advance Wars inspired ──
-const TERRAIN_COLORS: Record<string, { base: string; shade: string; highlight: string }> = {
-  grass:  { base: '#3d6b35', shade: '#2d5228', highlight: '#4e8043' },
-  dirt:   { base: '#7a6545', shade: '#5e4e35', highlight: '#8f7a58' },
-  stone:  { base: '#6b6b72', shade: '#4f4f55', highlight: '#82828a' },
-  water:  { base: '#2a5580', shade: '#1e3f62', highlight: '#3a6b9a' },
-  sand:   { base: '#b8a060', shade: '#9a854e', highlight: '#d0b870' },
-  wall:   { base: '#4a4a52', shade: '#333338', highlight: '#5e5e68' },
-  trench: { base: '#4a3e2e', shade: '#352c20', highlight: '#5c4e3c' },
+// ── Richer terrain palette with multiple tones for natural variation ──
+const TERRAIN_COLORS: Record<string, { base: string; shade: string; highlight: string; detail: string }> = {
+  grass:  { base: '#4a7a3a', shade: '#3a6530', highlight: '#5c8e48', detail: '#3d6e2e' },
+  dirt:   { base: '#8a7050', shade: '#6e5a3e', highlight: '#a0845e', detail: '#7a6444' },
+  stone:  { base: '#787880', shade: '#5a5a62', highlight: '#92929a', detail: '#686870' },
+  water:  { base: '#2860a0', shade: '#1c4878', highlight: '#3878c0', detail: '#205088' },
+  sand:   { base: '#c8aa68', shade: '#a89050', highlight: '#e0c280', detail: '#b89858' },
+  wall:   { base: '#585860', shade: '#404048', highlight: '#6e6e78', detail: '#4e4e56' },
+  trench: { base: '#5a4a38', shade: '#443828', highlight: '#6e5c48', detail: '#4e4030' },
 };
 
-const PROP_GLYPHS: Record<string, { color: string; char: string }> = {
-  crate:          { color: '#c89040', char: '▪' },
-  barrel:         { color: '#7a5530', char: '●' },
-  sandbag:        { color: '#a09070', char: '▬' },
-  rock:           { color: '#666', char: '◆' },
-  bush:           { color: '#3a7a30', char: '♣' },
-  tree:           { color: '#2a5a20', char: '▲' },
-  ruins:          { color: '#555', char: '▧' },
-  wire:           { color: '#888', char: '╳' },
-  jersey_barrier: { color: '#888', char: '▰' },
-  burnt_vehicle:  { color: '#444', char: '▮' },
-  foxhole:        { color: '#5a4a30', char: '◌' },
-  hesco:          { color: '#7a7a60', char: '▦' },
-  tank_trap:      { color: '#555', char: '✖' },
-};
+// ── Seeded noise for consistent tile variation ──
+function tileNoise(x: number, z: number, seed: number): number {
+  const n = Math.sin(x * 127.1 + z * 311.7 + seed * 43758.5453) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+// ── Prop drawing functions (drawn as pixel art shapes, not glyphs) ──
+function drawProp(ctx: CanvasRenderingContext2D, prop: string, px: number, pz: number, ts: number, variant: number) {
+  const cx = px + ts / 2;
+  const cy = pz + ts / 2;
+
+  switch (prop) {
+    case 'crate': {
+      // Wooden crate with planks
+      ctx.fillStyle = '#a07838';
+      ctx.fillRect(cx - ts * 0.32, cy - ts * 0.32, ts * 0.64, ts * 0.64);
+      ctx.fillStyle = '#8a6428';
+      ctx.fillRect(cx - ts * 0.32, cy - ts * 0.05, ts * 0.64, ts * 0.1); // horizontal plank
+      ctx.fillRect(cx - ts * 0.05, cy - ts * 0.32, ts * 0.1, ts * 0.64); // vertical plank
+      ctx.fillStyle = '#c09048';
+      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.3, ts * 0.6, 2); // top highlight
+      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.3, 2, ts * 0.6);
+      break;
+    }
+    case 'barrel': {
+      ctx.fillStyle = '#6a4828';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, ts * 0.22, ts * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#7a5a38';
+      ctx.fillRect(cx - ts * 0.2, cy - ts * 0.06, ts * 0.4, ts * 0.04); // metal band
+      ctx.fillRect(cx - ts * 0.2, cy + ts * 0.1, ts * 0.4, ts * 0.04);
+      ctx.fillStyle = '#8a6a48';
+      ctx.fillRect(cx - ts * 0.15, cy - ts * 0.26, ts * 0.3, 2); // lid highlight
+      break;
+    }
+    case 'sandbag': {
+      // Stacked sandbag wall
+      ctx.fillStyle = '#a09068';
+      ctx.fillRect(cx - ts * 0.35, cy - ts * 0.1, ts * 0.32, ts * 0.2);
+      ctx.fillRect(cx + ts * 0.03, cy - ts * 0.1, ts * 0.32, ts * 0.2);
+      ctx.fillRect(cx - ts * 0.18, cy - ts * 0.28, ts * 0.36, ts * 0.2);
+      ctx.fillStyle = '#8a7a58';
+      ctx.fillRect(cx - ts * 0.35, cy + ts * 0.08, ts * 0.7, 2);
+      ctx.fillStyle = '#b0a078';
+      ctx.fillRect(cx - ts * 0.35, cy - ts * 0.1, ts * 0.7, 1);
+      break;
+    }
+    case 'rock': {
+      ctx.fillStyle = '#707070';
+      ctx.beginPath();
+      ctx.moveTo(cx - ts * 0.25, cy + ts * 0.15);
+      ctx.lineTo(cx - ts * 0.15, cy - ts * 0.2);
+      ctx.lineTo(cx + ts * 0.1, cy - ts * 0.25);
+      ctx.lineTo(cx + ts * 0.28, cy - ts * 0.05);
+      ctx.lineTo(cx + ts * 0.2, cy + ts * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#888';
+      ctx.fillRect(cx - ts * 0.12, cy - ts * 0.18, ts * 0.18, 2); // highlight
+      ctx.fillStyle = '#585858';
+      ctx.fillRect(cx + ts * 0.05, cy + ts * 0.05, ts * 0.12, ts * 0.08); // shadow crack
+      break;
+    }
+    case 'bush': {
+      // Layered foliage
+      ctx.fillStyle = '#2a5520';
+      ctx.beginPath();
+      ctx.arc(cx, cy + ts * 0.05, ts * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#387028';
+      ctx.beginPath();
+      ctx.arc(cx - ts * 0.08, cy - ts * 0.05, ts * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#48883a';
+      ctx.beginPath();
+      ctx.arc(cx + ts * 0.1, cy - ts * 0.08, ts * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'tree': {
+      // Tree trunk + layered canopy
+      ctx.fillStyle = '#5a4028';
+      ctx.fillRect(cx - ts * 0.06, cy, ts * 0.12, ts * 0.3); // trunk
+      ctx.fillStyle = '#2a5a1e';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - ts * 0.35);
+      ctx.lineTo(cx - ts * 0.28, cy + ts * 0.05);
+      ctx.lineTo(cx + ts * 0.28, cy + ts * 0.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#38701e';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - ts * 0.22);
+      ctx.lineTo(cx - ts * 0.22, cy + ts * 0.12);
+      ctx.lineTo(cx + ts * 0.22, cy + ts * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'ruins': {
+      // Broken wall segments
+      ctx.fillStyle = '#606060';
+      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.1, ts * 0.18, ts * 0.35);
+      ctx.fillRect(cx + ts * 0.05, cy - ts * 0.25, ts * 0.2, ts * 0.5);
+      ctx.fillRect(cx - ts * 0.15, cy + ts * 0.1, ts * 0.25, ts * 0.15);
+      ctx.fillStyle = '#505050';
+      ctx.fillRect(cx - ts * 0.28, cy + ts * 0.2, ts * 0.14, ts * 0.08);
+      ctx.fillStyle = '#707070';
+      ctx.fillRect(cx + ts * 0.05, cy - ts * 0.25, ts * 0.2, 2);
+      break;
+    }
+    case 'wire': {
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 1;
+      // Zigzag wire
+      ctx.beginPath();
+      ctx.moveTo(px + 3, pz + ts * 0.3);
+      for (let i = 0; i < 5; i++) {
+        const wx = px + 3 + (i + 0.5) * (ts - 6) / 5;
+        const wy = pz + (i % 2 === 0 ? ts * 0.2 : ts * 0.5);
+        ctx.lineTo(wx, wy);
+      }
+      ctx.lineTo(px + ts - 3, pz + ts * 0.4);
+      ctx.stroke();
+      // Posts
+      ctx.fillStyle = '#777';
+      ctx.fillRect(px + 4, pz + ts * 0.15, 2, ts * 0.45);
+      ctx.fillRect(px + ts - 6, pz + ts * 0.2, 2, ts * 0.4);
+      break;
+    }
+    case 'jersey_barrier': {
+      ctx.fillStyle = '#909090';
+      ctx.fillRect(cx - ts * 0.35, cy - ts * 0.12, ts * 0.7, ts * 0.24);
+      ctx.fillStyle = '#a0a0a0';
+      ctx.fillRect(cx - ts * 0.33, cy - ts * 0.12, ts * 0.66, 2);
+      ctx.fillStyle = '#e8a020';
+      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.02, ts * 0.6, ts * 0.04); // warning stripe
+      break;
+    }
+    case 'burnt_vehicle': {
+      ctx.fillStyle = '#383838';
+      ctx.fillRect(cx - ts * 0.35, cy - ts * 0.2, ts * 0.7, ts * 0.4);
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.3, ts * 0.5, ts * 0.15); // cab
+      // Wheels
+      ctx.fillStyle = '#222';
+      ctx.beginPath(); ctx.arc(cx - ts * 0.22, cy + ts * 0.2, ts * 0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + ts * 0.22, cy + ts * 0.2, ts * 0.08, 0, Math.PI * 2); ctx.fill();
+      // Burn marks
+      ctx.fillStyle = '#4a3020';
+      ctx.fillRect(cx - ts * 0.1, cy - ts * 0.28, ts * 0.25, ts * 0.1);
+      break;
+    }
+    case 'foxhole': {
+      ctx.fillStyle = '#3a3020';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, ts * 0.28, ts * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#504030';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, ts * 0.22, ts * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#5a4a38';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, ts * 0.28, ts * 0.2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case 'hesco': {
+      // Hesco barrier — stacked boxes
+      ctx.fillStyle = '#8a8a68';
+      ctx.fillRect(cx - ts * 0.3, cy - ts * 0.15, ts * 0.28, ts * 0.3);
+      ctx.fillRect(cx + ts * 0.02, cy - ts * 0.15, ts * 0.28, ts * 0.3);
+      ctx.strokeStyle = '#6a6a50';
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(cx - ts * 0.3, cy - ts * 0.15, ts * 0.28, ts * 0.3);
+      ctx.strokeRect(cx + ts * 0.02, cy - ts * 0.15, ts * 0.28, ts * 0.3);
+      // Mesh lines
+      ctx.strokeStyle = '#7a7a5a';
+      ctx.beginPath();
+      ctx.moveTo(cx - ts * 0.3, cy); ctx.lineTo(cx - ts * 0.02, cy); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx + ts * 0.02, cy); ctx.lineTo(cx + ts * 0.3, cy); ctx.stroke();
+      break;
+    }
+    case 'tank_trap': {
+      // Czech hedgehog
+      ctx.strokeStyle = '#606060';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx - ts * 0.25, cy + ts * 0.2); ctx.lineTo(cx + ts * 0.25, cy - ts * 0.2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + ts * 0.25, cy + ts * 0.2); ctx.lineTo(cx - ts * 0.25, cy - ts * 0.2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy - ts * 0.28); ctx.lineTo(cx, cy + ts * 0.28); ctx.stroke();
+      ctx.fillStyle = '#555';
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill(); // center bolt
+      break;
+    }
+  }
+}
+
+// ── Draw natural terrain details on a tile ──
+function drawTerrainDetail(ctx: CanvasRenderingContext2D, type: string, px: number, pz: number, ts: number, variant: number, elevation: number) {
+  const n1 = tileNoise(px, pz, 1);
+  const n2 = tileNoise(px, pz, 2);
+  const n3 = tileNoise(px, pz, 3);
+
+  switch (type) {
+    case 'grass': {
+      // Small grass tufts
+      ctx.fillStyle = '#5a9a45';
+      if (n1 > 0.5) {
+        ctx.fillRect(px + ts * 0.15, pz + ts * 0.7, 2, 3);
+        ctx.fillRect(px + ts * 0.18, pz + ts * 0.68, 2, 4);
+      }
+      if (n2 > 0.4) {
+        ctx.fillRect(px + ts * 0.65, pz + ts * 0.3, 2, 3);
+        ctx.fillRect(px + ts * 0.68, pz + ts * 0.28, 2, 4);
+      }
+      if (n3 > 0.6) {
+        // Small flower / pebble
+        ctx.fillStyle = n1 > 0.7 ? '#c8b848' : '#6aa050';
+        ctx.fillRect(px + ts * 0.4 + n2 * ts * 0.2, pz + ts * 0.5 + n3 * ts * 0.2, 2, 2);
+      }
+      break;
+    }
+    case 'dirt': {
+      // Pebbles and tracks
+      ctx.fillStyle = '#665538';
+      if (n1 > 0.3) ctx.fillRect(px + n2 * ts * 0.6 + 2, pz + n3 * ts * 0.6 + 2, 3, 2);
+      if (n2 > 0.5) ctx.fillRect(px + n1 * ts * 0.5 + 4, pz + n3 * ts * 0.4 + 6, 2, 2);
+      // Subtle tire track
+      if (n3 > 0.7) {
+        ctx.fillStyle = '#5a4a35';
+        ctx.fillRect(px + ts * 0.3, pz, 2, ts);
+        ctx.fillRect(px + ts * 0.65, pz, 2, ts);
+      }
+      break;
+    }
+    case 'stone': {
+      // Cracks and chips
+      ctx.strokeStyle = '#50505a';
+      ctx.lineWidth = 0.8;
+      if (n1 > 0.5) {
+        ctx.beginPath();
+        ctx.moveTo(px + ts * 0.2, pz + ts * n2);
+        ctx.lineTo(px + ts * 0.5, pz + ts * n3 * 0.8);
+        ctx.stroke();
+      }
+      if (n2 > 0.6) {
+        ctx.fillStyle = '#62626a';
+        ctx.fillRect(px + ts * 0.6, pz + ts * 0.4, 3, 3);
+      }
+      break;
+    }
+    case 'water': {
+      // Animated ripple highlights (using variant as pseudo-time)
+      const shimmer = Math.sin(variant * 0.5 + px * 0.1 + pz * 0.15) * 0.5 + 0.5;
+      ctx.fillStyle = `rgba(100,180,255,${shimmer * 0.12})`;
+      ctx.fillRect(px + ts * n1 * 0.5, pz + ts * n2 * 0.5, ts * 0.4, 1);
+      ctx.fillRect(px + ts * n3 * 0.3 + 2, pz + ts * n1 * 0.6 + 4, ts * 0.3, 1);
+      break;
+    }
+    case 'sand': {
+      // Wind ripple lines
+      ctx.strokeStyle = '#b8985a';
+      ctx.lineWidth = 0.6;
+      const yOff = ts * 0.2 + n1 * ts * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(px + 2, pz + yOff);
+      ctx.quadraticCurveTo(px + ts / 2, pz + yOff - 2, px + ts - 2, pz + yOff + 1);
+      ctx.stroke();
+      if (n2 > 0.4) {
+        const yOff2 = ts * 0.5 + n3 * ts * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(px + 3, pz + yOff2);
+        ctx.quadraticCurveTo(px + ts / 2, pz + yOff2 + 2, px + ts - 3, pz + yOff2 - 1);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'trench': {
+      // Plank lines
+      ctx.fillStyle = '#4a3a28';
+      ctx.fillRect(px + 2, pz + ts * 0.2, ts - 4, 2);
+      ctx.fillRect(px + 2, pz + ts * 0.6, ts - 4, 2);
+      break;
+    }
+  }
+}
 
 // ── Unit Animation State ──
 interface UnitAnim {
@@ -249,47 +524,55 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
           const outOfZone = state.shrinkLevel > 0 && !isInZone(x, z, state.shrinkLevel);
           const colors = TERRAIN_COLORS[tile.type] || TERRAIN_COLORS.grass;
 
-          // Base tile
-          ctx.fillStyle = outOfZone ? '#2a1515' : colors.base;
-          ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-
-          // Pixel art detail — checkerboard pattern
-          if ((x + z) % 2 === 0) {
-            ctx.fillStyle = outOfZone ? '#331a1a' : colors.shade;
+          // Base tile with subtle variation using noise
+          const n = tileNoise(x, z, 0);
+          if (outOfZone) {
+            ctx.fillStyle = n > 0.5 ? '#2a1515' : '#241212';
             ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-          }
+          } else {
+            // Main fill
+            ctx.fillStyle = (x + z) % 2 === 0 ? colors.base : colors.shade;
+            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
 
-          // Highlight edge (top-left pixel art bevel)
-          if (!outOfZone) {
-            ctx.fillStyle = colors.highlight + '40';
+            // Natural noise patches — break up the grid
+            if (n > 0.55) {
+              ctx.fillStyle = colors.detail + '60';
+              ctx.fillRect(px + n * 4, pz + n * 6, TILE_SIZE * 0.5, TILE_SIZE * 0.4);
+            }
+            if (n < 0.3) {
+              ctx.fillStyle = colors.highlight + '30';
+              ctx.fillRect(px + 2, pz + 2, TILE_SIZE * 0.6, TILE_SIZE * 0.5);
+            }
+
+            // Bevel — subtle top-left highlight, bottom-right shadow
+            ctx.fillStyle = colors.highlight + '28';
             ctx.fillRect(px, pz, TILE_SIZE, 1);
             ctx.fillRect(px, pz, 1, TILE_SIZE);
+            ctx.fillStyle = '#00000018';
+            ctx.fillRect(px, pz + TILE_SIZE - 1, TILE_SIZE, 1);
+            ctx.fillRect(px + TILE_SIZE - 1, pz, 1, TILE_SIZE);
+
+            // Elevation shading
+            if (tile.elevation > 0.6) {
+              ctx.fillStyle = 'rgba(255,255,255,0.07)';
+              ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
+            } else if (tile.elevation < 0.3) {
+              ctx.fillStyle = 'rgba(0,0,0,0.1)';
+              ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
+            }
+
+            // Natural terrain detail (tufts, pebbles, ripples)
+            drawTerrainDetail(ctx, tile.type, px, pz, TILE_SIZE, tile.variant, tile.elevation);
           }
 
-          // Grid line
-          ctx.strokeStyle = outOfZone ? '#1a0808' : '#00000030';
+          // Grid line — very subtle
+          ctx.strokeStyle = outOfZone ? '#1a080808' : '#00000018';
           ctx.lineWidth = 0.5;
           ctx.strokeRect(px + 0.25, pz + 0.25, TILE_SIZE - 0.5, TILE_SIZE - 0.5);
 
-          // Elevation shading
-          if (tile.elevation > 0.6) {
-            ctx.fillStyle = 'rgba(255,255,255,0.06)';
-            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-          } else if (tile.elevation < 0.3) {
-            ctx.fillStyle = 'rgba(0,0,0,0.08)';
-            ctx.fillRect(px, pz, TILE_SIZE, TILE_SIZE);
-          }
-
-          // Props
+          // Props — drawn as pixel art shapes
           if (tile.prop) {
-            const glyph = PROP_GLYPHS[tile.prop];
-            if (glyph) {
-              ctx.fillStyle = glyph.color;
-              ctx.font = `bold ${TILE_SIZE * 0.55}px monospace`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(glyph.char, px + TILE_SIZE / 2, pz + TILE_SIZE / 2);
-            }
+            drawProp(ctx, tile.prop, px, pz, TILE_SIZE, tile.variant);
           }
 
           // Smoke

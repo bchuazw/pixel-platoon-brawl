@@ -240,7 +240,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
                   <div>
                     <div className="text-[9px] text-foreground font-bold">{u.name}</div>
                     <div className="text-[7px] uppercase tracking-wider" style={{ color: TEAM_COLORS[u.team] }}>
-                      {u.team}
+                      {u.unitClass} • {u.team}
                     </div>
                     <div className="text-[7px] text-muted-foreground">
                       HP:{u.hp} • {u.weapon.name} • Vision:{u.visionRange}

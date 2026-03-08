@@ -1152,14 +1152,19 @@ function scoreTacticalPosition(pos: Position, unit: Unit, enemies: Unit[], state
     if (weakest.hp < 30) score += 15;
   }
 
-  // ── Maintain optimal engagement distance — don't rush in ──
+  // ── Maintain optimal engagement distance — stay at MAX weapon range ──
   for (const enemy of visibleEnemies) {
     const dist = getManhattanDistance(pos, enemy.position);
     // Too close — penalize heavily (ranged units shouldn't melee)
-    if (dist <= 1) score -= 25;
-    else if (dist === 2 && unit.weapon.id !== 'shotgun') score -= 10;
-    // Sweet spot: at weapon range
-    if (dist >= Math.max(2, Math.ceil(weaponRange * 0.6)) && dist <= weaponRange) score += 12;
+    if (dist <= 1) score -= 35;
+    else if (dist === 2 && unit.weapon.id !== 'shotgun') score -= 15;
+    // Best position: at weapon's max range (can still shoot but far away)
+    if (dist === weaponRange) score += 20;
+    else if (dist === weaponRange - 1 && weaponRange >= 3) score += 12;
+    // Bonus for being farther from enemies while still in range
+    if (dist >= Math.max(2, weaponRange - 1) && dist <= weaponRange) score += 15;
+    // Penalty for being within half weapon range (too close for comfort)
+    if (dist <= Math.ceil(weaponRange * 0.4) && unit.weapon.id !== 'shotgun') score -= 10;
   }
 
   // Weapon-specific positioning

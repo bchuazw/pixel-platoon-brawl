@@ -69,7 +69,6 @@ function UnitCard({ unit, index, onCustomize }: { unit: Unit; index: number; onC
             </div>
           )}
           <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ backgroundColor: tc }} />
-          {/* Customize indicator */}
           <div className="absolute top-1 right-1 w-5 h-5 rounded bg-card/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <Settings className="w-3 h-3 text-muted-foreground" />
           </div>
@@ -77,16 +76,16 @@ function UnitCard({ unit, index, onCustomize }: { unit: Unit; index: number; onC
 
         <div className="flex-1 px-3 py-2 sm:px-4 sm:py-2.5 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm sm:text-base text-foreground font-bold truncate">{unit.name}</span>
-            <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md uppercase font-bold font-display"
+            <span className="text-base sm:text-lg text-foreground font-bold truncate">{unit.name}</span>
+            <span className="text-[12px] sm:text-[13px] px-1.5 py-0.5 rounded-md uppercase font-bold font-display"
               style={{ backgroundColor: `${tc}15`, color: tc }}>
               {unit.unitClass}
             </span>
           </div>
-          <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.15em] mt-0.5 font-display" style={{ color: tc }}>
+          <div className="text-[12px] sm:text-[13px] uppercase tracking-[0.15em] mt-0.5 font-display" style={{ color: tc }}>
             {TEAM_NAMES[unit.team]}
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2 text-[12px] sm:text-[13px] text-muted-foreground">
             <span className="flex items-center gap-1"><Heart className="w-3 h-3 text-destructive" /> {unit.hp}</span>
             <span className="flex items-center gap-1"><Swords className="w-3 h-3 text-destructive/70" /> {unit.attack}</span>
             <span className="flex items-center gap-1"><Shield className="w-3 h-3 text-primary/70" /> {unit.defense}</span>
@@ -184,7 +183,7 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
           <Reveal delay={200}>
             <div className="flex items-center justify-center gap-3 mb-2">
               <div className="w-8 sm:w-12 h-[1px]" style={{ background: 'linear-gradient(to right, transparent, hsl(142 70% 45% / 0.4))' }} />
-              <span className="text-[9px] sm:text-[10px] tracking-[0.4em] sm:tracking-[0.5em] text-muted-foreground/30 font-display">TACTICAL BATTLE ROYALE</span>
+              <span className="text-[11px] sm:text-[12px] tracking-[0.4em] sm:tracking-[0.5em] text-muted-foreground/30 font-display">TACTICAL BATTLE ROYALE</span>
               <div className="w-8 sm:w-12 h-[1px]" style={{ background: 'linear-gradient(to left, transparent, hsl(142 70% 45% / 0.4))' }} />
             </div>
           </Reveal>
@@ -205,24 +204,24 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
               <div className="flex items-center gap-1.5">
                 <Swords className="w-4 h-4 text-destructive/60" />
-                <span className="text-sm sm:text-base text-muted-foreground tracking-[0.12em] font-display">4 SQUADS</span>
+                <span className="text-base sm:text-lg text-muted-foreground tracking-[0.12em] font-display">4 SQUADS</span>
               </div>
               <div className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
               <div className="flex items-center gap-1.5">
                 <Crosshair className="w-4 h-4 text-primary/60" />
-                <span className="text-sm sm:text-base text-muted-foreground tracking-[0.12em] font-display">8 COMBATANTS</span>
+                <span className="text-base sm:text-lg text-muted-foreground tracking-[0.12em] font-display">8 COMBATANTS</span>
               </div>
               <div className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
               <div className="flex items-center gap-1.5">
                 <Shield className="w-4 h-4 text-accent/60" />
-                <span className="text-sm sm:text-base text-muted-foreground tracking-[0.12em] font-display">1 SURVIVES</span>
+                <span className="text-base sm:text-lg text-muted-foreground tracking-[0.12em] font-display">1 SURVIVES</span>
               </div>
             </div>
           </Reveal>
 
           <Reveal delay={650}>
             <div className="glass-panel rounded-lg px-4 sm:px-6 py-2 inline-flex items-center gap-3">
-              <span className="text-[10px] sm:text-[11px] text-accent tracking-[0.1em] font-display">
+              <span className="text-[12px] sm:text-[13px] text-accent tracking-[0.1em] font-display">
                 EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE
               </span>
             </div>
@@ -241,7 +240,7 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
                     <div className="flex items-center gap-3 justify-center mb-2">
                       <div className="h-px flex-1 max-w-[60px] sm:max-w-[80px]" style={{ background: `linear-gradient(to right, transparent, ${TEAM_COLORS[team]}30)` }} />
                       <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
-                      <span className="text-[11px] sm:text-xs font-bold tracking-[0.2em] sm:tracking-[0.25em] font-display" style={{ color: TEAM_COLORS[team] }}>
+                      <span className="text-[13px] sm:text-sm font-bold tracking-[0.2em] sm:tracking-[0.25em] font-display" style={{ color: TEAM_COLORS[team] }}>
                         {TEAM_NAMES[team]}
                       </span>
                       <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
@@ -262,7 +261,7 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
               <div className="text-center">
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/20 bg-card/30">
                   <Settings className="w-3.5 h-3.5 text-muted-foreground/40" />
-                  <span className="text-[10px] text-muted-foreground/40">Click any unit to customize gear</span>
+                  <span className="text-[12px] text-muted-foreground/40">Click any unit to customize gear</span>
                 </div>
               </div>
             </Reveal>
@@ -272,11 +271,10 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
           <Reveal delay={1200}>
             <div className="lg:w-[300px] shrink-0">
               <div className="glass-panel rounded-xl p-4 sm:p-5 relative overflow-hidden">
-                {/* WIP Overlay */}
                 <div className="absolute inset-0 z-10 bg-background/40 backdrop-blur-[1px] flex flex-col items-center justify-center rounded-xl">
                   <Lock className="w-6 h-6 text-accent/40 mb-2" />
-                  <div className="text-xs font-display font-bold text-accent/50 tracking-[0.2em]">COMING SOON</div>
-                  <div className="text-[9px] text-muted-foreground/40 mt-1">Crypto betting in a future update</div>
+                  <div className="text-sm font-display font-bold text-accent/50 tracking-[0.2em]">COMING SOON</div>
+                  <div className="text-[11px] text-muted-foreground/40 mt-1">Crypto betting in a future update</div>
                 </div>
                 <CryptoBettingPanel disabled />
               </div>
@@ -288,12 +286,12 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
         <Reveal delay={1800}>
           <div className="text-center space-y-3 sm:space-y-4">
             <button onClick={onStartAutoPlay}
-              className="group px-10 sm:px-16 py-4 sm:py-5 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-all text-sm sm:text-base tracking-[0.2em] sm:tracking-[0.25em] flex items-center gap-3 sm:gap-4 mx-auto relative overflow-hidden font-display font-bold shadow-[0_0_30px_hsl(142_70%_45%/0.2)]">
+              className="group px-10 sm:px-16 py-4 sm:py-5 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-all text-base sm:text-lg tracking-[0.2em] sm:tracking-[0.25em] flex items-center gap-3 sm:gap-4 mx-auto relative overflow-hidden font-display font-bold shadow-[0_0_30px_hsl(142_70%_45%/0.2)]">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
               <Play className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
               <span className="relative z-10">START BATTLE</span>
             </button>
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] text-muted-foreground/40">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[12px] sm:text-[13px] text-muted-foreground/40">
               <span>🤖 AI commands each squad</span>
               <span className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
               <span>🌫️ Fog of War active</span>

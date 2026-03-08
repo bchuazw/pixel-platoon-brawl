@@ -119,7 +119,7 @@ export function BroadcastOverlay({ state }: BroadcastOverlayProps) {
           <div className="flex-1 h-px" style={{ background: `linear-gradient(to left, transparent, ${current.color}35)` }} />
         </div>
 
-        <h2 className={`font-black leading-none font-display ${isLarge ? 'text-4xl tracking-[0.5em]' : 'text-3xl tracking-[0.4em]'}`}
+        <h2 className={`font-black leading-none font-display ${isLarge ? 'text-5xl tracking-[0.5em]' : 'text-4xl tracking-[0.4em]'}`}
           style={{
             color: current.color,
             textShadow: `0 0 40px ${current.color}55, 0 2px 10px rgba(0,0,0,0.8)`,
@@ -128,7 +128,7 @@ export function BroadcastOverlay({ state }: BroadcastOverlayProps) {
         </h2>
 
         {current.subtext && (
-          <p className="text-sm tracking-[0.15em] text-foreground/50 mt-1"
+          <p className="text-base tracking-[0.15em] text-foreground/50 mt-1"
             style={{ textShadow: '0 1px 6px rgba(0,0,0,0.8)' }}>
             {current.subtext}
           </p>

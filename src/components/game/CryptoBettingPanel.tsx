@@ -52,10 +52,10 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
       <div className="text-center space-y-1">
         <div className="flex items-center justify-center gap-2">
           <Coins className="w-4 h-4 text-accent" />
-          <h2 className="text-[11px] font-bold text-accent tracking-[0.2em]">BATTLE WAGER</h2>
+          <h2 className="text-[13px] font-bold text-accent tracking-[0.2em]">BATTLE WAGER</h2>
           <Coins className="w-4 h-4 text-accent" />
         </div>
-        <p className="text-[7px] text-muted-foreground">Place bets with $WAR tokens on the winning squad</p>
+        <p className="text-[9px] text-muted-foreground">Place bets with $WAR tokens on the winning squad</p>
       </div>
 
       {/* Wallet Connect */}
@@ -66,13 +66,13 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
         {walletConnected ? (
           <>
             <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-[8px] text-foreground font-bold">0x7f3a...4d2e</span>
-            <span className="text-[7px] text-muted-foreground">• 12.5 $WAR</span>
+            <span className="text-[10px] text-foreground font-bold">0x7f3a...4d2e</span>
+            <span className="text-[9px] text-muted-foreground">• 12.5 $WAR</span>
           </>
         ) : (
           <>
             <Lock className="w-3 h-3 text-accent" />
-            <span className="text-[8px] text-accent font-bold tracking-wider">CONNECT WALLET</span>
+            <span className="text-[10px] text-accent font-bold tracking-wider">CONNECT WALLET</span>
           </>
         )}
       </button>
@@ -100,31 +100,30 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
                 ...(isSelected ? { boxShadow: `0 0 0 1px ${teamColor}` } : {}),
               }}
             >
-              {/* Team color accent bar */}
               <div className="absolute top-0 left-0 right-0 h-0.5" style={{ backgroundColor: teamColor }} />
 
               <div className="flex items-center gap-1.5 mb-1.5">
                 <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: teamColor }} />
-                <span className="text-[8px] font-bold text-foreground">{TEAM_NAMES[team]}</span>
+                <span className="text-[10px] font-bold text-foreground">{TEAM_NAMES[team]}</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-[6px] text-muted-foreground">POOL</div>
-                  <div className="text-[9px] font-bold text-foreground">
+                  <div className="text-[8px] text-muted-foreground">POOL</div>
+                  <div className="text-[11px] font-bold text-foreground">
                     {teamPool > 0 ? `${teamPool.toFixed(2)} $WAR` : '—'}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[6px] text-muted-foreground">ODDS</div>
-                  <div className="text-[9px] font-bold" style={{ color: teamColor }}>{odds}</div>
+                  <div className="text-[8px] text-muted-foreground">ODDS</div>
+                  <div className="text-[11px] font-bold" style={{ color: teamColor }}>{odds}</div>
                 </div>
               </div>
 
               {hasBet && (
                 <div className="mt-1.5 bg-card/60 rounded px-1.5 py-0.5 flex items-center gap-1">
                   <TrendingUp className="w-2.5 h-2.5 text-accent" />
-                  <span className="text-[6px] text-accent font-bold">YOUR BET: {teamPool.toFixed(2)}</span>
+                  <span className="text-[8px] text-accent font-bold">YOUR BET: {teamPool.toFixed(2)}</span>
                 </div>
               )}
             </button>
@@ -132,13 +131,13 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
         })}
       </div>
 
-      {/* Bet Amount Selector (shows when team selected) */}
+      {/* Bet Amount Selector */}
       {selectedTeam && !disabled && (
         <div
           className="rounded-lg border p-3 space-y-2 animate-in slide-in-from-top-2 duration-200"
           style={{ borderColor: `${TEAM_COLORS[selectedTeam]}40`, backgroundColor: `${TEAM_COLORS[selectedTeam]}05` }}
         >
-          <div className="text-[7px] text-muted-foreground tracking-wider">
+          <div className="text-[9px] text-muted-foreground tracking-wider">
             BET ON <span className="font-bold" style={{ color: TEAM_COLORS[selectedTeam] }}>{TEAM_NAMES[selectedTeam]}</span>
           </div>
 
@@ -147,7 +146,7 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
               <button
                 key={amt}
                 onClick={() => handlePlaceBet(selectedTeam, amt)}
-                className="py-1.5 rounded border border-border/30 bg-secondary/40 hover:bg-secondary/70 transition-all text-[8px] font-bold text-foreground"
+                className="py-1.5 rounded border border-border/30 bg-secondary/40 hover:bg-secondary/70 transition-all text-[10px] font-bold text-foreground"
               >
                 {amt} $WAR
               </button>
@@ -162,7 +161,7 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
               placeholder="Custom amount..."
               value={customAmount}
               onChange={e => setCustomAmount(e.target.value)}
-              className="flex-1 bg-secondary/30 border border-border/30 rounded px-2 py-1.5 text-[8px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent/50"
+              className="flex-1 bg-secondary/30 border border-border/30 rounded px-2 py-1.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent/50"
             />
             <button
               onClick={() => {
@@ -170,7 +169,7 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
                 if (amt > 0) handlePlaceBet(selectedTeam, amt);
               }}
               disabled={!customAmount || parseFloat(customAmount) <= 0}
-              className="px-3 py-1.5 rounded bg-accent/20 border border-accent/30 text-[8px] font-bold text-accent hover:bg-accent/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded bg-accent/20 border border-accent/30 text-[10px] font-bold text-accent hover:bg-accent/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               BET
             </button>
@@ -183,9 +182,9 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Users className="w-3 h-3 text-muted-foreground" />
-            <span className="text-[7px] text-muted-foreground">TOTAL POOL</span>
+            <span className="text-[9px] text-muted-foreground">TOTAL POOL</span>
           </div>
-          <span className="text-[10px] font-bold text-foreground">
+          <span className="text-[12px] font-bold text-foreground">
             {totalPool > 0 ? `${totalPool.toFixed(2)} $WAR` : '0.00 $WAR'}
           </span>
         </div>
@@ -204,10 +203,9 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
           })}
         </div>
 
-        {/* Min bet requirement */}
         <div className="flex items-center gap-1.5 pt-1">
           <Zap className="w-3 h-3" style={{ color: canStart ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }} />
-          <span className="text-[6px]" style={{ color: canStart ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }}>
+          <span className="text-[8px]" style={{ color: canStart ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }}>
             {canStart
               ? '✓ MIN 2 TEAMS COVERED — READY TO FIGHT'
               : `NEED BETS ON ${2 - uniqueTeams} MORE TEAM${2 - uniqueTeams > 1 ? 'S' : ''} TO START`
@@ -219,8 +217,8 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
       {/* Disabled overlay message */}
       {disabled && (
         <div className="text-center py-1.5 rounded-lg border border-accent/20 bg-accent/5">
-          <div className="text-[7px] text-accent font-bold tracking-wider">🔒 COMING SOON</div>
-          <div className="text-[5px] text-muted-foreground mt-0.5">Crypto betting will be enabled in a future update</div>
+          <div className="text-[9px] text-accent font-bold tracking-wider">🔒 COMING SOON</div>
+          <div className="text-[7px] text-muted-foreground mt-0.5">Crypto betting will be enabled in a future update</div>
         </div>
       )}
     </div>

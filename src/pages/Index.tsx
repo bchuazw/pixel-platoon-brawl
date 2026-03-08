@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { GameBoard } from '@/components/game/GameBoard';
+import { GameBoard2D } from '@/components/game/GameBoard2D';
 import { GameHUD } from '@/components/game/GameHUD';
 import { useGameStore } from '@/game/useGameStore';
 import { CharacterPanel, SponsorAction } from '@/components/game/CharacterPanel';

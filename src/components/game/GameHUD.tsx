@@ -13,6 +13,7 @@ interface GameHUDProps {
   onUseAbility: (id: AbilityId) => void;
   onStartAutoPlay: () => void;
   onStopAutoPlay: () => void;
+  onMainMenu?: () => void;
   sponsorPoints?: number;
   onUnitInspect?: (unitId: string) => void;
 }

@@ -307,8 +307,14 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {/* Left - Unit cards */}
       {!isPreGame && (
         <div className="pointer-events-auto absolute left-2 top-14 w-48 space-y-1.5 max-h-[calc(100vh-200px)] overflow-y-auto">
+          {sponsorPoints !== undefined && (
+            <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-1.5 text-center mb-1">
+              <span className="text-[7px] text-accent font-bold">🎁 SPONSOR POINTS: ⭐{sponsorPoints}</span>
+              <div className="text-[5px] text-muted-foreground mt-0.5">Click a unit to sponsor</div>
+            </div>
+          )}
           {state.units.map(u => (
-            <UnitCard key={u.id} unit={u} isActive={u.team === state.currentTeam && u.isAlive} />
+            <UnitCard key={u.id} unit={u} isActive={u.team === state.currentTeam && u.isAlive} onClick={() => onUnitInspect?.(u.id)} />
           ))}
         </div>
       )}

@@ -40,7 +40,9 @@ function getMat(color: string, metalness = 0.1, roughness = 0.7, emissive = '#00
 }
 
 // ── XCOM-style chunky soldier body ──
-function SoldierBody({ teamColor, isMedic }: { teamColor: string; isMedic: boolean }) {
+const BEARDED_UNITS = new Set(['blue-soldier', 'yellow-soldier', 'red-medic', 'yellow-medic']);
+
+function SoldierBody({ teamColor, isMedic, unitId }: { teamColor: string; isMedic: boolean; unitId?: string }) {
   const armorColor = useMemo(() => {
     const c = new THREE.Color(teamColor);
     return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.25).getHexString();
@@ -55,6 +57,7 @@ function SoldierBody({ teamColor, isMedic }: { teamColor: string; isMedic: boole
   const skinMat = useMemo(() => getMat('#c8a882', 0, 0.85), []);
   const bootMat = useMemo(() => getMat('#1e1a14', 0.1, 0.7), []);
   const gearMat = useMemo(() => getMat('#2e2e28', 0.15, 0.6), []);
+  const beardMat = useMemo(() => getMat('#5a3a1a', 0, 0.9), []);
   const helmetMat = useMemo(() => getMat(armorColor, 0.25, 0.45), [armorColor]);
   const visorMat = useMemo(() => getMat('#0a0a0a', 0.8, 0.15), []);
 
@@ -97,6 +100,24 @@ function SoldierBody({ teamColor, isMedic }: { teamColor: string; isMedic: boole
         <mesh position={[0, 0.05, 0.055]} material={visorMat}>
           <boxGeometry args={[0.1, 0.025, 0.02]} />
         </mesh>
+
+        {/* ── BEARD ── */}
+        {unitId && BEARDED_UNITS.has(unitId) && (
+          <>
+            <mesh position={[0, -0.005, 0.04]} material={beardMat}>
+              <boxGeometry args={[0.08, 0.05, 0.06]} />
+            </mesh>
+            <mesh position={[-0.05, 0.01, 0.03]} material={beardMat}>
+              <boxGeometry args={[0.03, 0.06, 0.04]} />
+            </mesh>
+            <mesh position={[0.05, 0.01, 0.03]} material={beardMat}>
+              <boxGeometry args={[0.03, 0.06, 0.04]} />
+            </mesh>
+            <mesh position={[0, 0.025, 0.058]} material={beardMat}>
+              <boxGeometry args={[0.06, 0.015, 0.02]} />
+            </mesh>
+          </>
+        )}
       </group>
 
       {/* ── BACKPACK ── */}
@@ -582,7 +603,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <group ref={bodyRef}>
-        <SoldierBody teamColor={color} isMedic={isMedic} />
+        <SoldierBody teamColor={color} isMedic={isMedic} unitId={unit.id} />
 
         {/* ── LEFT ARM ── */}
         <group ref={leftArmRef} position={[-0.19, 0.48, 0]}>

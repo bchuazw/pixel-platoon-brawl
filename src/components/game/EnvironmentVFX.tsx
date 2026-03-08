@@ -5,7 +5,7 @@ import * as THREE from 'three';
 
 // ── Rain Particles ──
 export function RainParticles() {
-  const count = 800;
+  const count = 300;
   const ref = useRef<THREE.Points>(null);
 
   const [positions, velocities] = useMemo(() => {
@@ -171,8 +171,8 @@ export function GroundFog() {
 // ── Distant trees silhouettes ──
 export function DistantTrees() {
   const trees = useMemo(() =>
-    Array.from({ length: 40 }, (_, i) => {
-      const angle = (i / 40) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
+    Array.from({ length: 20 }, (_, i) => {
+      const angle = (i / 20) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
       const dist = 20 + Math.random() * 15;
       return {
         x: GRID_SIZE / 2 + Math.cos(angle) * dist,

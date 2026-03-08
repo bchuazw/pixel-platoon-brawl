@@ -6,6 +6,16 @@ import { getTileY } from './GridTiles';
 import { playMove } from '@/game/sounds';
 import * as THREE from 'three';
 
+// Get the Y position where units should stand (on TOP of the tile)
+function getUnitBaseY(grid: TileData[][], x: number, z: number): number {
+  const tile = grid[x]?.[z];
+  if (!tile) return 0.15;
+  const tileY = getTileY(tile.elevation);
+  const isTrench = tile.type === 'trench';
+  const height = tile.type === 'water' ? 0.08 : isTrench ? 0.08 : 0.15 + tile.elevation * 0.12;
+  return tileY + height / 2;
+}
+
 interface GameUnitsProps {
   units: Unit[];
   selectedUnitId: string | null;
@@ -195,9 +205,9 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
   const pathRef = useRef<Position[] | null>(null);
   const pathIndex = useRef(0);
   const walkProgress = useRef(1);
-  const walkFrom = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
-  const walkTo = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
-  const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, 0.01, unit.position.z));
+  const walkFrom = useRef(new THREE.Vector3(unit.position.x, getUnitBaseY(grid, unit.position.x, unit.position.z), unit.position.z));
+  const walkTo = useRef(new THREE.Vector3(unit.position.x, getUnitBaseY(grid, unit.position.x, unit.position.z), unit.position.z));
+  const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, getUnitBaseY(grid, unit.position.x, unit.position.z), unit.position.z));
   const moveCompleted = useRef(false);
   const prevPos = useRef({ x: unit.position.x, z: unit.position.z });
 
@@ -212,11 +222,10 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       animTimer.current = 0;
 
       const fromElev = grid[prevPos.current.x]?.[prevPos.current.z]?.elevation || 0;
-      walkFrom.current.set(prevPos.current.x, getTileY(fromElev) + 0.01, prevPos.current.z);
+      walkFrom.current.set(prevPos.current.x, getUnitBaseY(grid, prevPos.current.x, prevPos.current.z), prevPos.current.z);
 
       const firstTarget = movePath[0];
-      const toElev = grid[firstTarget.x]?.[firstTarget.z]?.elevation || 0;
-      walkTo.current.set(firstTarget.x, getTileY(toElev) + 0.01, firstTarget.z);
+      walkTo.current.set(firstTarget.x, getUnitBaseY(grid, firstTarget.x, firstTarget.z), firstTarget.z);
 
       playMove();
     }
@@ -280,8 +289,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     const t = clock.getElapsedTime();
     animTimer.current += delta;
 
-    const unitElev = grid[unit.position.x]?.[unit.position.z]?.elevation || 0;
-    const unitBaseY = getTileY(unitElev) + 0.01;
+    const unitBaseY = getUnitBaseY(grid, unit.position.x, unit.position.z);
 
     // Reset limb rotations each frame
     const resetLimbs = () => {
@@ -361,8 +369,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
           walkProgress.current = 0;
           walkFrom.current.copy(walkTo.current);
           const nextTarget = pathRef.current[pathIndex.current];
-          const nextElev = grid[nextTarget.x]?.[nextTarget.z]?.elevation || 0;
-          walkTo.current.set(nextTarget.x, getTileY(nextElev) + 0.01, nextTarget.z);
+          walkTo.current.set(nextTarget.x, getUnitBaseY(grid, nextTarget.x, nextTarget.z), nextTarget.z);
         } else {
           animState.current = 'idle';
           pathRef.current = null;
@@ -604,7 +611,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
   return (
     <group
       ref={rootRef}
-      position={[unit.position.x, 0.01, unit.position.z]}
+      position={[unit.position.x, getUnitBaseY(grid, unit.position.x, unit.position.z), unit.position.z]}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
       <group ref={bodyRef}>
@@ -798,34 +805,18 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
 
       {/* ── Fog of war vision ring ── */}
       {unit.isAlive && (
-        <>
-          <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[unit.visionRange - 0.06, unit.visionRange + 0.06, 48]} />
-            <meshBasicMaterial color={color} transparent opacity={0.1} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[unit.visionRange, 48]} />
-            <meshBasicMaterial color={color} transparent opacity={0.02} side={THREE.DoubleSide} />
-          </mesh>
-        </>
+        <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[unit.visionRange - 0.06, unit.visionRange + 0.06, 24]} />
+          <meshBasicMaterial color={color} transparent opacity={0.08} side={THREE.DoubleSide} />
+        </mesh>
       )}
 
       {/* ── Overwatch range ── */}
       {unit.isOnOverwatch && (
-        <>
-          <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[unit.attackRange, 32]} />
-            <meshBasicMaterial color="#44aaff" transparent opacity={0.05} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[unit.attackRange - 0.1, unit.attackRange + 0.1, 32]} />
-            <meshBasicMaterial color="#44aaff" transparent opacity={0.2} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh position={[0, 0.022, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[unit.attackRange * 0.5 - 0.04, unit.attackRange * 0.5 + 0.04, 32]} />
-            <meshBasicMaterial color="#44aaff" transparent opacity={0.08} side={THREE.DoubleSide} />
-          </mesh>
-        </>
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[unit.attackRange - 0.1, unit.attackRange + 0.1, 24]} />
+          <meshBasicMaterial color="#44aaff" transparent opacity={0.15} side={THREE.DoubleSide} />
+        </mesh>
       )}
     </group>
   );

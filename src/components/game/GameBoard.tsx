@@ -1,14 +1,14 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette, ChromaticAberration, SSAO, ToneMapping } from '@react-three/postprocessing';
-import { BlendFunction, ToneMappingMode } from 'postprocessing';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
+import { BlendFunction } from 'postprocessing';
 import { Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { GridTiles } from './GridTiles';
 import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
 import { ScreenShake } from './ScreenShake';
-import { EmberParticles, LightShafts, GroundFog, DistantTrees, RainParticles, CloudLayer, RainPuddles } from './EnvironmentVFX';
+import { EmberParticles, DistantTrees, CloudLayer } from './EnvironmentVFX';
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
@@ -103,7 +103,7 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
 }
 
 function DustParticles() {
-  const count = 100;
+  const count = 40;
   const ref = useRef<THREE.Points>(null);
   
   const positions = useMemo(() => {
@@ -169,19 +169,20 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           near: 0.1,
           far: 200,
         }}
-        shadows="soft"
+        shadows
         gl={{
-          antialias: true,
+          antialias: false,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.1,
+          powerPreference: 'high-performance',
         }}
-        dpr={[1, 1.5]}
+        dpr={[1, 1.25]}
       >
         <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />
         <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} />
         <color attach="background" args={['#080e1a']} />
-        <Stars radius={100} depth={60} count={4000} factor={3} saturation={0.3} fade speed={0.2} />
+        <Stars radius={100} depth={60} count={1500} factor={3} saturation={0.3} fade speed={0.2} />
 
         {/* Sky dome */}
         <mesh scale={[-1, 1, 1]}>
@@ -211,31 +212,20 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           <meshStandardMaterial color="#0c160c" roughness={1} metalness={0} />
         </mesh>
 
-        {/* Mountains - more variety */}
-        {Array.from({ length: 14 }, (_, i) => {
-          const angle = (i / 14) * Math.PI * 2;
+        {/* Mountains - reduced count */}
+        {Array.from({ length: 8 }, (_, i) => {
+          const angle = (i / 8) * Math.PI * 2;
           const dist = 35 + Math.sin(i * 2.7) * 12;
-          const height = 6 + Math.sin(i * 1.3) * 5 + Math.cos(i * 0.7) * 3;
+          const height = 6 + Math.sin(i * 1.3) * 5;
           return (
-            <group key={i}>
-              <mesh position={[
-                GRID_SIZE / 2 + Math.cos(angle) * dist,
-                height * 0.35,
-                GRID_SIZE / 2 + Math.sin(angle) * dist
-              ]}>
-                <coneGeometry args={[8 + i * 1.1, height, 7]} />
-                <meshStandardMaterial color="#08100a" roughness={1} />
-              </mesh>
-              {/* Secondary peak */}
-              <mesh position={[
-                GRID_SIZE / 2 + Math.cos(angle + 0.15) * (dist - 3),
-                height * 0.25,
-                GRID_SIZE / 2 + Math.sin(angle + 0.15) * (dist - 3)
-              ]}>
-                <coneGeometry args={[5 + i * 0.5, height * 0.7, 5]} />
-                <meshStandardMaterial color="#0a120c" roughness={1} />
-              </mesh>
-            </group>
+            <mesh key={i} position={[
+              GRID_SIZE / 2 + Math.cos(angle) * dist,
+              height * 0.35,
+              GRID_SIZE / 2 + Math.sin(angle) * dist
+            ]}>
+              <coneGeometry args={[8 + i * 1.1, height, 5]} />
+              <meshStandardMaterial color="#08100a" roughness={1} />
+            </mesh>
           );
         })}
 
@@ -251,8 +241,8 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           intensity={1.2}
           castShadow
           color="#ffe0b0"
-          shadow-mapSize-width={4096}
-          shadow-mapSize-height={4096}
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
           shadow-camera-near={0.5}
           shadow-camera-far={80}
           shadow-camera-left={-25}
@@ -260,7 +250,6 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           shadow-camera-top={25}
           shadow-camera-bottom={-25}
           shadow-bias={-0.0003}
-          shadow-normalBias={0.02}
         />
         
         {/* Fill light (cool blue) */}
@@ -275,35 +264,24 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         {/* Fog */}
         <fog attach="fog" args={['#0a101e', 35, 80]} />
 
-        {/* Atmospheric particles */}
+        {/* Atmospheric particles - reduced */}
         <DustParticles />
         <EmberParticles />
-        <LightShafts />
-        <GroundFog />
-        <RainParticles />
-        <RainPuddles />
         <ScreenShake events={state.combatEvents} />
 
-        {/* ── Post-processing pipeline ── */}
-        <EffectComposer multisampling={4}>
+        {/* ── Post-processing pipeline (simplified) ── */}
+        <EffectComposer multisampling={0}>
           <Bloom
-            intensity={0.5}
-            luminanceThreshold={0.5}
-            luminanceSmoothing={0.8}
+            intensity={0.4}
+            luminanceThreshold={0.6}
+            luminanceSmoothing={0.9}
             mipmapBlur
-          />
-          <ChromaticAberration
-            offset={new THREE.Vector2(0.0004, 0.0004)}
-            radialModulation={true}
-            modulationOffset={0.5}
-            blendFunction={BlendFunction.NORMAL}
           />
           <Vignette
             offset={0.25}
-            darkness={0.75}
+            darkness={0.7}
             blendFunction={BlendFunction.NORMAL}
           />
-          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         </EffectComposer>
 
         <Suspense fallback={<LoadingFallback />}>

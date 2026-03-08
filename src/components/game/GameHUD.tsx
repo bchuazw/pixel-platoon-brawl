@@ -21,7 +21,7 @@ const CLASS_ICONS: Record<string, typeof Swords> = {
   medic: Heart,
 };
 
-function UnitCard({ unit, isActive }: { unit: Unit; isActive: boolean }) {
+function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; onClick?: () => void }) {
   const hpPercent = (unit.hp / unit.maxHp) * 100;
   const teamColor = TEAM_COLORS[unit.team];
   const Icon = CLASS_ICONS[unit.unitClass] || Swords;

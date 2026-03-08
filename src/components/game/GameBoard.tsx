@@ -14,6 +14,41 @@ import { GameState, Position, GRID_SIZE, KillCamData, AirdropData } from '@/game
 import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
 
+// ── WASD Camera Panning ──
+function WASDControls({ orbitRef }: { orbitRef: React.RefObject<any> }) {
+  const keys = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => keys.current.add(e.key.toLowerCase());
+    const onUp = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
+  }, []);
+
+  useFrame(() => {
+    if (!orbitRef.current) return;
+    const speed = 0.15;
+    const target = orbitRef.current.target;
+    const camera = orbitRef.current.object;
+    // Get forward/right vectors projected on xz plane
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+    let moved = false;
+    if (keys.current.has('w') || keys.current.has('arrowup')) { target.addScaledVector(forward, speed); camera.position.addScaledVector(forward, speed); moved = true; }
+    if (keys.current.has('s') || keys.current.has('arrowdown')) { target.addScaledVector(forward, -speed); camera.position.addScaledVector(forward, -speed); moved = true; }
+    if (keys.current.has('a') || keys.current.has('arrowleft')) { target.addScaledVector(right, -speed); camera.position.addScaledVector(right, -speed); moved = true; }
+    if (keys.current.has('d') || keys.current.has('arrowright')) { target.addScaledVector(right, speed); camera.position.addScaledVector(right, speed); moved = true; }
+    if (moved) orbitRef.current.update();
+  });
+
+  return null;
+}
+
 interface GameBoardProps {
   state: GameState;
   onTileClick: (pos: Position) => void;

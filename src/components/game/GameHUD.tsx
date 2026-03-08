@@ -182,6 +182,7 @@ function Minimap({ state }: { state: GameState }) {
 }
 
 export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay }: GameHUDProps) {
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;

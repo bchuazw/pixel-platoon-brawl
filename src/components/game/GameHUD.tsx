@@ -220,15 +220,6 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
   const mvp = [...state.units].sort((a, b) => b.kills - a.kills)[0];
   const totalKills = state.units.reduce((s, u) => s + u.kills, 0);
   const survivors = state.units.filter(u => u.isAlive);
-  const [betPayout, setBetPayout] = useState(0);
-
-  // Collect bet payout once on mount
-  useEffect(() => {
-    if (collectBetPayout) {
-      const payout = collectBetPayout();
-      setBetPayout(payout);
-    }
-  }, []);
 
   useEffect(() => {
     playVictoryFanfare();

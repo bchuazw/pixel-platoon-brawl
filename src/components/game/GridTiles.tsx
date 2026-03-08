@@ -601,12 +601,12 @@ function PropObject({ tile }: { tile: TileData }) {
           {/* Body/chassis */}
           <mesh position={[0, 0.14, 0]} castShadow>
             <boxGeometry args={[0.8, 0.22, 0.4]} />
-            <meshStandardMaterial color={h > 0.5 ? '#4a3a2a' : '#2a3a4a'} roughness={0.75} metalness={0.35} />
+            <meshStandardMaterial color={carColor} roughness={0.75} metalness={0.35} />
           </mesh>
           {/* Roof/cabin */}
           <mesh position={[0.05, 0.32, 0]} castShadow>
             <boxGeometry args={[0.4, 0.18, 0.36]} />
-            <meshStandardMaterial color={h > 0.5 ? '#3a2a1a' : '#1a2a3a'} roughness={0.7} metalness={0.4} />
+            <meshStandardMaterial color={darkenColor(carColor, 0.2)} roughness={0.7} metalness={0.4} />
           </mesh>
           {/* Windshield (broken) */}
           <mesh position={[0.26, 0.3, 0]} rotation={[0, 0, -0.2]}>

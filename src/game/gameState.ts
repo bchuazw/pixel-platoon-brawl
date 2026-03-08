@@ -1,120 +1,103 @@
-import { GameState, Unit, Position, TileData, Team, UnitClass, GRID_SIZE, CLASS_STATS, TileType, PropType } from './types';
+import {
+  GameState, Unit, Position, TileData, Team, UnitClass, GRID_SIZE,
+  CLASS_STATS, CLASS_ABILITIES, TileType, PropType, CombatEvent,
+  AP_MOVE_COST, AP_ATTACK_COST, AttackPreview, AbilityId,
+} from './types';
 
-// Seeded random for reproducible maps
+// ── Random ──
 function seededRandom(seed: number) {
   let s = seed;
-  return () => {
-    s = (s * 16807 + 0) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
+  return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
 
+let eventCounter = 0;
+function makeEventId() { return `evt-${++eventCounter}-${Date.now()}`; }
+
+// ── Grid Generation ──
 function createGrid(): TileData[][] {
   const grid: TileData[][] = [];
   const rand = seededRandom(Date.now());
 
-  // Create base terrain with noise-like patterns
   for (let x = 0; x < GRID_SIZE; x++) {
     grid[x] = [];
     for (let z = 0; z < GRID_SIZE; z++) {
-      // Create natural terrain patterns
       const distFromCenter = Math.sqrt((x - 10) ** 2 + (z - 10) ** 2);
       const r = rand();
 
       let type: TileType = 'grass';
       let elevation = 0;
 
-      // Paths/dirt roads crossing the map
       const onHorizPath = Math.abs(z - 10) <= 1 && x > 3 && x < 17;
       const onVertPath = Math.abs(x - 10) <= 1 && z > 3 && z < 17;
       const onDiagPath1 = Math.abs(x - z) <= 1;
       const onDiagPath2 = Math.abs(x - (GRID_SIZE - 1 - z)) <= 1;
 
       if (onHorizPath || onVertPath) {
-        type = 'dirt';
-        elevation = 0;
+        type = 'dirt'; elevation = 0;
       } else if ((onDiagPath1 || onDiagPath2) && r < 0.4) {
-        type = 'sand';
-        elevation = 0;
+        type = 'sand'; elevation = 0;
       } else if (distFromCenter < 3 && r < 0.3) {
-        type = 'stone';
-        elevation = 0.1;
+        type = 'stone'; elevation = 0.1;
       } else if (r < 0.04) {
-        type = 'water';
-        elevation = -0.15;
+        type = 'water'; elevation = -0.15;
       } else if (r < 0.07 && distFromCenter > 4) {
-        type = 'stone';
-        elevation = 0.15;
+        type = 'stone'; elevation = 0.15;
       }
 
-      // Add random props
       let prop: PropType = null;
       let isBlocked = false;
-      let givesCover = false;
+      let coverValue: 0 | 1 | 2 = 0;
 
       if (type === 'water') {
         isBlocked = true;
       } else if (type !== 'dirt' && type !== 'sand') {
         const propRoll = rand();
         if (propRoll < 0.03 && distFromCenter > 3) {
-          prop = 'tree';
-          isBlocked = true;
-          givesCover = true;
-          elevation = 0;
+          prop = 'tree'; isBlocked = true; coverValue = 2;
         } else if (propRoll < 0.06) {
-          prop = 'rock';
-          isBlocked = true;
-          givesCover = true;
+          prop = 'rock'; isBlocked = true; coverValue = 2;
         } else if (propRoll < 0.08) {
-          prop = 'bush';
-          givesCover = true;
+          prop = 'bush'; coverValue = 1;
         } else if (propRoll < 0.10) {
-          prop = 'crate';
-          isBlocked = true;
-          givesCover = true;
+          prop = 'crate'; isBlocked = true; coverValue = 2;
         } else if (propRoll < 0.12) {
-          prop = 'barrel';
-          isBlocked = true;
-          givesCover = true;
+          prop = 'barrel'; isBlocked = true; coverValue = 1;
         } else if (propRoll < 0.14 && distFromCenter > 5) {
-          prop = 'sandbag';
-          givesCover = true;
+          prop = 'sandbag'; coverValue = 2;
         } else if (propRoll < 0.155 && distFromCenter > 6) {
-          prop = 'ruins';
-          isBlocked = true;
-          givesCover = true;
-          elevation = 0.3;
+          prop = 'ruins'; isBlocked = true; coverValue = 2; elevation = 0.3;
         }
       }
 
-      grid[x][z] = { x, z, elevation, type, prop, isBlocked, givesCover, variant: Math.floor(rand() * 4) };
+      grid[x][z] = { x, z, elevation, type, prop, isBlocked, coverValue, variant: Math.floor(rand() * 4), hasSmoke: false };
     }
   }
 
-  // Add strategic cover clusters near center
+  // Strategic cover clusters
   const coverPositions = [
     { x: 8, z: 8 }, { x: 8, z: 9 }, { x: 9, z: 8 },
     { x: 11, z: 11 }, { x: 11, z: 12 }, { x: 12, z: 11 },
     { x: 8, z: 12 }, { x: 12, z: 8 },
     { x: 5, z: 10 }, { x: 14, z: 10 }, { x: 10, z: 5 }, { x: 10, z: 14 },
+    { x: 4, z: 4 }, { x: 15, z: 15 }, { x: 4, z: 15 }, { x: 15, z: 4 },
+    { x: 7, z: 5 }, { x: 12, z: 14 }, { x: 5, z: 13 }, { x: 14, z: 7 },
   ];
+  const coverProps: PropType[] = ['sandbag', 'crate', 'barrel'];
   for (const pos of coverPositions) {
-    if (grid[pos.x][pos.z].type !== 'water') {
-      const props: PropType[] = ['sandbag', 'crate', 'barrel'];
-      grid[pos.x][pos.z].prop = props[Math.floor(rand() * props.length)];
+    if (pos.x < GRID_SIZE && pos.z < GRID_SIZE && grid[pos.x][pos.z].type !== 'water') {
+      grid[pos.x][pos.z].prop = coverProps[Math.floor(rand() * coverProps.length)];
       grid[pos.x][pos.z].isBlocked = true;
-      grid[pos.x][pos.z].givesCover = true;
+      grid[pos.x][pos.z].coverValue = 2;
     }
   }
 
-  // Clear spawn corners
+  // Clear spawn corners (bigger area)
   for (const corner of [[0, 0], [0, GRID_SIZE - 1], [GRID_SIZE - 1, 0], [GRID_SIZE - 1, GRID_SIZE - 1]]) {
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dz = -1; dz <= 1; dz++) {
-        const cx = corner[0] + dx;
-        const cz = corner[1] + dz;
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        const cx = corner[0] + dx, cz = corner[1] + dz;
         if (cx >= 0 && cx < GRID_SIZE && cz >= 0 && cz < GRID_SIZE) {
-          grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, givesCover: false, elevation: 0 };
+          grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, coverValue: 0, elevation: 0, hasSmoke: false };
         }
       }
     }
@@ -123,45 +106,160 @@ function createGrid(): TileData[][] {
   return grid;
 }
 
+// ── Unit Creation ──
 function createUnit(id: string, name: string, unitClass: UnitClass, team: Team, position: Position): Unit {
   const stats = CLASS_STATS[unitClass];
   return {
     id, name, unitClass, team, position,
     hp: stats.hp, maxHp: stats.hp, attack: stats.attack, defense: stats.defense,
-    moveRange: stats.moveRange, attackRange: stats.attackRange,
-    hasMoved: false, hasAttacked: false, isAlive: true, level: 1, xp: 0,
+    accuracy: stats.accuracy, moveRange: stats.moveRange, attackRange: stats.attackRange,
+    ap: stats.maxAp, maxAp: stats.maxAp,
+    isAlive: true, level: 1, xp: 0,
+    abilities: [...CLASS_ABILITIES[unitClass]],
+    cooldowns: {}, isOnOverwatch: false, isSuppressed: false,
+    coverType: 'none', kills: 0,
   };
 }
 
+// ── State Init ──
 export function createInitialState(): GameState {
   const grid = createGrid();
   const units: Unit[] = [
+    // Blue team (player) - bottom-left
     createUnit('blue-0', 'Marco', 'soldier', 'blue', { x: 1, z: 1 }),
+    createUnit('blue-1', 'Tarma', 'sniper', 'blue', { x: 0, z: 2 }),
+    createUnit('blue-2', 'Eri', 'medic', 'blue', { x: 2, z: 0 }),
+    // Red team - top-right
     createUnit('red-0', 'Viper', 'sniper', 'red', { x: 18, z: 18 }),
-    createUnit('green-0', 'Oak', 'heavy', 'green', { x: 1, z: 18 }),
-    createUnit('yellow-0', 'Bolt', 'medic', 'yellow', { x: 18, z: 1 }),
+    createUnit('red-1', 'Cobra', 'soldier', 'red', { x: 17, z: 19 }),
+    createUnit('red-2', 'Mamba', 'heavy', 'red', { x: 19, z: 17 }),
+    // Green team - bottom-right
+    createUnit('green-0', 'Oak', 'heavy', 'green', { x: 18, z: 1 }),
+    createUnit('green-1', 'Elm', 'medic', 'green', { x: 19, z: 2 }),
+    createUnit('green-2', 'Ash', 'soldier', 'green', { x: 17, z: 0 }),
+    // Yellow team - top-left
+    createUnit('yellow-0', 'Bolt', 'soldier', 'yellow', { x: 1, z: 18 }),
+    createUnit('yellow-1', 'Spark', 'sniper', 'yellow', { x: 0, z: 17 }),
+    createUnit('yellow-2', 'Flash', 'heavy', 'yellow', { x: 2, z: 19 }),
   ];
 
+  // Update initial cover
+  updateAllUnitsCover(units, grid);
+
   return {
-    units,
-    currentTeam: 'blue',
-    selectedUnitId: null,
-    phase: 'select',
-    turn: 1,
-    movableTiles: [],
-    attackableTiles: [],
+    units, currentTeam: 'blue', selectedUnitId: null,
+    phase: 'select', turn: 1,
+    movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+    activeAbility: null,
     grid,
-    log: ['⚔ BATTLE ROYALE BEGINS! Blue team\'s turn.', 'Select your unit to move and fight!'],
-    shrinkLevel: 0,
-    zoneTimer: 5,
+    log: [
+      '═══════════════════════════',
+      '⚔ TACTICAL ROYALE — BATTLE BEGIN',
+      '═══════════════════════════',
+      '» Blue team deploys. 2 AP per unit.',
+      '» Use MOVE, ATTACK, and ABILITIES wisely!',
+    ],
+    shrinkLevel: 0, zoneTimer: 5,
+    combatEvents: [], attackPreview: null, hoveredTile: null,
   };
 }
 
+// ── Cover System ──
+export function getCoverFromDirection(pos: Position, attackerPos: Position, grid: TileData[][]): 'none' | 'half' | 'full' {
+  // Check tiles between defender and attacker for cover
+  const dx = Math.sign(attackerPos.x - pos.x);
+  const dz = Math.sign(attackerPos.z - pos.z);
+
+  // Check the tile closest to defender in attacker's direction
+  const checkPositions = [
+    { x: pos.x + dx, z: pos.z },
+    { x: pos.x, z: pos.z + dz },
+    { x: pos.x + dx, z: pos.z + dz },
+  ];
+
+  let bestCover: 'none' | 'half' | 'full' = 'none';
+  for (const cp of checkPositions) {
+    if (cp.x >= 0 && cp.x < GRID_SIZE && cp.z >= 0 && cp.z < GRID_SIZE) {
+      const tile = grid[cp.x][cp.z];
+      if (tile.coverValue === 2) bestCover = 'full';
+      else if (tile.coverValue === 1 && bestCover === 'none') bestCover = 'half';
+      if (tile.hasSmoke) bestCover = 'full'; // smoke = full cover
+    }
+  }
+  return bestCover;
+}
+
+function updateAllUnitsCover(units: Unit[], grid: TileData[][]) {
+  for (const u of units) {
+    if (!u.isAlive) continue;
+    // Check all adjacent tiles for cover
+    let best: 0 | 1 | 2 = 0;
+    for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = u.position.x + dx, nz = u.position.z + dz;
+      if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+        const cv = grid[nx][nz].coverValue;
+        if (cv > best) best = cv;
+        if (grid[nx][nz].hasSmoke && best < 2) best = 2;
+      }
+    }
+    u.coverType = best === 2 ? 'full' : best === 1 ? 'half' : 'none';
+  }
+}
+
+// ── Hit Chance ──
+export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]): number {
+  let chance = attacker.accuracy;
+
+  // Distance penalty
+  const dist = getManhattanDistance(attacker.position, defender.position);
+  if (dist > 3) chance -= (dist - 3) * 5;
+
+  // Cover penalty
+  const cover = getCoverFromDirection(defender.position, attacker.position, grid);
+  if (cover === 'half') chance -= 25;
+  if (cover === 'full') chance -= 45;
+
+  // Suppressed attacker penalty
+  if (attacker.isSuppressed) chance -= 30;
+
+  // Elevation bonus
+  const aElev = grid[attacker.position.x]?.[attacker.position.z]?.elevation || 0;
+  const dElev = grid[defender.position.x]?.[defender.position.z]?.elevation || 0;
+  if (aElev > dElev) chance += 10;
+
+  return Math.max(5, Math.min(95, chance));
+}
+
+export function calcCritChance(attacker: Unit, defender: Unit): number {
+  let crit = 10;
+  if (attacker.unitClass === 'sniper') crit += 15;
+  if (defender.coverType === 'none') crit += 10;
+  const dist = getManhattanDistance(attacker.position, defender.position);
+  if (dist <= 1) crit += 10;
+  return Math.min(40, crit);
+}
+
+export function getAttackPreview(attacker: Unit, defender: Unit, grid: TileData[][]): AttackPreview {
+  const hitChance = calcHitChance(attacker, defender, grid);
+  const critChance = calcCritChance(attacker, defender);
+  const baseDmg = Math.max(1, attacker.attack - defender.defense * 0.4);
+  const cover = getCoverFromDirection(defender.position, attacker.position, grid);
+  return {
+    targetId: defender.id,
+    hitChance,
+    expectedDamage: Math.floor(baseDmg),
+    critChance,
+    targetCover: cover,
+  };
+}
+
+// ── Core Mechanics ──
 export function getManhattanDistance(a: Position, b: Position): number {
   return Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
 }
 
 export function getMovableTiles(unit: Unit, state: GameState): Position[] {
+  if (unit.ap < AP_MOVE_COST || unit.isSuppressed) return [];
   const tiles: Position[] = [];
   for (let x = 0; x < GRID_SIZE; x++) {
     for (let z = 0; z < GRID_SIZE; z++) {
@@ -177,6 +275,7 @@ export function getMovableTiles(unit: Unit, state: GameState): Position[] {
 }
 
 export function getAttackableTiles(unit: Unit, state: GameState): Position[] {
+  if (unit.ap < AP_ATTACK_COST) return [];
   const tiles: Position[] = [];
   for (let x = 0; x < GRID_SIZE; x++) {
     for (let z = 0; z < GRID_SIZE; z++) {
@@ -190,27 +289,112 @@ export function getAttackableTiles(unit: Unit, state: GameState): Position[] {
   return tiles;
 }
 
+export function getAbilityTargetTiles(unit: Unit, abilityId: AbilityId, state: GameState): Position[] {
+  const ability = unit.abilities.find(a => a.id === abilityId);
+  if (!ability || unit.ap < ability.apCost) return [];
+  if (unit.cooldowns[abilityId] && unit.cooldowns[abilityId] > 0) return [];
+
+  const tiles: Position[] = [];
+  switch (abilityId) {
+    case 'grenade':
+    case 'smoke':
+      for (let x = 0; x < GRID_SIZE; x++) {
+        for (let z = 0; z < GRID_SIZE; z++) {
+          const dist = getManhattanDistance(unit.position, { x, z });
+          if (dist > 0 && dist <= ability.range) tiles.push({ x, z });
+        }
+      }
+      break;
+    case 'heal':
+      for (const u of state.units) {
+        if (u.isAlive && u.team === unit.team && u.id !== unit.id && u.hp < u.maxHp) {
+          if (getManhattanDistance(unit.position, u.position) <= ability.range) {
+            tiles.push(u.position);
+          }
+        }
+      }
+      break;
+    case 'suppress':
+      for (const u of state.units) {
+        if (u.isAlive && u.team !== unit.team) {
+          if (getManhattanDistance(unit.position, u.position) <= ability.range) {
+            tiles.push(u.position);
+          }
+        }
+      }
+      break;
+    case 'overwatch':
+      tiles.push(unit.position); // self-target
+      break;
+  }
+  return tiles;
+}
+
 export function isInZone(x: number, z: number, shrinkLevel: number): boolean {
   const margin = shrinkLevel * 2;
   return x >= margin && x < GRID_SIZE - margin && z >= margin && z < GRID_SIZE - margin;
 }
 
-export function performAttack(attacker: Unit, defender: Unit): { damage: number; killed: boolean } {
-  const baseDmg = attacker.attack - defender.defense * 0.5;
-  const variance = 0.8 + Math.random() * 0.4;
-  const damage = Math.max(1, Math.floor(baseDmg * variance));
+// ── Combat Resolution ──
+export function performAttack(
+  attacker: Unit, defender: Unit, grid: TileData[][]
+): { damage: number; killed: boolean; hit: boolean; crit: boolean; events: CombatEvent[] } {
+  const events: CombatEvent[] = [];
+  const hitChance = calcHitChance(attacker, defender, grid);
+  const critChance = calcCritChance(attacker, defender);
+  const roll = Math.random() * 100;
+
+  if (roll > hitChance) {
+    events.push({
+      id: makeEventId(), type: 'miss',
+      attackerPos: { ...attacker.position }, targetPos: { ...defender.position },
+      message: `${attacker.name} MISSED ${defender.name}!`,
+      timestamp: Date.now(),
+    });
+    return { damage: 0, killed: false, hit: false, crit: false, events };
+  }
+
+  const isCrit = Math.random() * 100 < critChance;
+  const baseDmg = Math.max(1, attacker.attack - defender.defense * 0.4);
+  const variance = 0.85 + Math.random() * 0.3;
+  let damage = Math.floor(baseDmg * variance);
+  if (isCrit) damage = Math.floor(damage * 1.5);
+
   defender.hp -= damage;
   const killed = defender.hp <= 0;
-  if (killed) { defender.hp = 0; defender.isAlive = false; attacker.xp += 50; }
-  else { attacker.xp += 10; }
+  if (killed) {
+    defender.hp = 0;
+    defender.isAlive = false;
+    attacker.xp += 50;
+    attacker.kills++;
+  } else {
+    attacker.xp += 10;
+  }
+
+  // Level up
   if (attacker.xp >= 100) {
     attacker.xp -= 100; attacker.level++;
     attacker.maxHp += 10; attacker.hp = Math.min(attacker.hp + 10, attacker.maxHp);
-    attacker.attack += 3; attacker.defense += 2;
+    attacker.attack += 3; attacker.defense += 2; attacker.accuracy += 2;
   }
-  return { damage, killed };
+
+  events.push({
+    id: makeEventId(),
+    type: killed ? 'kill' : isCrit ? 'crit' : 'damage',
+    attackerPos: { ...attacker.position }, targetPos: { ...defender.position },
+    value: damage,
+    message: killed
+      ? `💀 ${attacker.name} ELIMINATED ${defender.name}! (${damage} dmg)`
+      : isCrit
+        ? `💥 CRITICAL HIT! ${attacker.name} → ${defender.name} for ${damage} dmg!`
+        : `${attacker.name} → ${defender.name} for ${damage} dmg`,
+    timestamp: Date.now(),
+  });
+
+  return { damage, killed, hit: true, crit: isCrit, events };
 }
 
+// ── Team Management ──
 export function getNextTeam(currentTeam: Team, units: Unit[]): Team | null {
   const order: Team[] = ['blue', 'red', 'green', 'yellow'];
   const idx = order.indexOf(currentTeam);
@@ -227,14 +411,17 @@ export function getAliveTeams(units: Unit[]): Team[] {
   return Array.from(teams);
 }
 
-export function runAiTurn(state: GameState): GameState {
-  const newState = { ...state };
+// ── AI ──
+export function runAiTurn(state: GameState): { state: GameState; events: CombatEvent[] } {
+  const newState = { ...state, units: state.units.map(u => ({ ...u })) };
+  const allEvents: CombatEvent[] = [];
   const teamUnits = newState.units.filter(u => u.team === newState.currentTeam && u.isAlive);
 
   for (const unit of teamUnits) {
     const enemies = newState.units.filter(u => u.isAlive && u.team !== unit.team);
     if (enemies.length === 0) break;
 
+    // Find closest enemy
     let closest = enemies[0];
     let closestDist = getManhattanDistance(unit.position, closest.position);
     for (const e of enemies) {
@@ -242,33 +429,105 @@ export function runAiTurn(state: GameState): GameState {
       if (d < closestDist) { closest = e; closestDist = d; }
     }
 
-    if (!unit.hasMoved) {
-      const movable = getMovableTiles(unit, newState);
-      if (movable.length > 0) {
-        let bestTile = movable[0];
-        let bestDist = getManhattanDistance(movable[0], closest.position);
-        for (const t of movable) {
-          const d = getManhattanDistance(t, closest.position);
-          if (d < bestDist) { bestTile = t; bestDist = d; }
+    // Try to use ability first
+    if (unit.ap >= 1) {
+      if (unit.unitClass === 'medic') {
+        // Heal injured allies
+        const injuredAlly = newState.units.find(u =>
+          u.isAlive && u.team === unit.team && u.id !== unit.id &&
+          u.hp < u.maxHp * 0.6 && getManhattanDistance(unit.position, u.position) <= 2
+        );
+        if (injuredAlly && (!unit.cooldowns['heal'] || unit.cooldowns['heal'] <= 0)) {
+          const healAmt = 40;
+          injuredAlly.hp = Math.min(injuredAlly.maxHp, injuredAlly.hp + healAmt);
+          unit.ap -= 1;
+          unit.cooldowns['heal'] = 2;
+          allEvents.push({
+            id: makeEventId(), type: 'heal',
+            attackerPos: { ...unit.position }, targetPos: { ...injuredAlly.position },
+            value: healAmt,
+            message: `💊 ${unit.name} heals ${injuredAlly.name} for ${healAmt} HP!`,
+            timestamp: Date.now(),
+          });
         }
-        unit.position = bestTile;
-        unit.hasMoved = true;
       }
     }
 
-    if (!unit.hasAttacked) {
+    // Move toward closest enemy (prefer cover tiles)
+    if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
+      const movable = getMovableTiles(unit, newState);
+      if (movable.length > 0) {
+        // Score tiles: closer to enemy + has cover nearby
+        let bestTile = movable[0];
+        let bestScore = -Infinity;
+        for (const t of movable) {
+          const dist = getManhattanDistance(t, closest.position);
+          let score = -dist * 2; // want to be close
+          // Cover bonus
+          for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            const nx = t.x + dx, nz = t.z + dz;
+            if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+              score += newState.grid[nx][nz].coverValue * 3;
+            }
+          }
+          // Don't move too close as sniper
+          if (unit.unitClass === 'sniper' && dist < 3) score -= 10;
+          if (score > bestScore) { bestTile = t; bestScore = score; }
+        }
+        unit.position = bestTile;
+        unit.ap -= AP_MOVE_COST;
+      }
+    }
+
+    // Attack
+    if (unit.ap >= AP_ATTACK_COST) {
       const attackable = getAttackableTiles(unit, newState);
       if (attackable.length > 0) {
-        const targetPos = attackable[0];
-        const target = newState.units.find(u => u.isAlive && u.position.x === targetPos.x && u.position.z === targetPos.z);
-        if (target) {
-          const result = performAttack(unit, target);
-          newState.log = [...newState.log, `${unit.name} hits ${target.name} for ${result.damage} dmg!${result.killed ? ' ELIMINATED!' : ''}`];
-          unit.hasAttacked = true;
+        // Pick target with lowest HP
+        let bestTarget: Unit | null = null;
+        let lowestHp = Infinity;
+        for (const tp of attackable) {
+          const target = newState.units.find(u => u.isAlive && u.position.x === tp.x && u.position.z === tp.z && u.team !== unit.team);
+          if (target && target.hp < lowestHp) { bestTarget = target; lowestHp = target.hp; }
+        }
+        if (bestTarget) {
+          const result = performAttack(unit, bestTarget, newState.grid);
+          allEvents.push(...result.events);
+          newState.log = [...newState.log, ...result.events.map(e => e.message)];
+          unit.ap -= AP_ATTACK_COST;
         }
       }
+    }
+
+    // Set overwatch with remaining AP (snipers)
+    if (unit.unitClass === 'sniper' && unit.ap >= 1 && !unit.isOnOverwatch) {
+      unit.isOnOverwatch = true;
+      unit.ap -= 1;
+      allEvents.push({
+        id: makeEventId(), type: 'overwatch',
+        attackerPos: { ...unit.position }, targetPos: { ...unit.position },
+        message: `👁 ${unit.name} goes on OVERWATCH`,
+        timestamp: Date.now(),
+      });
     }
   }
 
-  return newState;
+  updateAllUnitsCover(newState.units, newState.grid);
+  return { state: newState, events: allEvents };
+}
+
+// ── Overwatch Trigger ──
+export function checkOverwatch(movingUnit: Unit, state: GameState): CombatEvent[] {
+  const events: CombatEvent[] = [];
+  for (const u of state.units) {
+    if (!u.isAlive || u.team === movingUnit.team || !u.isOnOverwatch) continue;
+    const dist = getManhattanDistance(u.position, movingUnit.position);
+    if (dist <= u.attackRange) {
+      const result = performAttack(u, movingUnit, state.grid);
+      events.push(...result.events);
+      u.isOnOverwatch = false;
+      if (!movingUnit.isAlive) break;
+    }
+  }
+  return events;
 }

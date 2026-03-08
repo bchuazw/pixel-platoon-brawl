@@ -240,7 +240,19 @@ export function createInitialState(): GameState {
   const soldierNames = ['Marco', 'Ralf', 'Knox', 'Hawk', 'Blaze', 'Steel', 'Rex', 'Ace'];
   const medicNames = ['Mercy', 'Patch', 'Doc', 'Vita', 'Sage', 'Pulse', 'Angel', 'Fern'];
 
-  const pickName = (pool: string[]) => pool[Math.floor(globalRand() * pool.length)];
+  // Shuffle to guarantee no duplicates
+  const shuffle = (arr: string[]) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(globalRand() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const shuffledSoldiers = shuffle(soldierNames);
+  const shuffledMedics = shuffle(medicNames);
+  let soldierIdx = 0;
+  let medicIdx = 0;
 
   // Spawn positions: 2 units near each corner
   const cornerSpawns: Record<Team, Position[]> = {
@@ -268,9 +280,8 @@ export function createInitialState(): GameState {
   for (const team of teams) {
     const spawns = cornerSpawns[team];
     // Soldier
-    units.push(createUnit(`${team}-soldier`, pickName(soldierNames), 'soldier', team, spawns[0]));
-    // Medic
-    units.push(createUnit(`${team}-medic`, pickName(medicNames), 'medic', team, spawns[1]));
+    units.push(createUnit(`${team}-soldier`, shuffledSoldiers[soldierIdx++], 'soldier', team, spawns[0]));
+    units.push(createUnit(`${team}-medic`, shuffledMedics[medicIdx++], 'medic', team, spawns[1]));
   }
 
   // Ensure no two units share a tile

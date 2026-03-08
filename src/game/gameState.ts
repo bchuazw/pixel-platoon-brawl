@@ -212,7 +212,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         type = 'water'; elevation = -0.15;
       }
 
-      grid[x][z] = { x, z, elevation, type, prop: null, isBlocked: false, coverValue: 0, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null };
+      grid[x][z] = { x, z, elevation, type, prop: null, isBlocked: false, coverValue: 0, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null, damaged: false, scorchMark: false };
     }
   }
 
@@ -384,7 +384,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
       for (let dz = -3; dz <= 3; dz++) {
         const cx = spawn.x + dx, cz = spawn.z + dz;
         if (cx >= 0 && cx < GRID_SIZE && cz >= 0 && cz < GRID_SIZE) {
-          grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, coverValue: 0, elevation: 0, hasSmoke: false, loot: null };
+          grid[cx][cz] = { ...grid[cx][cz], type: 'grass', prop: null, isBlocked: false, coverValue: 0, elevation: 0, hasSmoke: false, loot: null, damaged: false, scorchMark: false };
         }
       }
     }
@@ -929,7 +929,93 @@ export function performAttack(
     timestamp: Date.now(), weaponId: attacker.weapon.id,
   });
 
+  // Environmental destruction
+  applyEnvironmentalDamage(grid, defender.position, isCrit || killed ? 2 : 1);
+
   return { damage, killed, hit: true, crit: isCrit, events };
+}
+
+// ── Environmental Destruction ──
+export function applyEnvironmentalDamage(grid: TileData[][], pos: Position, intensity: number) {
+  const tile = grid[pos.x]?.[pos.z];
+  if (!tile) return;
+
+  // Mark tile as damaged
+  tile.damaged = true;
+  tile.scorchMark = true;
+
+  // Destroy cover objects on direct hit
+  if (tile.prop && intensity >= 2) {
+    const destructible = ['crate', 'barrel', 'bush', 'wire', 'sandbag', 'foxhole'];
+    if (destructible.includes(tile.prop)) {
+      tile.prop = null;
+      tile.isBlocked = false;
+      tile.coverValue = 0;
+    }
+  }
+
+  // Area damage for high intensity (explosions)
+  if (intensity >= 2) {
+    for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = pos.x + dx, nz = pos.z + dz;
+      if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
+        const neighbor = grid[nx][nz];
+        neighbor.scorchMark = true;
+        // Small chance to destroy nearby props
+        if (Math.random() < 0.3 && neighbor.prop) {
+          const fragile = ['bush', 'wire', 'crate'];
+          if (fragile.includes(neighbor.prop)) {
+            neighbor.prop = null;
+            neighbor.isBlocked = false;
+            neighbor.coverValue = 0;
+          }
+        }
+      }
+    }
+  }
+}
+
+// ── Explosion Destruction (grenades, airstrikes, rockets) ──
+export function applyExplosionDamage(grid: TileData[][], center: Position, radius: number) {
+  for (let dx = -radius; dx <= radius; dx++) {
+    for (let dz = -radius; dz <= radius; dz++) {
+      const nx = center.x + dx, nz = center.z + dz;
+      if (nx < 0 || nx >= GRID_SIZE || nz < 0 || nz >= GRID_SIZE) continue;
+      const dist = Math.abs(dx) + Math.abs(dz);
+      if (dist > radius) continue;
+
+      const tile = grid[nx][nz];
+      tile.scorchMark = true;
+
+      if (dist === 0) {
+        // Ground zero — crater
+        tile.type = 'crater';
+        tile.elevation = Math.max(-0.2, tile.elevation - 0.3);
+        tile.prop = null;
+        tile.isBlocked = false;
+        tile.coverValue = 0;
+        tile.damaged = true;
+      } else if (dist <= 1) {
+        tile.damaged = true;
+        // Destroy most props near center
+        if (tile.prop && Math.random() < 0.7) {
+          tile.prop = null;
+          tile.isBlocked = false;
+          tile.coverValue = 0;
+        }
+      } else {
+        // Outer ring — chance to destroy fragile props
+        if (tile.prop && Math.random() < 0.25) {
+          const fragile = ['bush', 'wire', 'crate', 'barrel'];
+          if (fragile.includes(tile.prop)) {
+            tile.prop = null;
+            tile.isBlocked = false;
+            tile.coverValue = 0;
+          }
+        }
+      }
+    }
+  }
 }
 
 // ── Team Management ──
@@ -1254,6 +1340,7 @@ export function runAiUnitStep(
           }
         }
         newState.log = [...newState.log, `💣 ${unit.name} throws GRENADE! ${damaged.join(', ')}`];
+        applyExplosionDamage(newState.grid, bestGrenadePos, radius);
         unit.ap -= grenadeAbility.apCost;
         unit.cooldowns['grenade'] = grenadeAbility.cooldown;
       }

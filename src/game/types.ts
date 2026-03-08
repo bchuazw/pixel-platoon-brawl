@@ -101,7 +101,7 @@ export interface Unit {
   empTurnsLeft: number;
 }
 
-export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand' | 'trench';
+export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand' | 'trench' | 'crater';
 export type PropType = 'crate' | 'barrel' | 'sandbag' | 'rock' | 'bush' | 'tree' | 'ruins'
   | 'wire' | 'jersey_barrier' | 'burnt_vehicle' | 'foxhole' | 'hesco' | 'tank_trap' | null;
 
@@ -116,6 +116,8 @@ export interface TileData {
   variant: number;
   hasSmoke: boolean;
   loot: LootItem | null;
+  damaged: boolean; // environmental destruction marker
+  scorchMark: boolean; // scorch/burn marks from explosions
 }
 
 export type GamePhase = 'select' | 'move' | 'attack' | 'ability' | 'enemy_turn' | 'game_over' | 'pre_game';

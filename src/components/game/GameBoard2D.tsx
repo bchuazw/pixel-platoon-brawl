@@ -52,29 +52,41 @@ function tileNoise(x: number, z: number, seed: number): number {
 function drawIsoTile(
   ctx: CanvasRenderingContext2D,
   sx: number, sy: number,
-  colors: { top: string; left: string; right: string; detail: string },
+  colors: { top: string; left: string; right: string },
   elevation: number,
   outOfZone: boolean,
   highlight?: string,
+  tileType?: string,
+  noiseVal?: number,
 ) {
   const hw = TILE_W / 2;
   const hh = TILE_H / 2;
-  const sideH = Math.max(elevation * ELEV_SCALE, 4); // minimum side height for depth
+  const sideH = Math.max(elevation * ELEV_SCALE, 3);
 
   if (outOfZone) {
-    // Dead zone — desaturated red
-    drawDiamond(ctx, sx, sy, hw, hh, '#3a1818');
-    drawLeftFace(ctx, sx, sy, hw, hh, sideH, '#2a1010');
-    drawRightFace(ctx, sx, sy, hw, hh, sideH, '#221010');
+    drawDiamond(ctx, sx, sy, hw, hh, '#2a1212');
+    drawLeftFace(ctx, sx, sy, hw, hh, sideH, '#1a0a0a');
+    drawRightFace(ctx, sx, sy, hw, hh, sideH, '#200e0e');
     return;
   }
 
-  // Side faces (drawn first, behind top)
+  // Side faces
   drawLeftFace(ctx, sx, sy, hw, hh, sideH, colors.left);
   drawRightFace(ctx, sx, sy, hw, hh, sideH, colors.right);
 
-  // Top face (diamond)
+  // Top face
   drawDiamond(ctx, sx, sy, hw, hh, colors.top);
+
+  // Subtle noise variation on top face (not decoration — just color variation)
+  if (noiseVal !== undefined && tileType === 'grass') {
+    if (noiseVal > 0.7) {
+      drawDiamond(ctx, sx, sy, hw, hh, 'rgba(80,140,60,0.12)');
+    } else if (noiseVal < 0.25) {
+      drawDiamond(ctx, sx, sy, hw, hh, 'rgba(40,60,20,0.08)');
+    }
+  } else if (noiseVal !== undefined && tileType === 'dirt' && noiseVal > 0.75) {
+    drawDiamond(ctx, sx, sy, hw, hh, 'rgba(60,50,30,0.08)');
+  }
 
   // Highlight overlay
   if (highlight) {

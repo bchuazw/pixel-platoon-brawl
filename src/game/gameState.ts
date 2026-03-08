@@ -91,7 +91,7 @@ function createGrid(): TileData[][] {
     }
   }
 
-  // Clear spawn corners (bigger area)
+  // Clear spawn corners
   for (const corner of [[0, 0], [0, GRID_SIZE - 1], [GRID_SIZE - 1, 0], [GRID_SIZE - 1, GRID_SIZE - 1]]) {
     for (let dx = -2; dx <= 2; dx++) {
       for (let dz = -2; dz <= 2; dz++) {
@@ -121,56 +121,42 @@ function createUnit(id: string, name: string, unitClass: UnitClass, team: Team, 
   };
 }
 
-// ── State Init ──
+// ── State Init ── (1 unit per team, 4 corners)
 export function createInitialState(): GameState {
   const grid = createGrid();
   const units: Unit[] = [
-    // Blue team (player) - bottom-left
     createUnit('blue-0', 'Marco', 'soldier', 'blue', { x: 1, z: 1 }),
-    createUnit('blue-1', 'Tarma', 'sniper', 'blue', { x: 0, z: 2 }),
-    createUnit('blue-2', 'Eri', 'medic', 'blue', { x: 2, z: 0 }),
-    // Red team - top-right
     createUnit('red-0', 'Viper', 'sniper', 'red', { x: 18, z: 18 }),
-    createUnit('red-1', 'Cobra', 'soldier', 'red', { x: 17, z: 19 }),
-    createUnit('red-2', 'Mamba', 'heavy', 'red', { x: 19, z: 17 }),
-    // Green team - bottom-right
     createUnit('green-0', 'Oak', 'heavy', 'green', { x: 18, z: 1 }),
-    createUnit('green-1', 'Elm', 'medic', 'green', { x: 19, z: 2 }),
-    createUnit('green-2', 'Ash', 'soldier', 'green', { x: 17, z: 0 }),
-    // Yellow team - top-left
-    createUnit('yellow-0', 'Bolt', 'soldier', 'yellow', { x: 1, z: 18 }),
-    createUnit('yellow-1', 'Spark', 'sniper', 'yellow', { x: 0, z: 17 }),
-    createUnit('yellow-2', 'Flash', 'heavy', 'yellow', { x: 2, z: 19 }),
+    createUnit('yellow-0', 'Bolt', 'medic', 'yellow', { x: 1, z: 18 }),
   ];
 
-  // Update initial cover
   updateAllUnitsCover(units, grid);
 
   return {
     units, currentTeam: 'blue', selectedUnitId: null,
-    phase: 'select', turn: 1,
+    phase: 'pre_game', turn: 1,
     movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
     activeAbility: null,
     grid,
     log: [
       '═══════════════════════════',
-      '⚔ TACTICAL ROYALE — BATTLE BEGIN',
+      '⚔ TACTICAL ROYALE',
       '═══════════════════════════',
-      '» Blue team deploys. 2 AP per unit.',
-      '» Use MOVE, ATTACK, and ABILITIES wisely!',
+      '» 4 warriors. 4 corners. 1 survivor.',
+      '» Press PLAY to watch the AI battle!',
     ],
     shrinkLevel: 0, zoneTimer: 5,
     combatEvents: [], attackPreview: null, hoveredTile: null,
+    autoPlay: false,
   };
 }
 
 // ── Cover System ──
 export function getCoverFromDirection(pos: Position, attackerPos: Position, grid: TileData[][]): 'none' | 'half' | 'full' {
-  // Check tiles between defender and attacker for cover
   const dx = Math.sign(attackerPos.x - pos.x);
   const dz = Math.sign(attackerPos.z - pos.z);
 
-  // Check the tile closest to defender in attacker's direction
   const checkPositions = [
     { x: pos.x + dx, z: pos.z },
     { x: pos.x, z: pos.z + dz },
@@ -183,7 +169,7 @@ export function getCoverFromDirection(pos: Position, attackerPos: Position, grid
       const tile = grid[cp.x][cp.z];
       if (tile.coverValue === 2) bestCover = 'full';
       else if (tile.coverValue === 1 && bestCover === 'none') bestCover = 'half';
-      if (tile.hasSmoke) bestCover = 'full'; // smoke = full cover
+      if (tile.hasSmoke) bestCover = 'full';
     }
   }
   return bestCover;
@@ -192,7 +178,6 @@ export function getCoverFromDirection(pos: Position, attackerPos: Position, grid
 function updateAllUnitsCover(units: Unit[], grid: TileData[][]) {
   for (const u of units) {
     if (!u.isAlive) continue;
-    // Check all adjacent tiles for cover
     let best: 0 | 1 | 2 = 0;
     for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
       const nx = u.position.x + dx, nz = u.position.z + dz;
@@ -209,20 +194,15 @@ function updateAllUnitsCover(units: Unit[], grid: TileData[][]) {
 // ── Hit Chance ──
 export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]): number {
   let chance = attacker.accuracy;
-
-  // Distance penalty
   const dist = getManhattanDistance(attacker.position, defender.position);
   if (dist > 3) chance -= (dist - 3) * 5;
 
-  // Cover penalty
   const cover = getCoverFromDirection(defender.position, attacker.position, grid);
   if (cover === 'half') chance -= 25;
   if (cover === 'full') chance -= 45;
 
-  // Suppressed attacker penalty
   if (attacker.isSuppressed) chance -= 30;
 
-  // Elevation bonus
   const aElev = grid[attacker.position.x]?.[attacker.position.z]?.elevation || 0;
   const dElev = grid[defender.position.x]?.[defender.position.z]?.elevation || 0;
   if (aElev > dElev) chance += 10;
@@ -324,7 +304,7 @@ export function getAbilityTargetTiles(unit: Unit, abilityId: AbilityId, state: G
       }
       break;
     case 'overwatch':
-      tiles.push(unit.position); // self-target
+      tiles.push(unit.position);
       break;
   }
   return tiles;
@@ -371,7 +351,6 @@ export function performAttack(
     attacker.xp += 10;
   }
 
-  // Level up
   if (attacker.xp >= 100) {
     attacker.xp -= 100; attacker.level++;
     attacker.maxHp += 10; attacker.hp = Math.min(attacker.hp + 10, attacker.maxHp);
@@ -421,7 +400,6 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
     const enemies = newState.units.filter(u => u.isAlive && u.team !== unit.team);
     if (enemies.length === 0) break;
 
-    // Find closest enemy
     let closest = enemies[0];
     let closestDist = getManhattanDistance(unit.position, closest.position);
     for (const e of enemies) {
@@ -429,10 +407,9 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
       if (d < closestDist) { closest = e; closestDist = d; }
     }
 
-    // Try to use ability first
+    // Try ability first
     if (unit.ap >= 1) {
       if (unit.unitClass === 'medic') {
-        // Heal injured allies
         const injuredAlly = newState.units.find(u =>
           u.isAlive && u.team === unit.team && u.id !== unit.id &&
           u.hp < u.maxHp * 0.6 && getManhattanDistance(unit.position, u.position) <= 2
@@ -453,24 +430,21 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
       }
     }
 
-    // Move toward closest enemy (prefer cover tiles)
+    // Move toward closest enemy (prefer cover)
     if (unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
       const movable = getMovableTiles(unit, newState);
       if (movable.length > 0) {
-        // Score tiles: closer to enemy + has cover nearby
         let bestTile = movable[0];
         let bestScore = -Infinity;
         for (const t of movable) {
           const dist = getManhattanDistance(t, closest.position);
-          let score = -dist * 2; // want to be close
-          // Cover bonus
+          let score = -dist * 2;
           for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const nx = t.x + dx, nz = t.z + dz;
             if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
               score += newState.grid[nx][nz].coverValue * 3;
             }
           }
-          // Don't move too close as sniper
           if (unit.unitClass === 'sniper' && dist < 3) score -= 10;
           if (score > bestScore) { bestTile = t; bestScore = score; }
         }
@@ -483,7 +457,6 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
     if (unit.ap >= AP_ATTACK_COST) {
       const attackable = getAttackableTiles(unit, newState);
       if (attackable.length > 0) {
-        // Pick target with lowest HP
         let bestTarget: Unit | null = null;
         let lowestHp = Infinity;
         for (const tp of attackable) {
@@ -499,7 +472,7 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
       }
     }
 
-    // Set overwatch with remaining AP (snipers)
+    // Overwatch with remaining AP
     if (unit.unitClass === 'sniper' && unit.ap >= 1 && !unit.isOnOverwatch) {
       unit.isOnOverwatch = true;
       unit.ap -= 1;

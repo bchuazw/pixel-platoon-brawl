@@ -7,10 +7,11 @@ import { Position, AbilityId } from '@/game/types';
 const Index = () => {
   const {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
-    useAbility, executeAbility, setHoveredTile,
+    useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
   } = useGameStore();
 
   const handleTileClick = useCallback((pos: Position) => {
+    if (state.autoPlay) return;
     if (state.phase === 'move' && state.movableTiles.some(t => t.x === pos.x && t.z === pos.z)) {
       moveUnit(pos);
     } else if (state.phase === 'attack' && state.attackableTiles.some(t => t.x === pos.x && t.z === pos.z)) {
@@ -18,9 +19,10 @@ const Index = () => {
     } else if (state.phase === 'ability' && state.abilityTargetTiles.some(t => t.x === pos.x && t.z === pos.z)) {
       executeAbility(pos);
     }
-  }, [state.phase, state.movableTiles, state.attackableTiles, state.abilityTargetTiles, moveUnit, attackTarget, executeAbility]);
+  }, [state.phase, state.autoPlay, state.movableTiles, state.attackableTiles, state.abilityTargetTiles, moveUnit, attackTarget, executeAbility]);
 
   const handleUnitClick = useCallback((unitId: string) => {
+    if (state.autoPlay) return;
     if (state.phase === 'attack') {
       const unit = state.units.find(u => u.id === unitId);
       if (unit && state.attackableTiles.some(t => t.x === unit.position.x && t.z === unit.position.z)) {
@@ -36,7 +38,7 @@ const Index = () => {
       }
     }
     selectUnit(unitId);
-  }, [state.phase, state.units, state.attackableTiles, state.abilityTargetTiles, selectUnit, attackTarget, executeAbility]);
+  }, [state.phase, state.autoPlay, state.units, state.attackableTiles, state.abilityTargetTiles, selectUnit, attackTarget, executeAbility]);
 
   const handleUseAbility = useCallback((abilityId: AbilityId) => {
     useAbility(abilityId);
@@ -48,9 +50,9 @@ const Index = () => {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (state.autoPlay) return;
       if (e.key === 'Escape') deselect();
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); endTurn(); }
-      // Number keys for abilities
       if (e.key >= '1' && e.key <= '4') {
         const unit = state.units.find(u => u.id === state.selectedUnitId);
         if (unit && unit.abilities[parseInt(e.key) - 1]) {
@@ -60,7 +62,7 @@ const Index = () => {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [deselect, endTurn, state.selectedUnitId, state.units, useAbility]);
+  }, [deselect, endTurn, state.selectedUnitId, state.units, state.autoPlay, useAbility]);
 
   return (
     <div className="w-screen h-screen overflow-hidden relative">
@@ -76,6 +78,8 @@ const Index = () => {
         onDeselect={deselect}
         onRestart={restart}
         onUseAbility={handleUseAbility}
+        onStartAutoPlay={startAutoPlay}
+        onStopAutoPlay={stopAutoPlay}
       />
     </div>
   );

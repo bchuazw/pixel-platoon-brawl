@@ -6,9 +6,13 @@ import {
 
 // ── Random ──
 function seededRandom(seed: number) {
-  let s = seed;
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
   return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
+
+// Global random for variety
+const globalRand = () => Math.random();
 
 let eventCounter = 0;
 function makeEventId() { return `evt-${++eventCounter}-${Date.now()}`; }
@@ -121,15 +125,40 @@ function createUnit(id: string, name: string, unitClass: UnitClass, team: Team, 
   };
 }
 
-// ── State Init ── (1 unit per team, 4 corners)
+// ── State Init ── (1 unit per team, randomized each game)
 export function createInitialState(): GameState {
   const grid = createGrid();
-  const units: Unit[] = [
-    createUnit('blue-0', 'Marco', 'soldier', 'blue', { x: 1, z: 1 }),
-    createUnit('red-0', 'Viper', 'sniper', 'red', { x: 18, z: 18 }),
-    createUnit('green-0', 'Oak', 'heavy', 'green', { x: 18, z: 1 }),
-    createUnit('yellow-0', 'Bolt', 'medic', 'yellow', { x: 1, z: 18 }),
+
+  // Randomize class per team
+  const classes: UnitClass[] = ['soldier', 'sniper', 'medic', 'heavy'];
+  const shuffledClasses = [...classes].sort(() => globalRand() - 0.5);
+
+  // Random names per class
+  const namePool: Record<UnitClass, string[]> = {
+    soldier: ['Marco', 'Ralf', 'Knox', 'Hawk', 'Blaze', 'Steel'],
+    sniper: ['Viper', 'Ghost', 'Scope', 'Lynx', 'Shade', 'Frost'],
+    medic: ['Mercy', 'Patch', 'Doc', 'Vita', 'Sage', 'Pulse'],
+    heavy: ['Tank', 'Oak', 'Brick', 'Titan', 'Crusher', 'Bull'],
+  };
+
+  const pickName = (cls: UnitClass) => {
+    const names = namePool[cls];
+    return names[Math.floor(globalRand() * names.length)];
+  };
+
+  // Spawn positions at 4 corners with slight randomization
+  const corners = [
+    { x: 1 + Math.floor(globalRand() * 2), z: 1 + Math.floor(globalRand() * 2) },
+    { x: 17 + Math.floor(globalRand() * 2), z: 17 + Math.floor(globalRand() * 2) },
+    { x: 17 + Math.floor(globalRand() * 2), z: 1 + Math.floor(globalRand() * 2) },
+    { x: 1 + Math.floor(globalRand() * 2), z: 17 + Math.floor(globalRand() * 2) },
   ];
+
+  const teams: Team[] = ['blue', 'red', 'green', 'yellow'];
+  const units: Unit[] = teams.map((team, i) => {
+    const cls = shuffledClasses[i];
+    return createUnit(`${team}-0`, pickName(cls), cls, team, corners[i]);
+  });
 
   updateAllUnitsCover(units, grid);
 

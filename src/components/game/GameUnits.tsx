@@ -22,17 +22,15 @@ const SPRITE_MAP: Record<string, string> = {
   yellow: medicYellowImg,
 };
 
-function CoverShield({ coverType, color }: { coverType: 'none' | 'half' | 'full'; color: string }) {
+function CoverShield({ coverType }: { coverType: 'none' | 'half' | 'full' }) {
   if (coverType === 'none') return null;
-
   return (
     <Billboard position={[0.35, 0.3, 0]}>
       <mesh>
         <planeGeometry args={[0.18, 0.18]} />
         <meshBasicMaterial
           color={coverType === 'full' ? '#4488ff' : '#ffaa44'}
-          transparent
-          opacity={0.8}
+          transparent opacity={0.8}
         />
       </mesh>
       <Text fontSize={0.1} color="#ffffff" anchorX="center" anchorY="middle" position={[0, 0, 0.01]} font={undefined}>
@@ -46,7 +44,6 @@ function StatusIcons({ unit }: { unit: Unit }) {
   const icons: { text: string; color: string }[] = [];
   if (unit.isOnOverwatch) icons.push({ text: '👁', color: '#44aaff' });
   if (unit.isSuppressed) icons.push({ text: '⛔', color: '#ff4444' });
-
   if (icons.length === 0) return null;
 
   return (
@@ -65,8 +62,16 @@ function StatusIcons({ unit }: { unit: Unit }) {
 
 function PixelCharacter({ unit, isSelected, onClick }: { unit: Unit; isSelected: boolean; onClick: () => void }) {
   const groupRef = useRef<THREE.Group>(null);
+  const innerRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
   const color = TEAM_COLORS[unit.team];
+
+  // Track animated position for smooth movement
+  const animatedPos = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
+  const prevPos = useRef({ x: unit.position.x, z: unit.position.z });
+  const moveStartTime = useRef(0);
+  const isMoving = useRef(false);
+  const attackFlash = useRef(0);
 
   const texture = useLoader(THREE.TextureLoader, SPRITE_MAP[unit.team]);
 
@@ -79,18 +84,76 @@ function PixelCharacter({ unit, isSelected, onClick }: { unit: Unit; isSelected:
   }, [texture]);
 
   useFrame(({ clock }) => {
-    if (!groupRef.current) return;
+    if (!groupRef.current || !innerRef.current) return;
     const t = clock.getElapsedTime();
 
-    // Idle bounce
-    const bounce = Math.sin(t * 2.5 + unit.position.x * 1.5) * 0.04;
-    groupRef.current.position.y = bounce;
+    // Detect position change → trigger move animation
+    if (prevPos.current.x !== unit.position.x || prevPos.current.z !== unit.position.z) {
+      // Start from current animated position
+      animatedPos.current.set(
+        animatedPos.current.x,
+        0.1,
+        animatedPos.current.z
+      );
+      prevPos.current = { x: unit.position.x, z: unit.position.z };
+      moveStartTime.current = t;
+      isMoving.current = true;
+    }
+
+    // Smooth movement lerp
+    const targetX = unit.position.x;
+    const targetZ = unit.position.z;
+    const moveDuration = 0.4;
+    const moveElapsed = t - moveStartTime.current;
+
+    if (isMoving.current) {
+      const moveT = Math.min(1, moveElapsed / moveDuration);
+      const eased = 1 - Math.pow(1 - moveT, 3); // ease out cubic
+
+      animatedPos.current.x = THREE.MathUtils.lerp(animatedPos.current.x, targetX, eased);
+      animatedPos.current.z = THREE.MathUtils.lerp(animatedPos.current.z, targetZ, eased);
+
+      // Hop effect during movement
+      const hopHeight = Math.sin(moveT * Math.PI) * 0.3;
+      groupRef.current.position.set(animatedPos.current.x, 0.1 + hopHeight, animatedPos.current.z);
+
+      // Lean forward during movement
+      innerRef.current.rotation.x = Math.sin(moveT * Math.PI) * 0.15;
+
+      // Sprite wobble (walking feel)
+      innerRef.current.rotation.z = Math.sin(moveT * Math.PI * 4) * 0.08;
+
+      if (moveT >= 1) {
+        isMoving.current = false;
+        animatedPos.current.set(targetX, 0.1, targetZ);
+        innerRef.current.rotation.x = 0;
+        innerRef.current.rotation.z = 0;
+      }
+    } else {
+      // Snap to position if not animating
+      groupRef.current.position.set(targetX, 0.1, targetZ);
+
+      // Idle bounce
+      const bounce = Math.sin(t * 2.5 + unit.position.x * 1.5) * 0.04;
+      innerRef.current.position.y = bounce;
+      innerRef.current.rotation.x = 0;
+      innerRef.current.rotation.z = Math.sin(t * 1.5) * 0.02; // subtle sway
+    }
 
     // Suppressed shake
-    if (unit.isSuppressed) {
-      groupRef.current.position.x = Math.sin(t * 15) * 0.02;
+    if (unit.isSuppressed && !isMoving.current) {
+      innerRef.current.position.x = Math.sin(t * 15) * 0.02;
+    } else if (!isMoving.current) {
+      innerRef.current.position.x = 0;
+    }
+
+    // Attack flash effect
+    if (attackFlash.current > 0) {
+      attackFlash.current -= 0.05;
+      const scale = 1 + attackFlash.current * 0.15;
+      innerRef.current.scale.setScalar(scale);
     } else {
-      groupRef.current.position.x = 0;
+      innerRef.current.scale.setScalar(1);
     }
 
     // Selection ring pulse
@@ -110,10 +173,11 @@ function PixelCharacter({ unit, isSelected, onClick }: { unit: Unit; isSelected:
 
   return (
     <group
+      ref={groupRef}
       position={[unit.position.x, 0.1, unit.position.z]}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
     >
-      <group ref={groupRef}>
+      <group ref={innerRef}>
         {/* Sprite */}
         <Billboard position={[0, 0.55, 0]}>
           <mesh>
@@ -168,7 +232,7 @@ function PixelCharacter({ unit, isSelected, onClick }: { unit: Unit; isSelected:
         </Billboard>
 
         {/* Cover indicator */}
-        <CoverShield coverType={unit.coverType} color={color} />
+        <CoverShield coverType={unit.coverType} />
 
         {/* Status icons */}
         <StatusIcons unit={unit} />

@@ -1,11 +1,13 @@
-import { Canvas } from '@react-three/fiber';
-import { Suspense, useState, useCallback } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
+import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
 import { GridTiles } from './GridTiles';
 import { GameUnits } from './GameUnits';
 import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
 import { GameState, Position, GRID_SIZE } from '@/game/types';
 import { RotateCw } from 'lucide-react';
+import * as THREE from 'three';
 
 interface GameBoardProps {
   state: GameState;
@@ -14,13 +16,51 @@ interface GameBoardProps {
   onTileHover: (pos: Position | null) => void;
 }
 
-// Fixed isometric camera positions (4 angles, 90° apart)
-const CAMERA_ANGLES = [
-  { position: [22, 18, 22] as [number, number, number], label: 'SW' },
-  { position: [22, 18, -2] as [number, number, number], label: 'NW' },
-  { position: [-2, 18, -2] as [number, number, number], label: 'NE' },
-  { position: [-2, 18, 22] as [number, number, number], label: 'SE' },
-];
+const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
+const CAM_DISTANCE = 24;
+const CAM_HEIGHT = 18;
+
+// 4 fixed angles around the board center
+function getCameraPosition(angleIndex: number): [number, number, number] {
+  const angle = (Math.PI / 4) + (angleIndex * Math.PI / 2); // 45°, 135°, 225°, 315°
+  const x = CENTER.x + Math.cos(angle) * CAM_DISTANCE;
+  const z = CENTER.z + Math.sin(angle) * CAM_DISTANCE;
+  return [x, CAM_HEIGHT, z];
+}
+
+const ANGLE_LABELS = ['SW', 'SE', 'NE', 'NW'];
+
+function CameraController({ angleIndex }: { angleIndex: number }) {
+  const { camera } = useThree();
+  const targetPos = useRef(new THREE.Vector3());
+  const animating = useRef(false);
+  const progress = useRef(1);
+
+  useEffect(() => {
+    const [x, y, z] = getCameraPosition(angleIndex);
+    targetPos.current.set(x, y, z);
+    progress.current = 0;
+    animating.current = true;
+  }, [angleIndex]);
+
+  useEffect(() => {
+    let raf: number;
+    const animate = () => {
+      if (animating.current && progress.current < 1) {
+        progress.current = Math.min(1, progress.current + 0.04);
+        const t = 1 - Math.pow(1 - progress.current, 3); // ease out cubic
+        camera.position.lerp(targetPos.current, t > 0.99 ? 1 : 0.08);
+        camera.lookAt(CENTER);
+        if (progress.current >= 1) animating.current = false;
+      }
+      raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [camera, angleIndex]);
+
+  return null;
+}
 
 function LoadingFallback() {
   return (
@@ -38,21 +78,22 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
     setAngleIndex(prev => (prev + 1) % 4);
   }, []);
 
-  const cameraPos = CAMERA_ANGLES[angleIndex].position;
+  const initialCamPos = getCameraPosition(0);
 
   return (
     <div className="relative w-full h-full">
       <Canvas
         camera={{
-          position: cameraPos,
+          position: initialCamPos,
           fov: 38,
           near: 0.1,
           far: 100,
         }}
         style={{ background: 'linear-gradient(180deg, #1a2a1a 0%, #0a1510 100%)' }}
         shadows
-        key={angleIndex}
       >
+        <CameraController angleIndex={angleIndex} />
+
         <ambientLight intensity={0.45} />
         <directionalLight position={[15, 20, 15]} intensity={0.85} castShadow color="#ffe8c0"
           shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
@@ -79,6 +120,29 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
         </Suspense>
 
         <ZoneBorder shrinkLevel={state.shrinkLevel} />
+
+        {/* Pan/zoom controls - no rotation (rotation via button only) */}
+        <OrbitControls
+          target={[CENTER.x, 0, CENTER.z]}
+          enableRotate={false}
+          enablePan={true}
+          enableZoom={true}
+          minDistance={8}
+          maxDistance={40}
+          maxPolarAngle={Math.PI / 2.3}
+          minPolarAngle={Math.PI / 8}
+          panSpeed={1.2}
+          screenSpacePanning={false}
+          mouseButtons={{
+            LEFT: THREE.MOUSE.PAN,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.PAN,
+          }}
+          touches={{
+            ONE: THREE.TOUCH.PAN,
+            TWO: THREE.TOUCH.DOLLY_PAN,
+          }}
+        />
       </Canvas>
 
       {/* Rotate Camera Button */}
@@ -87,7 +151,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
         className="absolute bottom-36 right-4 z-20 pointer-events-auto bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 text-foreground hover:bg-secondary transition-colors"
       >
         <RotateCw className="w-4 h-4 text-primary" />
-        <span className="text-[8px] tracking-wider">ROTATE ({CAMERA_ANGLES[angleIndex].label})</span>
+        <span className="text-[8px] tracking-wider">ROTATE ({ANGLE_LABELS[angleIndex]})</span>
       </button>
     </div>
   );

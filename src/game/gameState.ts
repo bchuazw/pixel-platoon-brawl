@@ -139,7 +139,7 @@ export function findPath(from: Position, to: Position, state: GameState): Positi
 }
 
 // ── Random spawn point generation ──
-const MIN_SPAWN_DISTANCE = 10; // minimum manhattan distance between team spawns
+const MIN_SPAWN_DISTANCE = 8; // minimum manhattan distance between team spawns
 
 function generateSpawnPoints(rand: () => number): Position[] {
   const margin = 3; // keep away from edges

@@ -43,15 +43,31 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
 };
 
 // ── Loot System ──
-export type LootType = 'weapon' | 'medkit' | 'armor' | 'ammo';
+export type LootType = 'weapon' | 'medkit' | 'armor' | 'ammo' | 'killstreak';
+export type KillstreakId = 'uav' | 'supply_drop' | 'airstrike' | 'emp';
 
 export interface LootItem {
   type: LootType;
   weaponId?: WeaponId;
+  killstreakId?: KillstreakId;
   value: number;
   icon: string;
   name: string;
 }
+
+export interface KillstreakDef {
+  id: KillstreakId;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+export const KILLSTREAKS: Record<KillstreakId, KillstreakDef> = {
+  uav: { id: 'uav', name: 'UAV', description: 'Reveals all enemies for 3 turns (+4 vision range)', icon: '📡' },
+  supply_drop: { id: 'supply_drop', name: 'Supply Drop', description: 'Full heal, refill ammo, +1 AP this turn', icon: '📦' },
+  airstrike: { id: 'airstrike', name: 'Airstrike', description: 'Deals 30 dmg to all enemies in a 3-tile radius', icon: '✈️' },
+  emp: { id: 'emp', name: 'EMP Blast', description: 'Suppresses all enemies for 2 turns, disables overwatch', icon: '⚡' },
+};
 
 export interface Unit {
   id: string;

@@ -2,12 +2,14 @@ import { useCallback, useEffect } from 'react';
 import { GameBoard } from '@/components/game/GameBoard';
 import { GameHUD } from '@/components/game/GameHUD';
 import { useGameStore } from '@/game/useGameStore';
+import { CharacterPanel, SponsorAction } from '@/components/game/CharacterPanel';
 import { Position, AbilityId } from '@/game/types';
 
 const Index = () => {
   const {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
+    sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit,
   } = useGameStore();
 
   const handleTileClick = useCallback((pos: Position) => {
@@ -22,7 +24,11 @@ const Index = () => {
   }, [state.phase, state.autoPlay, state.movableTiles, state.attackableTiles, state.abilityTargetTiles, moveUnit, attackTarget, executeAbility]);
 
   const handleUnitClick = useCallback((unitId: string) => {
-    if (state.autoPlay) return;
+    // In auto-play mode, clicking a unit opens the character/sponsor panel
+    if (state.autoPlay) {
+      inspectUnit(unitId);
+      return;
+    }
     if (state.phase === 'attack') {
       const unit = state.units.find(u => u.id === unitId);
       if (unit && state.attackableTiles.some(t => t.x === unit.position.x && t.z === unit.position.z)) {
@@ -38,7 +44,7 @@ const Index = () => {
       }
     }
     selectUnit(unitId);
-  }, [state.phase, state.autoPlay, state.units, state.attackableTiles, state.abilityTargetTiles, selectUnit, attackTarget, executeAbility]);
+  }, [state.phase, state.autoPlay, state.units, state.attackableTiles, state.abilityTargetTiles, selectUnit, attackTarget, executeAbility, inspectUnit]);
 
   const handleUseAbility = useCallback((abilityId: AbilityId) => {
     useAbility(abilityId);
@@ -48,8 +54,13 @@ const Index = () => {
     setHoveredTile(pos);
   }, [setHoveredTile]);
 
+  const handleSponsor = useCallback((unitId: string, action: SponsorAction) => {
+    sponsorUnit(unitId, action);
+  }, [sponsorUnit]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (inspectedUnitId && e.key === 'Escape') { inspectUnit(null); return; }
       if (state.autoPlay) return;
       if (e.key === 'Escape') deselect();
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); endTurn(); }
@@ -62,7 +73,9 @@ const Index = () => {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [deselect, endTurn, state.selectedUnitId, state.units, state.autoPlay, useAbility]);
+  }, [deselect, endTurn, state.selectedUnitId, state.units, state.autoPlay, useAbility, inspectedUnitId, inspectUnit]);
+
+  const inspectedUnit = inspectedUnitId ? state.units.find(u => u.id === inspectedUnitId) : null;
 
   return (
     <div className="w-screen h-screen overflow-hidden relative">
@@ -80,7 +93,17 @@ const Index = () => {
         onUseAbility={handleUseAbility}
         onStartAutoPlay={startAutoPlay}
         onStopAutoPlay={stopAutoPlay}
+        sponsorPoints={sponsorPoints}
+        onUnitInspect={inspectUnit}
       />
+      {inspectedUnit && (
+        <CharacterPanel
+          unit={inspectedUnit}
+          sponsorPoints={sponsorPoints}
+          onClose={() => inspectUnit(null)}
+          onSponsor={handleSponsor}
+        />
+      )}
     </div>
   );
 };

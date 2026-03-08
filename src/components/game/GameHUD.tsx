@@ -16,9 +16,7 @@ interface GameHUDProps {
 
 const CLASS_ICONS: Record<string, typeof Swords> = {
   soldier: Swords,
-  sniper: Crosshair,
   medic: Heart,
-  heavy: Shield,
 };
 
 function UnitCard({ unit, isActive }: { unit: Unit; isActive: boolean }) {

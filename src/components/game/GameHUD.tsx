@@ -4,7 +4,7 @@ import { Play, Pause, RotateCcw, Swords, Shield, Heart, Crosshair, Eye, Home, Tr
 import { isInZone, getManhattanDistance } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import bgTactical from '@/assets/bg-tactical.png';
-import { BettingPanel } from './BettingPanel';
+
 
 interface GameHUDProps {
   state: GameState;
@@ -17,10 +17,6 @@ interface GameHUDProps {
   onMainMenu?: () => void;
   sponsorPoints?: number;
   onUnitInspect?: (unitId: string) => void;
-  onPlaceBet?: (team: Team, amount: number) => void;
-  betTeam?: Team | null;
-  betAmount?: number;
-  collectBetPayout?: () => number;
 }
 
 const CLASS_ICONS: Record<string, typeof Swords> = {
@@ -209,7 +205,7 @@ function Minimap({ state }: { state: GameState }) {
   );
 }
 
-function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, collectBetPayout }: { state: GameState; onRestart: () => void; onMainMenu?: () => void; betTeam?: Team | null; betAmount?: number; collectBetPayout?: () => number }) {
+function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onRestart: () => void; onMainMenu?: () => void }) {
   const [show, setShow] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [particles, setParticles] = useState<{ id: number; x: number; delay: number; color: string; size: number }[]>([]);
@@ -224,15 +220,6 @@ function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, colle
   const mvp = [...state.units].sort((a, b) => b.kills - a.kills)[0];
   const totalKills = state.units.reduce((s, u) => s + u.kills, 0);
   const survivors = state.units.filter(u => u.isAlive);
-  const [betPayout, setBetPayout] = useState(0);
-
-  // Collect bet payout once on mount
-  useEffect(() => {
-    if (collectBetPayout) {
-      const payout = collectBetPayout();
-      setBetPayout(payout);
-    }
-  }, []);
 
   useEffect(() => {
     playVictoryFanfare();
@@ -368,27 +355,6 @@ function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, colle
           </div>
           </div>
 
-          {/* Bet result */}
-          {betTeam && (
-            <div
-              className="bg-card/90 border rounded-xl p-4 min-w-[140px] text-center transition-all duration-700"
-              style={{
-                opacity: showStats ? 1 : 0,
-                borderColor: betPayout > 0 ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)',
-                boxShadow: betPayout > 0 ? '0 0 20px hsl(142 70% 45% / 0.2)' : undefined,
-              }}
-            >
-              <div className="text-[7px] tracking-[0.2em] mb-1" style={{ color: betPayout > 0 ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }}>
-                {betPayout > 0 ? '🎰 BET WON!' : '🎰 BET LOST'}
-              </div>
-              <div className="text-[9px] text-foreground">
-                Bet ⭐{betAmount} on <span className="font-bold uppercase" style={{ color: TEAM_COLORS[betTeam] }}>{betTeam}</span>
-              </div>
-              <div className="text-[16px] font-bold mt-1" style={{ color: betPayout > 0 ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }}>
-                {betPayout > 0 ? `+⭐${betPayout}` : `-⭐${betAmount}`}
-              </div>
-            </div>
-          )}
 
         {/* Buttons */}
         <div
@@ -436,7 +402,7 @@ function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, colle
   );
 }
 
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, onPlaceBet, betTeam, betAmount, collectBetPayout }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect }: GameHUDProps) {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -503,23 +469,6 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
               </div>
             </div>
 
-            {/* Betting panel (right side) */}
-            <div className="w-[200px] shrink-0 pt-4">
-              {onPlaceBet && sponsorPoints !== undefined && !betTeam && (
-                <BettingPanel onPlaceBet={onPlaceBet} sponsorPoints={sponsorPoints} />
-              )}
-
-              {betTeam && (
-                <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-2.5 text-center">
-                  <div className="text-[8px] text-accent font-bold">🎰 BET PLACED</div>
-                  <div className="text-[12px] font-bold text-foreground mt-0.5">⭐{betAmount}</div>
-                  <div className="text-[7px] text-muted-foreground">
-                    on <span className="font-bold uppercase" style={{ color: TEAM_COLORS[betTeam] }}>{betTeam}</span>
-                  </div>
-                  <div className="text-[6px] text-accent mt-1">Win: ⭐{(betAmount || 0) * 3}</div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
@@ -673,7 +622,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       ))}
 
       {/* Victory screen */}
-      {isGameOver && <VictoryScreen state={state} onRestart={onRestart} onMainMenu={onMainMenu} betTeam={betTeam} betAmount={betAmount} collectBetPayout={collectBetPayout} />}
+      {isGameOver && <VictoryScreen state={state} onRestart={onRestart} onMainMenu={onMainMenu} />}
     </div>
   );
 }

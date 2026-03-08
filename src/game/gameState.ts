@@ -333,6 +333,8 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         // Paths get occasional roadside cover
         if (propRoll < 0.04) setTileProp(x, z, 'jersey_barrier', true, 2);
         else if (propRoll < 0.06) setTileProp(x, z, 'barrel', true, 1);
+        else if (propRoll < 0.07) setTileProp(x, z, 'rubble_pile', false, 1);
+        else if (propRoll < 0.08) setTileProp(x, z, 'wrecked_car', true, 2);
       } else {
         if (propRoll < 0.018 && distFromCenter > 4) {
           setTileProp(x, z, 'tree', true, 2);
@@ -344,11 +346,17 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
           setTileProp(x, z, 'crate', true, 2);
         } else if (propRoll < 0.07) {
           setTileProp(x, z, 'barrel', true, 1);
-        } else if (propRoll < 0.08 && distFromCenter > 6) {
+        } else if (propRoll < 0.078 && distFromCenter > 6) {
           setTileProp(x, z, 'sandbag', false, 2);
-        } else if (propRoll < 0.088 && distFromCenter > 7) {
+        } else if (propRoll < 0.086 && distFromCenter > 5) {
+          setTileProp(x, z, 'broken_wall', true, 2);
+        } else if (propRoll < 0.094 && distFromCenter > 7) {
           grid[x][z].elevation += 0.3;
           setTileProp(x, z, 'ruins', true, 2);
+        } else if (propRoll < 0.10 && distFromCenter > 4) {
+          setTileProp(x, z, 'wrecked_car', true, 2);
+        } else if (propRoll < 0.105) {
+          setTileProp(x, z, 'rubble_pile', false, 1);
         }
       }
     }

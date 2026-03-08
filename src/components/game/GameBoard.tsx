@@ -178,7 +178,7 @@ function LoadingFallback() {
 
 export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
-
+  const [autoFollow, setAutoFollow] = useState(true);
   const rotateCamera = useCallback(() => {
     setAngleIndex(prev => (prev + 1) % 4);
   }, []);

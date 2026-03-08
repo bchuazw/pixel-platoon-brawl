@@ -962,12 +962,13 @@ export function runAiUnitStep(
     grid: state.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null }))),
   };
   const allEvents: CombatEvent[] = [];
+  let didMove = false;
 
   const unit = newState.units.find(u => u.id === unitId);
-  if (!unit || !unit.isAlive) return { state: newState, events: allEvents };
+  if (!unit || !unit.isAlive) return { state: newState, events: allEvents, didMove };
 
   const allEnemies = newState.units.filter(u => u.isAlive && u.team !== unit.team);
-  if (allEnemies.length === 0) return { state: newState, events: allEvents };
+  if (allEnemies.length === 0) return { state: newState, events: allEvents, didMove };
 
   const visibleEnemies = getVisibleEnemies(unit, newState.units);
   const allies = newState.units.filter(u => u.isAlive && u.team === unit.team && u.id !== unit.id);

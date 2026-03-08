@@ -61,45 +61,145 @@ function CameraController({ angleIndex, orbitRef }: { angleIndex: number; orbitR
   return null;
 }
 
-// ── KILL CAM: Cinematic zoom to elimination ──
+// ── KILL CAM: Cinematic slow-zoom to elimination ──
 function KillCamController({ killCam }: { killCam: KillCamData | null }) {
   const { camera } = useThree();
   const savedPos = useRef(new THREE.Vector3());
+  const savedLookAt = useRef(new THREE.Vector3());
   const isActive = useRef(false);
+  const phase = useRef<'zoom_in' | 'hold' | 'zoom_out'>('zoom_in');
   const progress = useRef(0);
   const targetLook = useRef(new THREE.Vector3());
   const targetCamPos = useRef(new THREE.Vector3());
+  const startLook = useRef(new THREE.Vector3());
 
   useEffect(() => {
     if (killCam && !isActive.current) {
       savedPos.current.copy(camera.position);
+      // Approximate where camera was looking
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      savedLookAt.current.copy(camera.position).add(dir.multiplyScalar(20));
+
       isActive.current = true;
+      phase.current = 'zoom_in';
       progress.current = 0;
 
-      const midX = (killCam.attackerPos.x + killCam.targetPos.x) / 2;
-      const midZ = (killCam.attackerPos.z + killCam.targetPos.z) / 2;
-      targetLook.current.set(killCam.targetPos.x, 0.5, killCam.targetPos.z);
-
+      // Position camera low and close, slightly to the side of the action
       const dx = killCam.targetPos.x - killCam.attackerPos.x;
       const dz = killCam.targetPos.z - killCam.attackerPos.z;
       const len = Math.sqrt(dx * dx + dz * dz) || 1;
       const perpX = -dz / len;
       const perpZ = dx / len;
-      targetCamPos.current.set(midX + perpX * 3, 4, midZ + perpZ * 3);
+
+      // Start from attacker's shoulder perspective
+      startLook.current.set(
+        killCam.attackerPos.x + dx * 0.3,
+        1.5,
+        killCam.attackerPos.z + dz * 0.3
+      );
+
+      // End looking at the victim from a dramatic low angle
+      targetLook.current.set(killCam.targetPos.x, 0.8, killCam.targetPos.z);
+
+      // Camera sweeps from behind attacker to a cinematic side angle
+      targetCamPos.current.set(
+        killCam.targetPos.x + perpX * 2.5 + dx / len * -1.5,
+        2.2,
+        killCam.targetPos.z + perpZ * 2.5 + dz / len * -1.5
+      );
     } else if (!killCam && isActive.current) {
-      isActive.current = false;
+      // Smoothly return
+      phase.current = 'zoom_out';
       progress.current = 0;
     }
   }, [killCam, camera]);
 
-  useFrame(() => {
-    if (!isActive.current || !killCam) return;
-    progress.current = Math.min(1, progress.current + 0.04);
-    camera.position.lerp(targetCamPos.current, progress.current > 0.95 ? 1 : 0.1);
-    camera.lookAt(targetLook.current);
+  useFrame((_, delta) => {
+    if (!isActive.current) return;
+
+    const speed = phase.current === 'zoom_in' ? 0.6 : phase.current === 'hold' ? 0 : 1.2;
+    progress.current = Math.min(1, progress.current + delta * speed);
+    // Smooth ease-out cubic
+    const t = 1 - Math.pow(1 - progress.current, 3);
+
+    if (phase.current === 'zoom_in') {
+      camera.position.lerpVectors(savedPos.current, targetCamPos.current, t);
+      // Smoothly shift look target from start to victim
+      const lookTarget = new THREE.Vector3().lerpVectors(startLook.current, targetLook.current, t);
+      camera.lookAt(lookTarget);
+      // Subtle FOV zoom effect (narrow FOV = zoom)
+      if ('fov' in camera && camera instanceof THREE.PerspectiveCamera) {
+        camera.fov = THREE.MathUtils.lerp(38, 28, t);
+        camera.updateProjectionMatrix();
+      }
+      if (progress.current >= 1) {
+        phase.current = 'hold';
+        progress.current = 0;
+      }
+    } else if (phase.current === 'hold') {
+      camera.lookAt(targetLook.current);
+      // Very slow creep forward during hold
+      camera.position.lerp(
+        new THREE.Vector3(
+          targetCamPos.current.x * 0.95 + targetLook.current.x * 0.05,
+          targetCamPos.current.y - 0.3,
+          targetCamPos.current.z * 0.95 + targetLook.current.z * 0.05
+        ),
+        delta * 0.3
+      );
+    } else if (phase.current === 'zoom_out') {
+      camera.position.lerpVectors(targetCamPos.current, savedPos.current, t);
+      if ('fov' in camera && camera instanceof THREE.PerspectiveCamera) {
+        camera.fov = THREE.MathUtils.lerp(28, 38, t);
+        camera.updateProjectionMatrix();
+      }
+      if (progress.current >= 1) {
+        isActive.current = false;
+        camera.position.copy(savedPos.current);
+        if (camera instanceof THREE.PerspectiveCamera) {
+          camera.fov = 38;
+          camera.updateProjectionMatrix();
+        }
+      }
+    }
   });
 
-  return null;
+  return (
+    <>
+      {/* Dramatic spotlight on victim during kill cam */}
+      {killCam && (
+        <group>
+          {/* Warm spotlight from above on victim */}
+          <spotLight
+            position={[killCam.targetPos.x, 8, killCam.targetPos.z]}
+            target-position={[killCam.targetPos.x, 0, killCam.targetPos.z]}
+            angle={0.4}
+            penumbra={0.8}
+            intensity={3}
+            color="#ff6633"
+            distance={15}
+            castShadow
+          />
+          {/* Cold rim light from behind */}
+          <pointLight
+            position={[killCam.attackerPos.x, 3, killCam.attackerPos.z]}
+            intensity={1.5}
+            color="#4488ff"
+            distance={8}
+          />
+          {/* Ground impact glow */}
+          <mesh
+            position={[killCam.targetPos.x, 0.02, killCam.targetPos.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <circleGeometry args={[1.5, 16]} />
+            <meshBasicMaterial color="#ff3300" transparent opacity={0.15} />
+          </mesh>
+        </group>
+      )}
+    </>
+  );
 }
 
 function DustParticles() {

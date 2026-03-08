@@ -18,46 +18,37 @@ export function BettingPanel({ onPlaceBet, sponsorPoints }: BettingPanelProps) {
   };
 
   return (
-    <div className="bg-card/90 border border-accent/30 rounded-xl p-4 backdrop-blur-sm max-w-[320px] mx-auto mt-4">
-      <div className="text-center mb-3">
-        <div className="text-[8px] tracking-[0.3em] text-accent font-bold">🎰 PREDICTIONS</div>
-        <p className="text-[7px] text-muted-foreground mt-0.5">Bet sponsor points on the winning team • 3x payout!</p>
-      </div>
+    <div className="bg-card/90 border border-accent/30 rounded-lg p-2.5 backdrop-blur-sm">
+      <div className="text-[7px] tracking-[0.2em] text-accent font-bold text-center mb-1.5">🎰 PREDICTIONS</div>
 
       {/* Team selection */}
-      <div className="grid grid-cols-4 gap-2 mb-3">
+      <div className="grid grid-cols-4 gap-1 mb-2">
         {(['blue', 'red', 'green', 'yellow'] as Team[]).map(team => (
           <button
             key={team}
             onClick={() => setSelectedTeam(team)}
-            className={`relative rounded-lg p-2 border-2 transition-all ${
-              selectedTeam === team
-                ? 'scale-105 shadow-lg'
-                : 'border-border/30 hover:border-border/60 opacity-70 hover:opacity-100'
+            className={`rounded p-1.5 border transition-all ${
+              selectedTeam === team ? 'scale-105' : 'border-border/30 opacity-60 hover:opacity-100'
             }`}
             style={{
               borderColor: selectedTeam === team ? TEAM_COLORS[team] : undefined,
-              boxShadow: selectedTeam === team ? `0 0 15px ${TEAM_COLORS[team]}44` : undefined,
+              boxShadow: selectedTeam === team ? `0 0 8px ${TEAM_COLORS[team]}33` : undefined,
             }}
           >
-            <div
-              className="w-6 h-6 rounded-md mx-auto mb-1"
-              style={{ backgroundColor: TEAM_COLORS[team] }}
-            />
-            <div className="text-[7px] font-bold text-foreground uppercase tracking-wider">{team}</div>
+            <div className="w-4 h-4 rounded-sm mx-auto" style={{ backgroundColor: TEAM_COLORS[team] }} />
+            <div className="text-[6px] font-bold text-foreground uppercase mt-0.5">{team}</div>
           </button>
         ))}
       </div>
 
-      {/* Amount selection */}
-      <div className="flex items-center justify-center gap-2 mb-3">
-        <span className="text-[7px] text-muted-foreground">BET:</span>
+      {/* Amount + bet button inline */}
+      <div className="flex items-center gap-1 mb-1.5">
         {BET_AMOUNTS.map(amt => (
           <button
             key={amt}
             onClick={() => setSelectedAmount(amt)}
             disabled={amt > sponsorPoints}
-            className={`px-2.5 py-1 rounded text-[8px] font-bold transition-all ${
+            className={`flex-1 py-0.5 rounded text-[7px] font-bold transition-all ${
               selectedAmount === amt
                 ? 'bg-accent text-accent-foreground'
                 : amt > sponsorPoints
@@ -70,24 +61,19 @@ export function BettingPanel({ onPlaceBet, sponsorPoints }: BettingPanelProps) {
         ))}
       </div>
 
-      {/* Place bet button */}
       <button
         onClick={handlePlaceBet}
         disabled={!selectedTeam || selectedAmount > sponsorPoints}
-        className={`w-full py-2 rounded-lg text-[9px] tracking-[0.2em] font-bold transition-all ${
+        className={`w-full py-1.5 rounded text-[7px] tracking-[0.15em] font-bold transition-all ${
           selectedTeam && selectedAmount <= sponsorPoints
             ? 'bg-accent text-accent-foreground hover:opacity-90'
             : 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed'
         }`}
       >
-        {selectedTeam
-          ? `BET ⭐${selectedAmount} ON ${selectedTeam.toUpperCase()} (WIN ⭐${selectedAmount * 3})`
-          : 'SELECT A TEAM'}
+        {selectedTeam ? `BET ⭐${selectedAmount} → WIN ⭐${selectedAmount * 3}` : 'SELECT A TEAM'}
       </button>
 
-      <p className="text-[6px] text-muted-foreground text-center mt-1.5">
-        Balance: ⭐{sponsorPoints} • Optional — skip to just watch
-      </p>
+      <p className="text-[5px] text-muted-foreground text-center mt-1">⭐{sponsorPoints} available • optional</p>
     </div>
   );
 }

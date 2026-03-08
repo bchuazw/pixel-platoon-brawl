@@ -173,7 +173,7 @@ export interface GameState {
 export const GRID_SIZE = 30;
 export const AP_MOVE_COST = 1;
 export const AP_ATTACK_COST = 1;
-export const VISION_RANGE = 7;
+export const VISION_RANGE = 5;
 
 export const TEAM_COLORS: Record<Team, string> = {
   blue: '#4488ff',

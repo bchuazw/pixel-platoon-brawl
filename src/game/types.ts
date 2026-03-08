@@ -6,7 +6,7 @@ export interface Position {
   z: number;
 }
 
-export type AbilityId = 'grenade' | 'overwatch' | 'heal' | 'suppress' | 'smoke' | 'first_aid';
+export type AbilityId = 'grenade' | 'hunker_down' | 'heal' | 'suppress' | 'smoke' | 'first_aid';
 
 export interface Ability {
   id: AbilityId;

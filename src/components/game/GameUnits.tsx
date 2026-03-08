@@ -186,6 +186,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
           (e.type === 'damage' || e.type === 'crit')) {
         animState.current = 'hit';
         animTimer.current = 0;
+        currentFrame.current = 0;
       }
       if (e.targetPos.x === unit.position.x && e.targetPos.z === unit.position.z && e.type === 'heal') {
         animState.current = 'healing';

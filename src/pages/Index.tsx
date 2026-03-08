@@ -11,7 +11,6 @@ const Index = () => {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
-    placeBet, betTeam, betAmount, collectBetPayout,
   } = useGameStore();
 
   const handleTileClick = useCallback((pos: Position) => {

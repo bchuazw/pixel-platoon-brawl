@@ -1,18 +1,30 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST,
+  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS,
 } from './types';
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
   performAttack, getNextTeam, getAliveTeams, runAiTurn, isInZone,
   checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot,
 } from './gameState';
-import { startBgMusic, stopBgMusic, playPickup } from './sounds';
+import { startBgMusic, stopBgMusic, playPickup, playHeal, playPickup as playGift } from './sounds';
+import { SponsorAction } from '@/components/game/CharacterPanel';
 
 export function useGameStore() {
   const [state, setState] = useState<GameState>(createInitialState);
+  const [sponsorPoints, setSponsorPoints] = useState(5);
+  const [inspectedUnitId, setInspectedUnitId] = useState<string | null>(null);
   const autoPlayRef = useRef(false);
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Earn sponsor points over time
+  useEffect(() => {
+    if (!state.autoPlay || state.phase === 'game_over' || state.phase === 'pre_game') return;
+    const interval = setInterval(() => {
+      setSponsorPoints(p => Math.min(p + 1, 20));
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [state.autoPlay, state.phase]);
 
   const addEvents = useCallback((events: CombatEvent[]) => {
     setState(prev => ({
@@ -25,6 +37,124 @@ export function useGameStore() {
         combatEvents: prev.combatEvents.filter(e => Date.now() - e.timestamp < 2500),
       }));
     }, 3000);
+  }, []);
+
+  const sponsorUnit = useCallback((unitId: string, action: SponsorAction) => {
+    setSponsorPoints(prev => {
+      const costs: Record<SponsorAction, number> = {
+        reveal_enemies: 1, reveal_loot: 1, gift_rifle: 2, gift_shotgun: 2,
+        gift_sniper: 3, gift_rocket: 4, gift_medkit: 2, gift_armor: 3,
+      };
+      const cost = costs[action];
+      if (prev < cost) return prev;
+
+      setState(gs => {
+        const units = gs.units.map(u => ({ ...u, weapon: { ...u.weapon } }));
+        const unit = units.find(u => u.id === unitId);
+        if (!unit || !unit.isAlive) return gs;
+
+        const log = [...gs.log];
+        const events: CombatEvent[] = [];
+
+        switch (action) {
+          case 'reveal_enemies': {
+            // Find nearest enemy and create a marker event
+            const enemies = units.filter(u => u.isAlive && u.team !== unit.team);
+            if (enemies.length > 0) {
+              let nearest = enemies[0];
+              let nearestDist = getManhattanDistance(unit.position, nearest.position);
+              for (const e of enemies) {
+                const d = getManhattanDistance(unit.position, e.position);
+                if (d < nearestDist) { nearest = e; nearestDist = d; }
+              }
+              // Temporarily boost vision for 3 turns by increasing visionRange
+              unit.visionRange += 5;
+              log.push(`🎁 SPONSOR: ${unit.name} receives ENEMY INTEL! Nearest: ${nearest.name} (${nearestDist} tiles away)`);
+              events.push({
+                id: `evt-sponsor-${Date.now()}`, type: 'ability',
+                attackerPos: unit.position, targetPos: nearest.position,
+                message: `🔍 Enemy spotted: ${nearest.name}!`, timestamp: Date.now(),
+              });
+            }
+            break;
+          }
+          case 'reveal_loot': {
+            // Find nearest loot
+            let nearestLoot: Position | null = null;
+            let nearestDist = Infinity;
+            for (let x = 0; x < gs.grid.length; x++) {
+              for (let z = 0; z < gs.grid[0].length; z++) {
+                if (gs.grid[x][z].loot) {
+                  const d = getManhattanDistance(unit.position, { x, z });
+                  if (d < nearestDist) { nearestDist = d; nearestLoot = { x, z }; }
+                }
+              }
+            }
+            if (nearestLoot) {
+              log.push(`🎁 SPONSOR: ${unit.name} receives LOOT INTEL! Nearest loot at (${nearestLoot.x},${nearestLoot.z}) - ${nearestDist} tiles`);
+              events.push({
+                id: `evt-sponsor-${Date.now()}`, type: 'loot',
+                attackerPos: unit.position, targetPos: nearestLoot,
+                message: `📡 Loot located ${nearestDist} tiles away!`, timestamp: Date.now(),
+              });
+            } else {
+              log.push(`🎁 SPONSOR: No loot remaining on the field!`);
+            }
+            break;
+          }
+          case 'gift_rifle': {
+            const w = { ...WEAPONS.rifle };
+            unit.weapon = w; unit.attack = w.attack; unit.accuracy = w.accuracy; unit.attackRange = w.range;
+            log.push(`🎁 SPONSOR: ${unit.name} receives an Assault Rifle!`);
+            events.push({ id: `evt-sponsor-${Date.now()}`, type: 'loot', attackerPos: unit.position, targetPos: unit.position, message: `🎁 Sponsored: Assault Rifle!`, timestamp: Date.now() });
+            break;
+          }
+          case 'gift_shotgun': {
+            const w = { ...WEAPONS.shotgun };
+            unit.weapon = w; unit.attack = w.attack; unit.accuracy = w.accuracy; unit.attackRange = w.range;
+            log.push(`🎁 SPONSOR: ${unit.name} receives a Shotgun!`);
+            events.push({ id: `evt-sponsor-${Date.now()}`, type: 'loot', attackerPos: unit.position, targetPos: unit.position, message: `🎁 Sponsored: Shotgun!`, timestamp: Date.now() });
+            break;
+          }
+          case 'gift_sniper': {
+            const w = { ...WEAPONS.sniper_rifle };
+            unit.weapon = w; unit.attack = w.attack; unit.accuracy = w.accuracy; unit.attackRange = w.range;
+            log.push(`🎁 SPONSOR: ${unit.name} receives a Sniper Rifle!`);
+            events.push({ id: `evt-sponsor-${Date.now()}`, type: 'loot', attackerPos: unit.position, targetPos: unit.position, message: `🎁 Sponsored: Sniper Rifle!`, timestamp: Date.now() });
+            break;
+          }
+          case 'gift_rocket': {
+            const w = { ...WEAPONS.rocket_launcher };
+            unit.weapon = w; unit.attack = w.attack; unit.accuracy = w.accuracy; unit.attackRange = w.range;
+            log.push(`🎁 SPONSOR: ${unit.name} receives a Rocket Launcher!`);
+            events.push({ id: `evt-sponsor-${Date.now()}`, type: 'loot', attackerPos: unit.position, targetPos: unit.position, message: `🎁 Sponsored: Rocket Launcher!`, timestamp: Date.now() });
+            break;
+          }
+          case 'gift_medkit': {
+            const healAmt = Math.min(40, unit.maxHp - unit.hp);
+            unit.hp = Math.min(unit.maxHp, unit.hp + 40);
+            log.push(`🎁 SPONSOR: ${unit.name} receives Medical Supplies (+${healAmt} HP)!`);
+            events.push({ id: `evt-sponsor-${Date.now()}`, type: 'heal', attackerPos: unit.position, targetPos: unit.position, value: healAmt, message: `🎁 Sponsored: +${healAmt} HP!`, timestamp: Date.now() });
+            break;
+          }
+          case 'gift_armor': {
+            unit.armor += 8;
+            unit.defense += 4;
+            log.push(`🎁 SPONSOR: ${unit.name} receives Armor Vest (+8 armor, +4 DEF)!`);
+            events.push({ id: `evt-sponsor-${Date.now()}`, type: 'loot', attackerPos: unit.position, targetPos: unit.position, message: `🎁 Sponsored: Armor Vest!`, timestamp: Date.now() });
+            break;
+          }
+        }
+
+        return { ...gs, units, log, combatEvents: [...gs.combatEvents, ...events] };
+      });
+
+      return prev - cost;
+    });
+  }, []);
+
+  const inspectUnit = useCallback((unitId: string | null) => {
+    setInspectedUnitId(unitId);
   }, []);
 
   const runFullTurn = useCallback(() => {
@@ -164,7 +294,11 @@ export function useGameStore() {
       ...prev,
       phase: 'select',
       autoPlay: true,
-      log: [...prev.log, '» AUTO-BATTLE ENGAGED! All teams controlled by AI.', '» Fog of War: AI units have limited vision!'],
+      log: [...prev.log,
+        '» AUTO-BATTLE ENGAGED! All teams controlled by AI.',
+        '» Fog of War: AI units have limited vision!',
+        '» 🎁 You are now a SPONSOR — click any unit to send gifts!',
+      ],
     }));
   }, []);
 
@@ -205,7 +339,6 @@ export function useGameStore() {
       movingUnit.position = pos;
       movingUnit.ap -= AP_MOVE_COST;
 
-      // Pickup loot
       const log = [...prev.log];
       const newEvents: CombatEvent[] = [];
       const tile = grid[pos.x][pos.z];
@@ -354,9 +487,8 @@ export function useGameStore() {
         }
         case 'first_aid':
         case 'heal': {
-          // first_aid can target self or ally
           let target = units.find(u => u.isAlive && u.position.x === pos.x && u.position.z === pos.z && u.team === unit.team);
-          if (!target && pos.x === unit.position.x && pos.z === unit.position.z) target = unit; // self
+          if (!target && pos.x === unit.position.x && pos.z === unit.position.z) target = unit;
           if (target) {
             const healAmt = prev.activeAbility === 'first_aid' ? 35 : 40;
             target.hp = Math.min(target.maxHp, target.hp + healAmt);
@@ -535,11 +667,14 @@ export function useGameStore() {
 
   const restart = useCallback(() => {
     stopBgMusic();
+    setSponsorPoints(5);
+    setInspectedUnitId(null);
     setState(createInitialState());
   }, []);
 
   return {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
+    sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit,
   };
 }

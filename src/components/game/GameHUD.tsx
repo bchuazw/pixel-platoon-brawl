@@ -12,6 +12,8 @@ interface GameHUDProps {
   onUseAbility: (id: AbilityId) => void;
   onStartAutoPlay: () => void;
   onStopAutoPlay: () => void;
+  sponsorPoints?: number;
+  onUnitInspect?: (unitId: string) => void;
 }
 
 const CLASS_ICONS: Record<string, typeof Swords> = {
@@ -19,14 +21,15 @@ const CLASS_ICONS: Record<string, typeof Swords> = {
   medic: Heart,
 };
 
-function UnitCard({ unit, isActive }: { unit: Unit; isActive: boolean }) {
+function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; onClick?: () => void }) {
   const hpPercent = (unit.hp / unit.maxHp) * 100;
   const teamColor = TEAM_COLORS[unit.team];
   const Icon = CLASS_ICONS[unit.unitClass] || Swords;
 
   return (
     <div
-      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all ${
+      onClick={onClick}
+      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all ${onClick ? 'cursor-pointer hover:bg-secondary/60' : ''} ${
         isActive
           ? 'bg-secondary/80 border-primary/40 shadow-[0_0_15px_hsl(142_70%_45%/0.15)]'
           : 'bg-card/60 border-border/20'
@@ -199,7 +202,7 @@ function Minimap({ state }: { state: GameState }) {
   );
 }
 
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, sponsorPoints, onUnitInspect }: GameHUDProps) {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -304,8 +307,14 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {/* Left - Unit cards */}
       {!isPreGame && (
         <div className="pointer-events-auto absolute left-2 top-14 w-48 space-y-1.5 max-h-[calc(100vh-200px)] overflow-y-auto">
+          {sponsorPoints !== undefined && (
+            <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-1.5 text-center mb-1">
+              <span className="text-[7px] text-accent font-bold">🎁 SPONSOR POINTS: ⭐{sponsorPoints}</span>
+              <div className="text-[5px] text-muted-foreground mt-0.5">Click a unit to sponsor</div>
+            </div>
+          )}
           {state.units.map(u => (
-            <UnitCard key={u.id} unit={u} isActive={u.team === state.currentTeam && u.isAlive} />
+            <UnitCard key={u.id} unit={u} isActive={u.team === state.currentTeam && u.isAlive} onClick={() => onUnitInspect?.(u.id)} />
           ))}
         </div>
       )}

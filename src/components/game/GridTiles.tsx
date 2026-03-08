@@ -328,7 +328,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Natural boulder — knee to waist height
     case 'rock':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.5, h * Math.PI, rotVar * 0.3]} scale={[scaleVar, 0.8 + tileHash(tile.x, tile.z, 202) * 0.4, scaleVar]}>
           <mesh position={[0, 0.15, 0]} castShadow>
             <dodecahedronGeometry args={[0.25 + h * 0.1, 1]} />
             <meshStandardMaterial color="#7a7a82" roughness={0.95} />

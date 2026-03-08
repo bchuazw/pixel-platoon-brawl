@@ -95,21 +95,16 @@ function PropObject({ tile }: { tile: TileData }) {
     case 'crate':
       return (
         <group position={[tile.x, baseY, tile.z]}>
-          {/* Military ammo crate */}
           <mesh position={[0, 0.18, 0]}><boxGeometry args={[0.5, 0.35, 0.4]} /><meshStandardMaterial color="#5a4a2a" roughness={0.95} /></mesh>
-          {/* Metal bands */}
           <mesh position={[0, 0.18, 0.201]}><boxGeometry args={[0.52, 0.04, 0.01]} /><meshStandardMaterial color="#3a3a3a" metalness={0.6} roughness={0.4} /></mesh>
           <mesh position={[0, 0.28, 0.201]}><boxGeometry args={[0.52, 0.04, 0.01]} /><meshStandardMaterial color="#3a3a3a" metalness={0.6} roughness={0.4} /></mesh>
-          {/* Lock */}
           <mesh position={[0, 0.35, 0.201]}><boxGeometry args={[0.08, 0.06, 0.02]} /><meshStandardMaterial color="#8a7a3a" metalness={0.8} roughness={0.3} /></mesh>
         </group>
       );
     case 'barrel':
       return (
         <group position={[tile.x, baseY, tile.z]}>
-          {/* Oil drum */}
           <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.2, 0.22, 0.5, 8]} /><meshStandardMaterial color="#3a5a3a" roughness={0.6} metalness={0.4} /></mesh>
-          {/* Rim rings */}
           <mesh position={[0, 0.48, 0]}><cylinderGeometry args={[0.21, 0.21, 0.03, 8]} /><meshStandardMaterial color="#2a3a2a" metalness={0.7} roughness={0.3} /></mesh>
           <mesh position={[0, 0.02, 0]}><cylinderGeometry args={[0.23, 0.23, 0.03, 8]} /><meshStandardMaterial color="#2a3a2a" metalness={0.7} roughness={0.3} /></mesh>
         </group>
@@ -117,18 +112,20 @@ function PropObject({ tile }: { tile: TileData }) {
     case 'sandbag':
       return (
         <group position={[tile.x, baseY, tile.z]}>
-          {/* Stacked sandbags */}
-          <mesh position={[-0.15, 0.08, 0]}><boxGeometry args={[0.3, 0.14, 0.25]} /><meshStandardMaterial color="#b0a070" roughness={1} /></mesh>
-          <mesh position={[0.15, 0.08, 0]}><boxGeometry args={[0.3, 0.14, 0.25]} /><meshStandardMaterial color="#a89565" roughness={1} /></mesh>
-          <mesh position={[0, 0.2, 0]}><boxGeometry args={[0.35, 0.12, 0.22]} /><meshStandardMaterial color="#a89060" roughness={1} /></mesh>
-          {/* Top sandbag */}
-          <mesh position={[0, 0.3, 0]}><boxGeometry args={[0.25, 0.10, 0.2]} /><meshStandardMaterial color="#b5a575" roughness={1} /></mesh>
+          {/* Thick sandbag wall - strong full cover */}
+          <mesh position={[-0.2, 0.09, 0]}><boxGeometry args={[0.28, 0.16, 0.3]} /><meshStandardMaterial color="#b0a070" roughness={1} /></mesh>
+          <mesh position={[0.2, 0.09, 0]}><boxGeometry args={[0.28, 0.16, 0.3]} /><meshStandardMaterial color="#a89565" roughness={1} /></mesh>
+          <mesh position={[0, 0.09, -0.25]}><boxGeometry args={[0.28, 0.16, 0.22]} /><meshStandardMaterial color="#a89060" roughness={1} /></mesh>
+          {/* Second row */}
+          <mesh position={[-0.1, 0.24, 0]}><boxGeometry args={[0.32, 0.14, 0.28]} /><meshStandardMaterial color="#a89060" roughness={1} /></mesh>
+          <mesh position={[0.15, 0.24, 0]}><boxGeometry args={[0.28, 0.14, 0.28]} /><meshStandardMaterial color="#b5a575" roughness={1} /></mesh>
+          {/* Top row */}
+          <mesh position={[0, 0.36, 0]}><boxGeometry args={[0.35, 0.10, 0.26]} /><meshStandardMaterial color="#b5a575" roughness={1} /></mesh>
         </group>
       );
     case 'rock':
       return (
         <group position={[tile.x, baseY, tile.z]}>
-          {/* Rugged boulder */}
           <mesh position={[0, 0.18, 0]} rotation={[0.1, tile.variant * 0.8, 0.05]}>
             <dodecahedronGeometry args={[0.3, 1]} /><meshStandardMaterial color="#5a5a5e" roughness={0.95} />
           </mesh>
@@ -140,7 +137,6 @@ function PropObject({ tile }: { tile: TileData }) {
     case 'bush':
       return (
         <group position={[tile.x, baseY, tile.z]}>
-          {/* Scrubby military bush */}
           <mesh position={[0, 0.15, 0]}><sphereGeometry args={[0.22, 5, 4]} /><meshStandardMaterial color="#2e5a1e" roughness={0.95} /></mesh>
           <mesh position={[0.12, 0.1, 0.08]}><sphereGeometry args={[0.15, 4, 3]} /><meshStandardMaterial color="#264e18" roughness={0.95} /></mesh>
           <mesh position={[-0.08, 0.12, -0.06]}><sphereGeometry args={[0.12, 4, 3]} /><meshStandardMaterial color="#325a22" roughness={0.95} /></mesh>
@@ -149,7 +145,6 @@ function PropObject({ tile }: { tile: TileData }) {
     case 'tree':
       return (
         <group position={[tile.x, baseY, tile.z]}>
-          {/* Pine tree - military themed */}
           <mesh position={[0, 0.3, 0]}><cylinderGeometry args={[0.06, 0.08, 0.6, 6]} /><meshStandardMaterial color="#4a3018" roughness={0.95} /></mesh>
           <mesh position={[0, 0.65, 0]}><coneGeometry args={[0.4, 0.5, 6]} /><meshStandardMaterial color="#1a4a0e" roughness={0.9} /></mesh>
           <mesh position={[0, 0.9, 0]}><coneGeometry args={[0.3, 0.4, 6]} /><meshStandardMaterial color="#225a16" roughness={0.9} /></mesh>
@@ -159,17 +154,153 @@ function PropObject({ tile }: { tile: TileData }) {
     case 'ruins':
       return (
         <group position={[tile.x, baseY, tile.z]}>
-          {/* Destroyed building remnant */}
           <mesh position={[-0.2, 0.25, -0.2]}><boxGeometry args={[0.1, 0.5, 0.1]} /><meshStandardMaterial color="#6a6a6e" roughness={0.95} /></mesh>
           <mesh position={[0.2, 0.15, 0.15]}><boxGeometry args={[0.12, 0.3, 0.12]} /><meshStandardMaterial color="#5a5a5e" roughness={0.95} /></mesh>
-          {/* Rubble base */}
           <mesh position={[0, 0.06, 0]}><boxGeometry args={[0.6, 0.1, 0.6]} /><meshStandardMaterial color="#4a4a4e" roughness={0.95} /></mesh>
-          {/* Rebar/debris */}
           <mesh position={[-0.2, 0.5, -0.2]} rotation={[0, 0, 0.3]}><cylinderGeometry args={[0.015, 0.015, 0.2, 4]} /><meshStandardMaterial color="#8a4a2a" metalness={0.5} roughness={0.6} /></mesh>
-          {/* Broken wall section */}
           <mesh position={[0, 0.18, -0.25]}><boxGeometry args={[0.5, 0.25, 0.08]} /><meshStandardMaterial color="#5e5e62" roughness={0.95} /></mesh>
         </group>
       );
+
+    // ═══ NEW WARZONE PROPS ═══
+
+    case 'wire':
+      // Concertina wire coils — half cover, not blocked (units can move through but take penalty)
+      return (
+        <group position={[tile.x, baseY, tile.z]}>
+          {/* Wire coil 1 */}
+          <mesh position={[-0.15, 0.12, 0]} rotation={[0, 0.3, Math.PI / 2]}>
+            <torusGeometry args={[0.12, 0.018, 6, 12]} /><meshStandardMaterial color="#6a6a6a" metalness={0.7} roughness={0.4} />
+          </mesh>
+          {/* Wire coil 2 */}
+          <mesh position={[0.1, 0.14, 0.05]} rotation={[0.2, -0.4, Math.PI / 2]}>
+            <torusGeometry args={[0.14, 0.015, 6, 12]} /><meshStandardMaterial color="#7a7a7a" metalness={0.7} roughness={0.4} />
+          </mesh>
+          {/* Wire coil 3 */}
+          <mesh position={[0, 0.1, -0.1]} rotation={[0.4, 0.1, Math.PI / 2]}>
+            <torusGeometry args={[0.1, 0.02, 6, 10]} /><meshStandardMaterial color="#5a5a5a" metalness={0.7} roughness={0.4} />
+          </mesh>
+          {/* Support posts */}
+          <mesh position={[-0.3, 0.15, 0]}><cylinderGeometry args={[0.02, 0.02, 0.3, 4]} /><meshStandardMaterial color="#4a3a2a" roughness={0.9} /></mesh>
+          <mesh position={[0.3, 0.15, 0]}><cylinderGeometry args={[0.02, 0.02, 0.3, 4]} /><meshStandardMaterial color="#4a3a2a" roughness={0.9} /></mesh>
+        </group>
+      );
+
+    case 'jersey_barrier':
+      // Concrete jersey barrier — full cover, blocked
+      return (
+        <group position={[tile.x, baseY, tile.z]}>
+          {/* Main barrier body — tapered concrete shape */}
+          <mesh position={[0, 0.2, 0]}>
+            <boxGeometry args={[0.7, 0.4, 0.28]} /><meshStandardMaterial color="#8a8a88" roughness={0.95} />
+          </mesh>
+          {/* Tapered base */}
+          <mesh position={[0, 0.03, 0]}>
+            <boxGeometry args={[0.8, 0.06, 0.4]} /><meshStandardMaterial color="#7a7a78" roughness={0.95} />
+          </mesh>
+          {/* Wear/damage marks */}
+          <mesh position={[0.15, 0.25, 0.141]}>
+            <boxGeometry args={[0.12, 0.08, 0.005]} /><meshStandardMaterial color="#6a6a68" roughness={1} />
+          </mesh>
+          <mesh position={[-0.2, 0.15, 0.141]}>
+            <boxGeometry args={[0.08, 0.06, 0.005]} /><meshStandardMaterial color="#5a5a58" roughness={1} />
+          </mesh>
+        </group>
+      );
+
+    case 'burnt_vehicle':
+      // Destroyed military vehicle wreck — full cover, blocked
+      return (
+        <group position={[tile.x, baseY, tile.z]}>
+          {/* Chassis */}
+          <mesh position={[0, 0.12, 0]}>
+            <boxGeometry args={[0.8, 0.18, 0.45]} /><meshStandardMaterial color="#2a2a28" roughness={0.9} metalness={0.3} />
+          </mesh>
+          {/* Cabin/turret remnant */}
+          <mesh position={[-0.05, 0.3, 0]}>
+            <boxGeometry args={[0.4, 0.2, 0.35]} /><meshStandardMaterial color="#1a1a18" roughness={0.85} metalness={0.4} />
+          </mesh>
+          {/* Wheels */}
+          <mesh position={[-0.3, 0.06, 0.22]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.08, 0.08, 0.06, 8]} /><meshStandardMaterial color="#1a1a1a" roughness={0.95} />
+          </mesh>
+          <mesh position={[0.3, 0.06, 0.22]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.08, 0.08, 0.06, 8]} /><meshStandardMaterial color="#1a1a1a" roughness={0.95} />
+          </mesh>
+          <mesh position={[0.3, 0.06, -0.22]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.07, 0.08, 0.06, 8]} /><meshStandardMaterial color="#1a1a1a" roughness={0.95} />
+          </mesh>
+          {/* Fire/scorch marks */}
+          <mesh position={[0.1, 0.22, 0.23]}>
+            <boxGeometry args={[0.2, 0.1, 0.01]} /><meshStandardMaterial color="#3a2010" roughness={1} />
+          </mesh>
+          {/* Bent barrel/pipe */}
+          <mesh position={[0.2, 0.35, 0]} rotation={[0, 0, -0.4]}>
+            <cylinderGeometry args={[0.025, 0.02, 0.3, 6]} /><meshStandardMaterial color="#3a3a38" metalness={0.6} roughness={0.5} />
+          </mesh>
+        </group>
+      );
+
+    case 'foxhole':
+      // Dug-in fighting position — half cover, not blocked (unit can stand in it)
+      return (
+        <group position={[tile.x, baseY - 0.1, tile.z]}>
+          {/* Dirt ring around hole */}
+          <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.2, 0.4, 8]} /><meshStandardMaterial color="#6a5a3a" roughness={1} side={THREE.DoubleSide} />
+          </mesh>
+          {/* Dirt mound edges */}
+          <mesh position={[0.3, 0.06, 0]}><boxGeometry args={[0.15, 0.1, 0.3]} /><meshStandardMaterial color="#7a6a4a" roughness={1} /></mesh>
+          <mesh position={[-0.3, 0.06, 0]}><boxGeometry args={[0.15, 0.1, 0.3]} /><meshStandardMaterial color="#6a5a3a" roughness={1} /></mesh>
+          <mesh position={[0, 0.06, 0.3]}><boxGeometry args={[0.3, 0.1, 0.15]} /><meshStandardMaterial color="#7a6a4a" roughness={1} /></mesh>
+          {/* Small sandbag on edge */}
+          <mesh position={[0.25, 0.12, 0.2]}><boxGeometry args={[0.15, 0.08, 0.1]} /><meshStandardMaterial color="#a89060" roughness={1} /></mesh>
+        </group>
+      );
+
+    case 'hesco':
+      // HESCO bastion (military blast wall) — full cover, blocked
+      return (
+        <group position={[tile.x, baseY, tile.z]}>
+          {/* Main HESCO cube */}
+          <mesh position={[0, 0.25, 0]}>
+            <boxGeometry args={[0.55, 0.5, 0.55]} /><meshStandardMaterial color="#a89565" roughness={0.95} />
+          </mesh>
+          {/* Wire mesh exterior */}
+          <mesh position={[0, 0.25, 0.276]}>
+            <boxGeometry args={[0.56, 0.51, 0.005]} /><meshStandardMaterial color="#7a7a78" metalness={0.5} roughness={0.6} wireframe />
+          </mesh>
+          <mesh position={[0.276, 0.25, 0]}>
+            <boxGeometry args={[0.005, 0.51, 0.56]} /><meshStandardMaterial color="#7a7a78" metalness={0.5} roughness={0.6} wireframe />
+          </mesh>
+          {/* Dirt fill visible on top */}
+          <mesh position={[0, 0.5, 0]}>
+            <boxGeometry args={[0.5, 0.02, 0.5]} /><meshStandardMaterial color="#6a5a3a" roughness={1} />
+          </mesh>
+        </group>
+      );
+
+    case 'tank_trap':
+      // Czech hedgehog anti-tank obstacle — half cover, blocked
+      return (
+        <group position={[tile.x, baseY, tile.z]}>
+          {/* Three crossed I-beams */}
+          <mesh position={[0, 0.18, 0]} rotation={[0, 0, Math.PI / 4]}>
+            <boxGeometry args={[0.06, 0.5, 0.06]} /><meshStandardMaterial color="#5a4a3a" metalness={0.6} roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.18, 0]} rotation={[Math.PI / 4, 0, 0]}>
+            <boxGeometry args={[0.06, 0.5, 0.06]} /><meshStandardMaterial color="#4a3a2a" metalness={0.6} roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.18, 0]} rotation={[0, Math.PI / 4, Math.PI / 4]}>
+            <boxGeometry args={[0.06, 0.5, 0.06]} /><meshStandardMaterial color="#5a4a3a" metalness={0.6} roughness={0.5} />
+          </mesh>
+          {/* Rust spots */}
+          <mesh position={[0.08, 0.28, 0.08]}>
+            <sphereGeometry args={[0.03, 4, 3]} /><meshStandardMaterial color="#8a4a1a" roughness={1} />
+          </mesh>
+        </group>
+      );
+
     default: return null;
   }
 }

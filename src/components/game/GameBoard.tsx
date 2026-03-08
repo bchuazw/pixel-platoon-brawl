@@ -103,7 +103,7 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
 }
 
 function DustParticles() {
-  const count = 100;
+  const count = 40;
   const ref = useRef<THREE.Points>(null);
   
   const positions = useMemo(() => {

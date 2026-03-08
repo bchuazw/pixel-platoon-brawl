@@ -129,31 +129,101 @@ function SoldierBody({ teamColor, isMedic }: { teamColor: string; isMedic: boole
   );
 }
 
-function Weapon({ unitClass }: { unitClass: string }) {
+function Weapon({ weaponId }: { weaponId: string }) {
   const metalMat = useMemo(() => getMat('#2a2a2a', 0.7, 0.3), []);
+  const darkMetalMat = useMemo(() => getMat('#1a1a1a', 0.8, 0.25), []);
   const woodMat = useMemo(() => getMat('#3a2818', 0, 0.8), []);
+  const brownMat = useMemo(() => getMat('#4a3020', 0.05, 0.85), []);
 
-  return (
-    <group position={[0.08, 0, 0.12]}>
-      <mesh material={metalMat}>
-        <boxGeometry args={[0.035, 0.045, 0.28]} />
-      </mesh>
-      <mesh position={[0, 0.005, 0.2]} material={metalMat}>
-        <cylinderGeometry args={[0.01, 0.01, 0.14, 5]} />
-      </mesh>
-      <mesh position={[0, -0.005, -0.15]} material={woodMat}>
-        <boxGeometry args={[0.028, 0.055, 0.08]} />
-      </mesh>
-      <mesh position={[0, -0.04, 0.02]} material={metalMat}>
-        <boxGeometry args={[0.022, 0.05, 0.03]} />
-      </mesh>
-      {unitClass === 'soldier' && (
-        <mesh position={[0, 0.035, 0.04]} material={metalMat}>
-          <cylinderGeometry args={[0.012, 0.014, 0.06, 5]} />
-        </mesh>
-      )}
-    </group>
-  );
+  switch (weaponId) {
+    case 'pistol':
+      return (
+        <group position={[0.06, 0, 0.08]}>
+          <mesh material={metalMat}><boxGeometry args={[0.025, 0.04, 0.14]} /></mesh>
+          <mesh position={[0, 0.005, 0.09]} material={metalMat}><cylinderGeometry args={[0.008, 0.008, 0.06, 5]} /></mesh>
+          <mesh position={[0, -0.02, -0.05]} material={woodMat}><boxGeometry args={[0.022, 0.055, 0.06]} /></mesh>
+        </group>
+      );
+    case 'rifle':
+      return (
+        <group position={[0.08, 0, 0.12]}>
+          <mesh material={metalMat}><boxGeometry args={[0.03, 0.04, 0.32]} /></mesh>
+          <mesh position={[0, 0.005, 0.22]} material={metalMat}><cylinderGeometry args={[0.009, 0.009, 0.16, 5]} /></mesh>
+          <mesh position={[0, -0.005, -0.15]} material={woodMat}><boxGeometry args={[0.025, 0.05, 0.08]} /></mesh>
+          <mesh position={[0, -0.04, 0.02]} material={metalMat}><boxGeometry args={[0.02, 0.05, 0.025]} /></mesh>
+          {/* Magazine */}
+          <mesh position={[0, -0.04, 0.06]} material={darkMetalMat}><boxGeometry args={[0.018, 0.06, 0.02]} /></mesh>
+          {/* Scope rail */}
+          <mesh position={[0, 0.025, 0.04]} material={metalMat}><boxGeometry args={[0.018, 0.008, 0.1]} /></mesh>
+        </group>
+      );
+    case 'shotgun':
+      return (
+        <group position={[0.08, 0, 0.1]}>
+          {/* Thick barrel */}
+          <mesh material={metalMat}><boxGeometry args={[0.035, 0.04, 0.28]} /></mesh>
+          <mesh position={[0, 0, 0.18]} material={darkMetalMat}><cylinderGeometry args={[0.014, 0.014, 0.12, 6]} /></mesh>
+          {/* Pump grip */}
+          <mesh position={[0, -0.005, 0.06]} material={brownMat}><boxGeometry args={[0.038, 0.035, 0.08]} /></mesh>
+          {/* Stock */}
+          <mesh position={[0, -0.008, -0.16]} material={woodMat}><boxGeometry args={[0.028, 0.06, 0.1]} /></mesh>
+        </group>
+      );
+    case 'sniper_rifle':
+      return (
+        <group position={[0.08, 0, 0.16]}>
+          {/* Long barrel */}
+          <mesh material={metalMat}><boxGeometry args={[0.025, 0.035, 0.42]} /></mesh>
+          <mesh position={[0, 0.005, 0.28]} material={metalMat}><cylinderGeometry args={[0.007, 0.007, 0.2, 5]} /></mesh>
+          {/* Scope */}
+          <mesh position={[0, 0.035, 0.04]} material={darkMetalMat}><cylinderGeometry args={[0.012, 0.012, 0.1, 6]} /></mesh>
+          <mesh position={[0, 0.035, -0.02]} material={darkMetalMat}><cylinderGeometry args={[0.015, 0.012, 0.02, 6]} /></mesh>
+          <mesh position={[0, 0.035, 0.1]} material={darkMetalMat}><cylinderGeometry args={[0.012, 0.015, 0.02, 6]} /></mesh>
+          {/* Stock */}
+          <mesh position={[0, -0.005, -0.2]} material={woodMat}><boxGeometry args={[0.024, 0.055, 0.12]} /></mesh>
+          {/* Bipod legs */}
+          <mesh position={[0.015, -0.035, 0.15]} rotation={[0, 0, -0.3]} material={metalMat}><boxGeometry args={[0.005, 0.04, 0.005]} /></mesh>
+          <mesh position={[-0.015, -0.035, 0.15]} rotation={[0, 0, 0.3]} material={metalMat}><boxGeometry args={[0.005, 0.04, 0.005]} /></mesh>
+        </group>
+      );
+    case 'rocket_launcher':
+      return (
+        <group position={[0.08, 0.02, 0.1]}>
+          {/* Main tube */}
+          <mesh material={darkMetalMat}><cylinderGeometry args={[0.035, 0.035, 0.38, 8]} /></mesh>
+          {/* Front flare */}
+          <mesh position={[0, 0, 0.2]}><cylinderGeometry args={[0.04, 0.035, 0.04, 8]} /><meshStandardMaterial color="#3a3a3a" metalness={0.6} roughness={0.4} /></mesh>
+          {/* Rear opening */}
+          <mesh position={[0, 0, -0.2]}><cylinderGeometry args={[0.032, 0.04, 0.04, 8]} /><meshStandardMaterial color="#2a2a2a" metalness={0.5} roughness={0.5} /></mesh>
+          {/* Grip */}
+          <mesh position={[0, -0.04, -0.04]} material={brownMat}><boxGeometry args={[0.025, 0.05, 0.04]} /></mesh>
+          {/* Sight */}
+          <mesh position={[0, 0.04, 0.05]} material={metalMat}><boxGeometry args={[0.015, 0.02, 0.06]} /></mesh>
+        </group>
+      );
+    case 'smg':
+      return (
+        <group position={[0.07, 0, 0.1]}>
+          {/* Compact body */}
+          <mesh material={metalMat}><boxGeometry args={[0.03, 0.04, 0.22]} /></mesh>
+          <mesh position={[0, 0.005, 0.14]} material={metalMat}><cylinderGeometry args={[0.008, 0.008, 0.08, 5]} /></mesh>
+          {/* Extended magazine */}
+          <mesh position={[0, -0.05, 0.04]} material={darkMetalMat}><boxGeometry args={[0.02, 0.07, 0.022]} /></mesh>
+          {/* Folding stock */}
+          <mesh position={[0, 0.01, -0.12]} material={metalMat}><boxGeometry args={[0.008, 0.035, 0.06]} /></mesh>
+          {/* Grip */}
+          <mesh position={[0, -0.03, -0.02]} material={brownMat}><boxGeometry args={[0.022, 0.04, 0.03]} /></mesh>
+        </group>
+      );
+    default:
+      // Fallback pistol
+      return (
+        <group position={[0.06, 0, 0.08]}>
+          <mesh material={metalMat}><boxGeometry args={[0.025, 0.04, 0.14]} /></mesh>
+          <mesh position={[0, -0.02, -0.05]} material={woodMat}><boxGeometry args={[0.022, 0.055, 0.06]} /></mesh>
+        </group>
+      );
+  }
 }
 
 // ── Main 3D Soldier ──

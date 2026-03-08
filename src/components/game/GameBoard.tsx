@@ -269,26 +269,19 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <EmberParticles />
         <ScreenShake events={state.combatEvents} />
 
-        {/* ── Post-processing pipeline ── */}
-        <EffectComposer multisampling={4}>
+        {/* ── Post-processing pipeline (simplified) ── */}
+        <EffectComposer multisampling={0}>
           <Bloom
-            intensity={0.5}
-            luminanceThreshold={0.5}
-            luminanceSmoothing={0.8}
+            intensity={0.4}
+            luminanceThreshold={0.6}
+            luminanceSmoothing={0.9}
             mipmapBlur
-          />
-          <ChromaticAberration
-            offset={new THREE.Vector2(0.0004, 0.0004)}
-            radialModulation={true}
-            modulationOffset={0.5}
-            blendFunction={BlendFunction.NORMAL}
           />
           <Vignette
             offset={0.25}
-            darkness={0.75}
+            darkness={0.7}
             blendFunction={BlendFunction.NORMAL}
           />
-          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         </EffectComposer>
 
         <Suspense fallback={<LoadingFallback />}>

@@ -1536,13 +1536,14 @@ export function runAiUnitStep(
       }
     }
 
-    // Overwatch (only if didn't shoot — still has AP)
-    if (unit.ap >= 1 && !unit.isOnOverwatch && visibleAfterMove.length > 0) {
-      const owAbility = unit.abilities.find(a => a.id === 'overwatch');
-      if (owAbility && (!unit.cooldowns['overwatch'] || unit.cooldowns['overwatch'] <= 0)) {
-        unit.isOnOverwatch = true;
+    // Hunker down (only if didn't shoot — still has AP and enemies visible)
+    if (unit.ap >= 1 && !unit.isHunkered && visibleAfterMove.length > 0 && unit.coverType !== 'none') {
+      const hunkerAbility = unit.abilities.find(a => a.id === 'hunker_down');
+      if (hunkerAbility) {
+        unit.isHunkered = true;
         unit.ap -= 1;
-        allEvents.push({ id: makeEventId(), type: 'overwatch', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `👁 ${unit.name} goes on OVERWATCH`, timestamp: Date.now() });
+        allEvents.push({ id: makeEventId(), type: 'hunker', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `🛡 ${unit.name} HUNKERS DOWN!`, timestamp: Date.now() });
+        newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
       }
     }
   }

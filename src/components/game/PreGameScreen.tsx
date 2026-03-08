@@ -52,7 +52,7 @@ function UnitCard({ unit, index }: { unit: Unit; index: number }) {
     <Reveal delay={800 + index * 100}>
       <div className="relative overflow-hidden bg-card/60 backdrop-blur-sm border rounded-xl flex items-stretch transition-all hover:scale-[1.02] hover:bg-card/80 group"
         style={{ borderColor: `${tc}30` }}>
-        <div className="w-20 h-20 shrink-0 relative overflow-hidden"
+        <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 relative overflow-hidden"
           style={{ background: `linear-gradient(135deg, ${tc}18, ${tc}06)` }}>
           {portrait ? (
             <img src={portrait} alt={unit.name}
@@ -60,29 +60,29 @@ function UnitCard({ unit, index }: { unit: Unit; index: number }) {
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               {unit.unitClass === 'soldier'
-                ? <Swords className="w-8 h-8" style={{ color: tc }} />
-                : <Heart className="w-8 h-8" style={{ color: tc }} />}
+                ? <Swords className="w-6 h-6 sm:w-8 sm:h-8" style={{ color: tc }} />
+                : <Heart className="w-6 h-6 sm:w-8 sm:h-8" style={{ color: tc }} />}
             </div>
           )}
           <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ backgroundColor: tc }} />
         </div>
 
-        <div className="flex-1 px-4 py-2.5 min-w-0">
+        <div className="flex-1 px-3 py-2 sm:px-4 sm:py-2.5 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-foreground font-bold truncate">{unit.name}</span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md uppercase font-bold font-display"
+            <span className="text-sm sm:text-base text-foreground font-bold truncate">{unit.name}</span>
+            <span className="text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md uppercase font-bold font-display"
               style={{ backgroundColor: `${tc}15`, color: tc }}>
               {unit.unitClass}
             </span>
           </div>
-          <div className="text-[10px] uppercase tracking-[0.15em] mt-0.5 font-display" style={{ color: tc }}>
+          <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.15em] mt-0.5 font-display" style={{ color: tc }}>
             {TEAM_NAMES[unit.team]}
           </div>
-          <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1"><Heart className="w-3 h-3 text-destructive" /> {unit.hp}</span>
             <span className="flex items-center gap-1"><Swords className="w-3 h-3 text-destructive/70" /> {unit.attack}</span>
             <span className="flex items-center gap-1"><Shield className="w-3 h-3 text-primary/70" /> {unit.defense}</span>
-            <span className="flex items-center gap-1"><Crosshair className="w-3 h-3 text-accent/70" /> {unit.accuracy}%</span>
+            <span className="hidden sm:flex items-center gap-1"><Crosshair className="w-3 h-3 text-accent/70" /> {unit.accuracy}%</span>
           </div>
         </div>
       </div>
@@ -119,7 +119,6 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
     return () => clearTimeout(t);
   }, []);
 
-  // Animated particle dots
   const particles = useMemo(() => 
     Array.from({ length: 40 }, (_, i) => ({
       x: Math.random() * 100,
@@ -132,17 +131,14 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
 
   return (
     <div className="absolute inset-0 z-30 pointer-events-auto overflow-y-auto" onClick={handleClick}>
-      {/* Dark cinematic backdrop */}
       <div className="absolute inset-0 bg-background/85 backdrop-blur-md" />
       
-      {/* Animated gradient backdrop */}
       <div className="absolute inset-0 pointer-events-none"
         style={{
           background: 'radial-gradient(ellipse at 50% 20%, hsl(142 70% 45% / 0.06) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, hsl(0 75% 55% / 0.04) 0%, transparent 50%), radial-gradient(ellipse at 20% 70%, hsl(210 70% 55% / 0.04) 0%, transparent 50%)',
         }}
       />
 
-      {/* Floating particle dots */}
       {showParticles && particles.map((p, i) => (
         <div key={i} className="absolute rounded-full pointer-events-none"
           style={{
@@ -155,30 +151,27 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
         />
       ))}
 
-      {/* Subtle scanlines */}
       <div className="absolute inset-0 pointer-events-none z-20 opacity-[0.02]"
         style={{
           backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(var(--foreground)) 2px, hsl(var(--foreground)) 3px)',
           backgroundSize: '100% 4px',
         }} />
 
-      {/* Horizontal accent lines */}
       <div className="absolute top-0 left-0 right-0 h-[1px] z-20" style={{ background: 'linear-gradient(90deg, transparent 10%, hsl(142 70% 45% / 0.3) 50%, transparent 90%)' }} />
       <div className="absolute bottom-0 left-0 right-0 h-[1px] z-20" style={{ background: 'linear-gradient(90deg, transparent 10%, hsl(0 75% 55% / 0.3) 50%, transparent 90%)' }} />
 
-      <div className="relative z-10 flex flex-col items-center w-full max-w-4xl mx-auto px-8 py-12 min-h-full">
+      <div className="relative z-10 flex flex-col items-center w-full max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-12 min-h-full">
         {/* Title section */}
-        <div className="text-center space-y-4 mb-10">
-          {/* Pre-title line */}
+        <div className="text-center space-y-3 sm:space-y-4 mb-6 sm:mb-10">
           <Reveal delay={200}>
             <div className="flex items-center justify-center gap-3 mb-2">
-              <div className="w-12 h-[1px]" style={{ background: 'linear-gradient(to right, transparent, hsl(142 70% 45% / 0.4))' }} />
-              <span className="text-[8px] tracking-[0.5em] text-muted-foreground/30 font-display">TACTICAL BATTLE ROYALE</span>
-              <div className="w-12 h-[1px]" style={{ background: 'linear-gradient(to left, transparent, hsl(142 70% 45% / 0.4))' }} />
+              <div className="w-8 sm:w-12 h-[1px]" style={{ background: 'linear-gradient(to right, transparent, hsl(142 70% 45% / 0.4))' }} />
+              <span className="text-[9px] sm:text-[10px] tracking-[0.4em] sm:tracking-[0.5em] text-muted-foreground/30 font-display">TACTICAL BATTLE ROYALE</span>
+              <div className="w-8 sm:w-12 h-[1px]" style={{ background: 'linear-gradient(to left, transparent, hsl(142 70% 45% / 0.4))' }} />
             </div>
           </Reveal>
 
-          <h1 className="text-6xl font-display font-black text-primary glow-text tracking-[0.5em] select-none">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-display font-black text-primary glow-text tracking-[0.3em] sm:tracking-[0.5em] select-none">
             {title.split('').map((char, i) => (
               <span key={i} className={`inline-block transition-all duration-300 ${i < titleRevealed ? 'opacity-100' : 'opacity-0'}`}
                 style={{ 
@@ -191,27 +184,27 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
           </h1>
 
           <Reveal delay={500}>
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
               <div className="flex items-center gap-1.5">
                 <Swords className="w-4 h-4 text-destructive/60" />
-                <span className="text-sm text-muted-foreground tracking-[0.12em] font-display">4 SQUADS</span>
+                <span className="text-sm sm:text-base text-muted-foreground tracking-[0.12em] font-display">4 SQUADS</span>
               </div>
-              <div className="w-1 h-1 rounded-full bg-muted-foreground/20" />
+              <div className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
               <div className="flex items-center gap-1.5">
                 <Crosshair className="w-4 h-4 text-primary/60" />
-                <span className="text-sm text-muted-foreground tracking-[0.12em] font-display">8 COMBATANTS</span>
+                <span className="text-sm sm:text-base text-muted-foreground tracking-[0.12em] font-display">8 COMBATANTS</span>
               </div>
-              <div className="w-1 h-1 rounded-full bg-muted-foreground/20" />
+              <div className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
               <div className="flex items-center gap-1.5">
                 <Shield className="w-4 h-4 text-accent/60" />
-                <span className="text-sm text-muted-foreground tracking-[0.12em] font-display">1 SURVIVES</span>
+                <span className="text-sm sm:text-base text-muted-foreground tracking-[0.12em] font-display">1 SURVIVES</span>
               </div>
             </div>
           </Reveal>
 
           <Reveal delay={650}>
-            <div className="glass-panel rounded-lg px-6 py-2 inline-flex items-center gap-3">
-              <span className="text-[10px] text-accent tracking-[0.1em] font-display">
+            <div className="glass-panel rounded-lg px-4 sm:px-6 py-2 inline-flex items-center gap-3">
+              <span className="text-[10px] sm:text-[11px] text-accent tracking-[0.1em] font-display">
                 EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE
               </span>
             </div>
@@ -219,23 +212,23 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
         </div>
 
         {/* Team Roster */}
-        <div className="w-full space-y-5 mb-10">
+        <div className="w-full space-y-4 sm:space-y-5 mb-6 sm:mb-10">
           {teams.map((team, ti) => {
             const teamUnits = state.units.filter(u => u.team === team);
             return (
               <div key={team}>
                 <Reveal delay={750 + ti * 80}>
                   <div className="flex items-center gap-3 justify-center mb-2">
-                    <div className="h-px flex-1 max-w-[80px]" style={{ background: `linear-gradient(to right, transparent, ${TEAM_COLORS[team]}30)` }} />
-                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
-                    <span className="text-xs font-bold tracking-[0.25em] font-display" style={{ color: TEAM_COLORS[team] }}>
+                    <div className="h-px flex-1 max-w-[60px] sm:max-w-[80px]" style={{ background: `linear-gradient(to right, transparent, ${TEAM_COLORS[team]}30)` }} />
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
+                    <span className="text-[11px] sm:text-xs font-bold tracking-[0.2em] sm:tracking-[0.25em] font-display" style={{ color: TEAM_COLORS[team] }}>
                       {TEAM_NAMES[team]}
                     </span>
-                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
-                    <div className="h-px flex-1 max-w-[80px]" style={{ background: `linear-gradient(to left, transparent, ${TEAM_COLORS[team]}30)` }} />
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
+                    <div className="h-px flex-1 max-w-[60px] sm:max-w-[80px]" style={{ background: `linear-gradient(to left, transparent, ${TEAM_COLORS[team]}30)` }} />
                   </div>
                 </Reveal>
-                <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 max-w-2xl mx-auto">
                   {teamUnits.map((u, i) => (
                     <UnitCard key={u.id} unit={u} index={ti * 2 + i} />
                   ))}
@@ -247,18 +240,18 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
 
         {/* Start Button */}
         <Reveal delay={1800}>
-          <div className="text-center space-y-4">
+          <div className="text-center space-y-3 sm:space-y-4">
             <button onClick={onStartAutoPlay}
-              className="group px-16 py-5 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-all text-base tracking-[0.25em] flex items-center gap-4 mx-auto relative overflow-hidden font-display font-bold shadow-[0_0_30px_hsl(142_70%_45%/0.2)]">
+              className="group px-10 sm:px-16 py-4 sm:py-5 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-all text-sm sm:text-base tracking-[0.2em] sm:tracking-[0.25em] flex items-center gap-3 sm:gap-4 mx-auto relative overflow-hidden font-display font-bold shadow-[0_0_30px_hsl(142_70%_45%/0.2)]">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
-              <Play className="w-6 h-6 relative z-10" />
+              <Play className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
               <span className="relative z-10">START BATTLE</span>
             </button>
-            <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground/40">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] text-muted-foreground/40">
               <span>🤖 AI commands each squad</span>
-              <span className="w-1 h-1 rounded-full bg-muted-foreground/20" />
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
               <span>🌫️ Fog of War active</span>
-              <span className="w-1 h-1 rounded-full bg-muted-foreground/20" />
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
               <span>💊 Medics heal allies</span>
             </div>
           </div>

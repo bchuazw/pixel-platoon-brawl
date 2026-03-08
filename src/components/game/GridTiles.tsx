@@ -19,14 +19,18 @@ interface GridTilesProps {
 
 // ── Naturalistic terrain palette ──
 const TERRAIN: Record<string, { base: string; dark: string; light: string; side: string }> = {
-  grass:   { base: '#5a9438', dark: '#4a7e2e', light: '#6aaa48', side: '#3d6828' },
-  dirt:    { base: '#b08a58', dark: '#9a7848', light: '#c49a68', side: '#7a5e38' },
-  stone:   { base: '#8a8a90', dark: '#6e6e76', light: '#a0a0a8', side: '#5a5a62' },
-  water:   { base: '#3888bb', dark: '#2a6a99', light: '#4499cc', side: '#1a5580' },
-  sand:    { base: '#d4b870', dark: '#baa058', light: '#e0c880', side: '#9a8048' },
-  wall:    { base: '#707078', dark: '#585860', light: '#888890', side: '#484850' },
-  trench:  { base: '#6a5a38', dark: '#544828', light: '#7a6a48', side: '#3e3220' },
-  crater:  { base: '#383330', dark: '#282420', light: '#484340', side: '#1e1a18' },
+  grass:         { base: '#5a9438', dark: '#4a7e2e', light: '#6aaa48', side: '#3d6828' },
+  dirt:          { base: '#b08a58', dark: '#9a7848', light: '#c49a68', side: '#7a5e38' },
+  stone:         { base: '#8a8a90', dark: '#6e6e76', light: '#a0a0a8', side: '#5a5a62' },
+  water:         { base: '#3888bb', dark: '#2a6a99', light: '#4499cc', side: '#1a5580' },
+  sand:          { base: '#d4b870', dark: '#baa058', light: '#e0c880', side: '#9a8048' },
+  wall:          { base: '#707078', dark: '#585860', light: '#888890', side: '#484850' },
+  trench:        { base: '#6a5a38', dark: '#544828', light: '#7a6a48', side: '#3e3220' },
+  crater:        { base: '#383330', dark: '#282420', light: '#484340', side: '#1e1a18' },
+  cobblestone:   { base: '#8a8078', dark: '#6e6860', light: '#9a9088', side: '#5a5450' },
+  beach_sand:    { base: '#e8d8a0', dark: '#d4c488', light: '#f0e0b0', side: '#c0a870' },
+  shallow_water: { base: '#5aaabb', dark: '#4899aa', light: '#6cbbcc', side: '#3a8899' },
+  mud:           { base: '#6a5a3a', dark: '#544828', light: '#7a6a4a', side: '#3e3220' },
 };
 
 // ── Deterministic hash for per-tile variation ──
@@ -733,6 +737,187 @@ function PropObject({ tile }: { tile: TileData }) {
           <mesh position={[0.05, 0.08, -0.12]}>
             <dodecahedronGeometry args={[0.08, 0]} />
             <meshStandardMaterial color="#8a7a70" roughness={0.95} />
+          </mesh>
+        </group>
+      );
+
+    // Street lamp post — tall, narrow
+    case 'lamp_post':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+          <mesh position={[0, 0.5, 0]} castShadow>
+            <cylinderGeometry args={[0.025, 0.04, 1.0, 6]} />
+            <meshStandardMaterial color="#3a3a3a" metalness={0.6} roughness={0.4} />
+          </mesh>
+          <mesh position={[0.12, 0.95, 0]}>
+            <boxGeometry args={[0.24, 0.06, 0.08]} />
+            <meshStandardMaterial color="#4a4a4a" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0.22, 0.92, 0]}>
+            <boxGeometry args={[0.08, 0.04, 0.06]} />
+            <meshStandardMaterial color="#aaaa66" emissive="#aaaa44" emissiveIntensity={0.15} roughness={0.3} />
+          </mesh>
+        </group>
+      );
+
+    // Park bench
+    case 'bench':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+          <mesh position={[0, 0.15, 0]} castShadow>
+            <boxGeometry args={[0.6, 0.04, 0.22]} />
+            <meshStandardMaterial color="#6a4a20" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.28, -0.1]} castShadow>
+            <boxGeometry args={[0.6, 0.2, 0.04]} />
+            <meshStandardMaterial color="#5a3a18" roughness={0.9} />
+          </mesh>
+          {[[-0.25, 0], [0.25, 0]].map(([ox, oz], i) => (
+            <mesh key={i} position={[ox, 0.075, oz]}>
+              <boxGeometry args={[0.04, 0.15, 0.2]} />
+              <meshStandardMaterial color="#3a3a38" metalness={0.5} roughness={0.5} />
+            </mesh>
+          ))}
+        </group>
+      );
+
+    // Market stall — collapsed/ruined
+    case 'market_stall':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, rotVar * 0.2]}>
+          <mesh position={[0, 0.02, 0]} castShadow>
+            <boxGeometry args={[0.6, 0.04, 0.5]} />
+            <meshStandardMaterial color="#7a5a30" roughness={0.95} />
+          </mesh>
+          <mesh position={[-0.28, 0.22, 0]} castShadow>
+            <cylinderGeometry args={[0.025, 0.025, 0.4, 5]} />
+            <meshStandardMaterial color="#5a4020" roughness={0.9} />
+          </mesh>
+          <mesh position={[0.28, 0.18, 0]} castShadow rotation={[0, 0, 0.15]}>
+            <cylinderGeometry args={[0.025, 0.025, 0.36, 5]} />
+            <meshStandardMaterial color="#5a4020" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.38, 0]} rotation={[0, 0, 0.08]}>
+            <boxGeometry args={[0.7, 0.02, 0.55]} />
+            <meshStandardMaterial color="#aa4422" roughness={0.9} transparent opacity={0.7} />
+          </mesh>
+        </group>
+      );
+
+    // Palm tree — coastal
+    case 'palm_tree':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.15, h * Math.PI * 2, 0]}>
+          <mesh position={[0, 0.45, 0]} castShadow>
+            <cylinderGeometry args={[0.04, 0.06, 0.9, 6]} />
+            <meshStandardMaterial color="#8a6a30" roughness={0.95} />
+          </mesh>
+          {[0, 1.2, 2.4, 3.6, 4.8].map((a, i) => (
+            <mesh key={i} position={[Math.cos(a) * 0.25, 0.88, Math.sin(a) * 0.25]} rotation={[Math.cos(a) * 0.8, 0, Math.sin(a) * 0.8]}>
+              <boxGeometry args={[0.08, 0.5, 0.02]} />
+              <meshStandardMaterial color={i % 2 === 0 ? '#2a7a18' : '#1e6a10'} roughness={0.9} />
+            </mesh>
+          ))}
+        </group>
+      );
+
+    // Driftwood
+    case 'driftwood':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * Math.PI * 2, rotVar * 0.4]}>
+          <mesh position={[0, 0.04, 0]} rotation={[0, 0, 0.1]} castShadow>
+            <cylinderGeometry args={[0.03, 0.05, 0.5, 5]} />
+            <meshStandardMaterial color="#9a8a6a" roughness={1} />
+          </mesh>
+          <mesh position={[0.18, 0.03, 0.06]} rotation={[0.2, 0.5, 0.3]}>
+            <cylinderGeometry args={[0.02, 0.03, 0.25, 4]} />
+            <meshStandardMaterial color="#8a7a5a" roughness={1} />
+          </mesh>
+        </group>
+      );
+
+    // Church/building wall fragment
+    case 'church_wall':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 2, 0]}>
+          <mesh position={[0, 0.4, 0]} castShadow>
+            <boxGeometry args={[0.65, 0.8, 0.14]} />
+            <meshStandardMaterial color="#b0a890" roughness={0.92} />
+          </mesh>
+          <mesh position={[0, 0.7, 0]} castShadow>
+            <boxGeometry args={[0.2, 0.25, 0.06]} />
+            <meshBasicMaterial color="#445566" transparent opacity={0.3} />
+          </mesh>
+          <mesh position={[0, 0.85, 0]}>
+            <coneGeometry args={[0.15, 0.15, 4]} />
+            <meshStandardMaterial color="#a09888" roughness={0.95} />
+          </mesh>
+        </group>
+      );
+
+    // Chimney remnant
+    case 'chimney':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.1, h * Math.PI, 0]}>
+          <mesh position={[0, 0.3, 0]} castShadow>
+            <boxGeometry args={[0.22, 0.6, 0.22]} />
+            <meshStandardMaterial color="#8a4422" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.08, 0]}>
+            <boxGeometry args={[0.35, 0.16, 0.35]} />
+            <meshStandardMaterial color="#7a3a18" roughness={0.92} />
+          </mesh>
+        </group>
+      );
+
+    // Boat wreck
+    case 'boat_wreck':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * Math.PI, 0.15]}>
+          <mesh position={[0, 0.12, 0]} castShadow>
+            <boxGeometry args={[0.7, 0.18, 0.32]} />
+            <meshStandardMaterial color="#5a4a30" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.08, 0.14]} rotation={[0.3, 0, 0]}>
+            <boxGeometry args={[0.68, 0.12, 0.04]} />
+            <meshStandardMaterial color="#4a3a22" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.08, -0.14]} rotation={[-0.3, 0, 0]}>
+            <boxGeometry args={[0.68, 0.12, 0.04]} />
+            <meshStandardMaterial color="#4a3a22" roughness={0.95} />
+          </mesh>
+        </group>
+      );
+
+    // Fountain — ruined town center piece
+    case 'fountain':
+      return (
+        <group position={[tile.x, baseY, tile.z]}>
+          <mesh position={[0, 0.06, 0]} castShadow>
+            <cylinderGeometry args={[0.35, 0.38, 0.12, 10]} />
+            <meshStandardMaterial color="#9a9a9a" roughness={0.85} />
+          </mesh>
+          <mesh position={[0, 0.18, 0]} castShadow>
+            <cylinderGeometry args={[0.06, 0.06, 0.24, 6]} />
+            <meshStandardMaterial color="#8a8a88" roughness={0.85} />
+          </mesh>
+          <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.32, 10]} />
+            <meshStandardMaterial color="#4a7a99" metalness={0.5} roughness={0.2} transparent opacity={0.4} />
+          </mesh>
+        </group>
+      );
+
+    case 'pier_post':
+      return (
+        <group position={[tile.x, baseY - 0.1, tile.z]}>
+          <mesh position={[0, 0.2, 0]} castShadow>
+            <cylinderGeometry args={[0.06, 0.07, 0.5, 6]} />
+            <meshStandardMaterial color="#6a5a30" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.46, 0]}>
+            <boxGeometry args={[0.6, 0.04, 0.3]} />
+            <meshStandardMaterial color="#7a6a40" roughness={0.92} />
           </mesh>
         </group>
       );

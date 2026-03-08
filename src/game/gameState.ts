@@ -183,11 +183,31 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
   const terrainSeed = Date.now() % 10000;
   const center = GRID_SIZE / 2;
 
+  // ═══ BIOME ZONES ═══
+  // Place 2-3 biome centers (town, beach) to break up grass monotony
+  const biomes: { cx: number; cz: number; type: 'town' | 'beach'; radius: number }[] = [];
+  const biomeCount = 2 + Math.floor(rand() * 2);
+  for (let i = 0; i < biomeCount; i++) {
+    const bx = 5 + Math.floor(rand() * (GRID_SIZE - 10));
+    const bz = 5 + Math.floor(rand() * (GRID_SIZE - 10));
+    const bType = rand() > 0.5 ? 'town' : 'beach';
+    biomes.push({ cx: bx, cz: bz, type: bType, radius: 4 + Math.floor(rand() * 3) });
+  }
+
+  function getBiome(x: number, z: number): 'town' | 'beach' | null {
+    for (const b of biomes) {
+      const dist = Math.sqrt((x - b.cx) ** 2 + (z - b.cz) ** 2);
+      if (dist <= b.radius) return b.type;
+    }
+    return null;
+  }
+
   for (let x = 0; x < GRID_SIZE; x++) {
     grid[x] = [];
     for (let z = 0; z < GRID_SIZE; z++) {
       const distFromCenter = Math.sqrt((x - center) ** 2 + (z - center) ** 2);
       const r = rand();
+      const biome = getBiome(x, z);
 
       let type: TileType = 'grass';
       let elevation = getTerrainElevation(x, z, terrainSeed, spawnPoints);
@@ -198,7 +218,31 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
       const onDiagPath1 = Math.abs(x - z) <= 1;
       const onDiagPath2 = Math.abs(x - (GRID_SIZE - 1 - z)) <= 1;
 
-      if (onHorizPath || onVertPath) {
+      if (biome === 'town') {
+        // Dilapidated town: cobblestone streets, mud, ruins
+        if (onHorizPath || onVertPath) {
+          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.2);
+        } else if (r < 0.3) {
+          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.25);
+        } else if (r < 0.45) {
+          type = 'mud'; elevation = Math.max(0, elevation * 0.3);
+        } else if (r < 0.55) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
+        } else {
+          type = 'stone'; elevation = Math.max(0, elevation * 0.35);
+        }
+      } else if (biome === 'beach') {
+        // Beach: sand, shallow water, beach sand
+        if (r < 0.35) {
+          type = 'beach_sand'; elevation = Math.max(0, elevation * 0.1);
+        } else if (r < 0.55) {
+          type = 'sand'; elevation = Math.max(0, elevation * 0.15);
+        } else if (r < 0.7) {
+          type = 'shallow_water'; elevation = -0.05;
+        } else {
+          type = 'beach_sand'; elevation = Math.max(0, elevation * 0.1);
+        }
+      } else if (onHorizPath || onVertPath) {
         type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
       } else if ((onDiagPath1 || onDiagPath2) && r < 0.4) {
         type = 'sand'; elevation = Math.max(0, elevation * 0.4);
@@ -216,13 +260,45 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
     }
   }
 
-  // Helper to set prop on tile safely
   const setTileProp = (x: number, z: number, prop: PropType, blocked: boolean, cover: 0 | 1 | 2) => {
     if (x < 0 || x >= GRID_SIZE || z < 0 || z >= GRID_SIZE) return;
     const t = grid[x][z];
-    if (t.type === 'water' || t.prop) return;
+    if (t.type === 'water' || t.type === 'shallow_water' || t.prop) return;
     t.prop = prop; t.isBlocked = blocked; t.coverValue = cover;
   };
+
+  // ═══ BIOME-SPECIFIC PROPS ═══
+  for (const biome of biomes) {
+    for (let dx = -biome.radius; dx <= biome.radius; dx++) {
+      for (let dz = -biome.radius; dz <= biome.radius; dz++) {
+        const bx = biome.cx + dx, bz = biome.cz + dz;
+        if (bx < 0 || bx >= GRID_SIZE || bz < 0 || bz >= GRID_SIZE) continue;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist > biome.radius) continue;
+        const pr = rand();
+
+        if (biome.type === 'town') {
+          if (pr < 0.06) setTileProp(bx, bz, 'church_wall', true, 2);
+          else if (pr < 0.10) setTileProp(bx, bz, 'chimney', true, 2);
+          else if (pr < 0.14) setTileProp(bx, bz, 'lamp_post', true, 1);
+          else if (pr < 0.17) setTileProp(bx, bz, 'bench', false, 1);
+          else if (pr < 0.20) setTileProp(bx, bz, 'market_stall', true, 2);
+          else if (pr < 0.24) setTileProp(bx, bz, 'broken_wall', true, 2);
+          else if (pr < 0.27) setTileProp(bx, bz, 'rubble_pile', false, 1);
+          else if (pr < 0.29) setTileProp(bx, bz, 'wrecked_car', true, 2);
+          // Town center fountain
+          if (dx === 0 && dz === 0 && !grid[bx][bz].prop) setTileProp(bx, bz, 'fountain', true, 1);
+        } else if (biome.type === 'beach') {
+          if (pr < 0.05) setTileProp(bx, bz, 'palm_tree', true, 2);
+          else if (pr < 0.09) setTileProp(bx, bz, 'driftwood', false, 1);
+          else if (pr < 0.12) setTileProp(bx, bz, 'boat_wreck', true, 2);
+          else if (pr < 0.14) setTileProp(bx, bz, 'rock', true, 2);
+          else if (pr < 0.16) setTileProp(bx, bz, 'pier_post', true, 1);
+          else if (pr < 0.18) setTileProp(bx, bz, 'barrel', true, 1);
+        }
+      }
+    }
+  }
 
   // ═══ TRENCH LINES ═══
   // Generate 3-6 trench lines across the map

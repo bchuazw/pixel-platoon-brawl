@@ -10,6 +10,8 @@ import spriteSoldierImg from '@/assets/sprite-soldier.png';
 import spriteSniperImg from '@/assets/sprite-sniper.png';
 import spriteHeavyImg from '@/assets/sprite-heavy.png';
 import spriteMedicImg from '@/assets/sprite-medic.png';
+import coverHalfImg from '@/assets/cover-half.png';
+import coverFullImg from '@/assets/cover-full.png';
 
 interface GameUnitsProps {
   units: Unit[];

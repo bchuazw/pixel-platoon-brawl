@@ -48,7 +48,8 @@ function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isO
   if (isAbilityTarget) { emissive = '#ffaa00'; emissiveIntensity = 0.5; }
 
   const tileY = getTileY(tile.elevation);
-  const height = tile.type === 'water' ? 0.08 : 0.15 + tile.elevation * 0.12;
+  const isTrench = tile.type === 'trench';
+  const height = tile.type === 'water' ? 0.08 : isTrench ? 0.08 : 0.15 + tile.elevation * 0.12;
 
   return (
     <group>

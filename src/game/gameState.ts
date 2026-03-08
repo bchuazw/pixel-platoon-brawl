@@ -42,23 +42,22 @@ function smoothNoise(x: number, z: number, scale: number, seed: number): number 
   return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
 }
 
-function getTerrainElevation(x: number, z: number, seed: number): number {
-  // Multi-octave noise for natural hills
+function getTerrainElevation(x: number, z: number, seed: number, flatZones?: Position[]): number {
   let elev = 0;
-  elev += smoothNoise(x, z, 6, seed) * 1.2;       // big hills
-  elev += smoothNoise(x, z, 3, seed + 100) * 0.5;  // medium features
-  elev += smoothNoise(x, z, 1.5, seed + 200) * 0.15; // small bumps
+  elev += smoothNoise(x, z, 8, seed) * 1.2;
+  elev += smoothNoise(x, z, 4, seed + 100) * 0.5;
+  elev += smoothNoise(x, z, 2, seed + 200) * 0.15;
 
-  // Flatten near corners (spawn areas)
-  const corners = [[0, 0], [0, GRID_SIZE - 1], [GRID_SIZE - 1, 0], [GRID_SIZE - 1, GRID_SIZE - 1]];
-  for (const [cx, cz] of corners) {
-    const dist = Math.sqrt((x - cx) ** 2 + (z - cz) ** 2);
-    if (dist < 5) {
-      elev *= Math.min(1, dist / 5);
+  // Flatten near spawn zones
+  if (flatZones) {
+    for (const zone of flatZones) {
+      const dist = Math.sqrt((x - zone.x) ** 2 + (z - zone.z) ** 2);
+      if (dist < 4) {
+        elev *= Math.min(1, dist / 4);
+      }
     }
   }
 
-  // Clamp
   return Math.max(0, Math.min(1.8, elev));
 }
 

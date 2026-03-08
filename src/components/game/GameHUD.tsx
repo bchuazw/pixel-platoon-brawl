@@ -489,6 +489,11 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {!isPreGame && <TeamRoster state={state} onUnitInspect={onUnitInspect} />}
       {!isPreGame && <CombatFeed log={state.log} />}
 
+      {/* ── Tactical Minimap ── */}
+      {!isPreGame && !isGameOver && (
+        <TacticalMinimap state={state} inspectedUnitId={inspectedUnitId ?? null} />
+      )}
+
       {/* ── Kill Feed ── */}
       <div className="absolute top-16 right-[280px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[280px]">
         {state.combatEvents.filter(e => e.type === 'kill' && Date.now() - e.timestamp < 3500).map(e => (

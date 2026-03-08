@@ -161,21 +161,26 @@ function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isO
   );
 }
 
-// ── Organic surface details: grass tufts, pebbles, dirt patches ──
-function TileSurfaceDetail({ tile, tileY, surfaceH, isOutOfZone }: { tile: TileData; tileY: number; surfaceH: number; isOutOfZone: boolean }) {
+// ── Organic surface details: grass tufts, pebbles, dirt patches, wildflowers, puddles, moss, leaves ──
+function TileSurfaceDetail({ tile, tileY, surfaceH, isOutOfZone, grid }: { tile: TileData; tileY: number; surfaceH: number; isOutOfZone: boolean; grid?: TileData[][] }) {
   if (tile.scorchMark || isOutOfZone || tile.type === 'water') return null;
   const y = tileY + surfaceH + 0.001;
   const h = tileHash(tile.x, tile.z, 3);
   const h2 = tileHash(tile.x, tile.z, 4);
   const h3 = tileHash(tile.x, tile.z, 5);
+  const h4 = tileHash(tile.x, tile.z, 6);
 
   if (tile.type === 'grass') {
-    // Grass patches — small clusters of blade-like shapes
-    if (h > 0.3) return null;
-    const count = 2 + Math.floor(h2 * 4);
+    // Check if a tree is nearby for fallen leaves
+    const hasNearbyTree = grid && [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1]].some(([dx,dz]) => {
+      const nx = tile.x + dx, nz = tile.z + dz;
+      return nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE && grid[nx]?.[nz]?.prop === 'tree';
+    });
+
     return (
       <group>
-        {Array.from({ length: count }, (_, i) => {
+        {/* Grass blades */}
+        {h < 0.35 && Array.from({ length: 2 + Math.floor(h2 * 4) }, (_, i) => {
           const angle = tileHash(tile.x + i, tile.z, 10 + i) * Math.PI * 2;
           const dist = tileHash(tile.x, tile.z + i, 20 + i) * 0.35;
           const ox = Math.cos(angle) * dist;
@@ -184,9 +189,35 @@ function TileSurfaceDetail({ tile, tileY, surfaceH, isOutOfZone }: { tile: TileD
           const shade = tileHash(tile.x + i, tile.z, 40 + i);
           const green = shade > 0.5 ? '#5aaa38' : '#4a8a2e';
           return (
-            <mesh key={i} position={[tile.x + ox, y + bladeH / 2, tile.z + oz]} rotation={[0, angle, 0]}>
+            <mesh key={`g${i}`} position={[tile.x + ox, y + bladeH / 2, tile.z + oz]} rotation={[0, angle, 0]}>
               <boxGeometry args={[0.015, bladeH, 0.005]} />
               <meshBasicMaterial color={green} transparent opacity={0.7} />
+            </mesh>
+          );
+        })}
+        {/* Wildflowers — occasional small color spots */}
+        {h4 < 0.12 && (
+          <mesh position={[tile.x + (h2 - 0.5) * 0.4, y + 0.025, tile.z + (h3 - 0.5) * 0.4]}>
+            <sphereGeometry args={[0.018, 4, 3]} />
+            <meshBasicMaterial color={h4 < 0.04 ? '#ee5588' : h4 < 0.08 ? '#eebb33' : '#aa77ee'} />
+          </mesh>
+        )}
+        {h4 > 0.85 && (
+          <mesh position={[tile.x + (h - 0.5) * 0.3, y + 0.02, tile.z + (h2 - 0.5) * 0.3]}>
+            <sphereGeometry args={[0.015, 4, 3]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+        )}
+        {/* Fallen leaves near trees */}
+        {hasNearbyTree && h3 < 0.6 && [0,1,2].map(i => {
+          const lx = (tileHash(tile.x, tile.z, 80+i) - 0.5) * 0.5;
+          const lz = (tileHash(tile.x, tile.z, 90+i) - 0.5) * 0.5;
+          const lRot = tileHash(tile.x+i, tile.z, 100) * Math.PI * 2;
+          const leafColor = tileHash(tile.x, tile.z+i, 110) > 0.5 ? '#8a5a20' : '#6a7a28';
+          return (
+            <mesh key={`lf${i}`} position={[tile.x + lx, y + 0.002, tile.z + lz]} rotation={[-Math.PI/2, lRot, 0]}>
+              <circleGeometry args={[0.025, 5]} />
+              <meshBasicMaterial color={leafColor} transparent opacity={0.6} side={THREE.DoubleSide} />
             </mesh>
           );
         })}
@@ -195,33 +226,55 @@ function TileSurfaceDetail({ tile, tileY, surfaceH, isOutOfZone }: { tile: TileD
   }
 
   if (tile.type === 'dirt' || tile.type === 'sand') {
-    // Small pebbles / grain detail
-    if (h > 0.4) return null;
     return (
       <group>
-        {[0, 1, 2].map(i => {
+        {/* Pebbles */}
+        {h < 0.4 && [0, 1, 2].map(i => {
           const ox = (tileHash(tile.x, tile.z, 50 + i) - 0.5) * 0.6;
           const oz = (tileHash(tile.x, tile.z, 60 + i) - 0.5) * 0.6;
           const size = 0.02 + tileHash(tile.x, tile.z, 70 + i) * 0.03;
           return (
-            <mesh key={i} position={[tile.x + ox, y + size * 0.3, tile.z + oz]}>
+            <mesh key={`p${i}`} position={[tile.x + ox, y + size * 0.3, tile.z + oz]}>
               <sphereGeometry args={[size, 4, 3]} />
               <meshStandardMaterial color={tile.type === 'sand' ? '#b8a058' : '#8a7858'} roughness={1} />
             </mesh>
           );
         })}
+        {/* Puddles on dirt tiles — small reflective patches */}
+        {tile.type === 'dirt' && h4 < 0.1 && (
+          <mesh position={[tile.x + (h2-0.5)*0.2, y + 0.002, tile.z + (h3-0.5)*0.2]} rotation={[-Math.PI/2, 0, 0]}>
+            <circleGeometry args={[0.12 + h * 0.1, 8]} />
+            <meshStandardMaterial color="#4a6a88" metalness={0.8} roughness={0.1} transparent opacity={0.5} />
+          </mesh>
+        )}
       </group>
     );
   }
 
   if (tile.type === 'stone') {
-    // Cracks / seams
-    if (h > 0.35) return null;
     return (
-      <mesh position={[tile.x + (h2 - 0.5) * 0.3, y + 0.001, tile.z + (h3 - 0.5) * 0.3]} rotation={[-Math.PI / 2, h * 3, 0]}>
-        <planeGeometry args={[0.3, 0.008]} />
-        <meshBasicMaterial color="#4a4a50" transparent opacity={0.3} />
-      </mesh>
+      <group>
+        {/* Cracks */}
+        {h < 0.35 && (
+          <mesh position={[tile.x + (h2 - 0.5) * 0.3, y + 0.001, tile.z + (h3 - 0.5) * 0.3]} rotation={[-Math.PI / 2, h * 3, 0]}>
+            <planeGeometry args={[0.3, 0.008]} />
+            <meshBasicMaterial color="#4a4a50" transparent opacity={0.3} />
+          </mesh>
+        )}
+        {/* Moss patches on stone */}
+        {h4 < 0.15 && (
+          <mesh position={[tile.x + (h-0.5)*0.3, y + 0.003, tile.z + (h2-0.5)*0.3]} rotation={[-Math.PI/2, h3 * Math.PI, 0]}>
+            <circleGeometry args={[0.08 + h * 0.06, 6]} />
+            <meshBasicMaterial color="#3a6a28" transparent opacity={0.35} />
+          </mesh>
+        )}
+        {h4 > 0.82 && (
+          <mesh position={[tile.x + (h3-0.5)*0.25, y + 0.003, tile.z + (h-0.5)*0.25]} rotation={[-Math.PI/2, h2 * Math.PI, 0]}>
+            <circleGeometry args={[0.06 + h2 * 0.05, 5]} />
+            <meshBasicMaterial color="#4a7a30" transparent opacity={0.3} />
+          </mesh>
+        )}
+      </group>
     );
   }
 

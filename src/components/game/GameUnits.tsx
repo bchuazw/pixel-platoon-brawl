@@ -6,10 +6,10 @@ import { getTileY } from './GridTiles';
 import { playMove } from '@/game/sounds';
 import * as THREE from 'three';
 
-import soldierBlueImg from '@/assets/soldier-blue.png';
-import sniperRedImg from '@/assets/sniper-red.png';
-import heavyGreenImg from '@/assets/heavy-green.png';
-import medicYellowImg from '@/assets/medic-yellow.png';
+import spriteSoldierImg from '@/assets/sprite-soldier.png';
+import spriteSniperImg from '@/assets/sprite-sniper.png';
+import spriteHeavyImg from '@/assets/sprite-heavy.png';
+import spriteMedicImg from '@/assets/sprite-medic.png';
 
 interface GameUnitsProps {
   units: Unit[];
@@ -22,11 +22,42 @@ interface GameUnitsProps {
   onMoveComplete?: () => void;
 }
 
+// Sprite sheet layout: 4 columns x 4 rows
+// Row 0: idle (4 frames), Row 1: walk (4 frames), Row 2: shoot (4 frames), Row 3: death (4 frames)
+const SPRITE_COLS = 4;
+const SPRITE_ROWS = 4;
+const FRAME_W = 1 / SPRITE_COLS;
+const FRAME_H = 1 / SPRITE_ROWS;
+
+// Animation row mapping
+const ANIM_ROW: Record<string, number> = {
+  idle: 0,
+  walking: 1,
+  aiming: 2,
+  shooting: 2,
+  recoil: 2,
+  hit: 0,
+  dying: 3,
+  healing: 0,
+};
+
+// Frames per second for each animation
+const ANIM_FPS: Record<string, number> = {
+  idle: 3,
+  walking: 8,
+  aiming: 6,
+  shooting: 10,
+  recoil: 6,
+  hit: 8,
+  dying: 4,
+  healing: 4,
+};
+
 const SPRITE_MAP: Record<string, string> = {
-  blue: soldierBlueImg,
-  red: sniperRedImg,
-  green: heavyGreenImg,
-  yellow: medicYellowImg,
+  blue: spriteSoldierImg,
+  red: spriteSniperImg,
+  green: spriteHeavyImg,
+  yellow: spriteMedicImg,
 };
 
 type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';

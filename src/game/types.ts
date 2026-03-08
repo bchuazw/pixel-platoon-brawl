@@ -149,6 +149,14 @@ export interface KillCamData {
   timestamp: number;
 }
 
+export interface AirdropData {
+  id: string;
+  targetPos: Position;
+  startTime: number;
+  phase: 'flying' | 'dropping' | 'landed';
+  loot: LootItem;
+}
+
 export interface GameState {
   units: Unit[];
   currentTeam: Team;
@@ -170,6 +178,7 @@ export interface GameState {
   movePath: Position[] | null;
   movingUnitId: string | null;
   killCam: KillCamData | null;
+  airdrops: AirdropData[];
 }
 
 export const GRID_SIZE = 24;

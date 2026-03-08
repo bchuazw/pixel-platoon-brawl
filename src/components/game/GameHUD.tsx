@@ -209,7 +209,7 @@ function Minimap({ state }: { state: GameState }) {
   );
 }
 
-function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onRestart: () => void; onMainMenu?: () => void }) {
+function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, collectBetPayout }: { state: GameState; onRestart: () => void; onMainMenu?: () => void; betTeam?: Team | null; betAmount?: number; collectBetPayout?: () => number }) {
   const [show, setShow] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [particles, setParticles] = useState<{ id: number; x: number; delay: number; color: string; size: number }[]>([]);

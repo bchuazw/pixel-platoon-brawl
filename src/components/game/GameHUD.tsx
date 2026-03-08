@@ -405,7 +405,7 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
   );
 }
 
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, onPlaceBet, betTeam, betAmount, collectBetPayout }: GameHUDProps) {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

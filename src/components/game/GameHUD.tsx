@@ -504,12 +504,12 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {!isPreGame && <TeamRoster state={state} onUnitInspect={onUnitInspect} visible={showRoster} />}
       {!isPreGame && <CombatFeed log={state.log} visible={showFeed} />}
 
-      {/* ── Tactical Minimap ── */}
+      {/* ── Tactical Minimap — right side, above live feed ── */}
       {!isPreGame && !isGameOver && (
         <TacticalMinimap state={state} inspectedUnitId={inspectedUnitId ?? null} />
       )}
 
-      {/* ── Sponsor HUD Panel (WIP) ── */}
+      {/* ── Sponsor HUD Panel (WIP) — bottom-left, below roster ── */}
       {!isPreGame && !isGameOver && state.autoPlay && <SponsorHUDPanel />}
 
       {/* ── Kill Feed ── */}

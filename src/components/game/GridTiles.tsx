@@ -964,31 +964,59 @@ function PropObject({ tile }: { tile: TileData }) {
   }
 }
 
-// ── Loot ──
+// ── Loot — Treasure Chests ──
 function LootObject({ tile }: { tile: TileData }) {
   const ref = useRef<THREE.Group>(null);
   const qElev = quantizeElevation(tile.elevation);
-  const baseY = qElev * 0.6 + SURFACE_H + 0.15;
+  const baseY = qElev * 0.6 + SURFACE_H + 0.01;
+  const h = tileHash(tile.x, tile.z, 999);
 
   useFrame(({ clock }) => {
     if (!ref.current || !tile.loot) return;
     const t = clock.getElapsedTime();
-    ref.current.position.y = baseY + Math.sin(t * 2.5 + tile.x * 0.7 + tile.z * 1.3) * 0.06;
-    ref.current.rotation.y = t * 1.2 + tile.x;
+    // Gentle hover bob
+    ref.current.position.y = baseY + Math.sin(t * 1.8 + tile.x * 0.7 + tile.z * 1.3) * 0.02;
   });
 
   if (!tile.loot) return null;
   const color = tile.loot.type === 'weapon' ? '#ffaa22' : tile.loot.type === 'medkit' ? '#ff3366' :
                 tile.loot.type === 'armor' ? '#3388ff' : tile.loot.type === 'killstreak' ? '#bb44ff' : '#66cc33';
+  const woodColor = h > 0.5 ? '#5a3a1a' : '#4a3018';
+  const metalColor = h > 0.5 ? '#8a7a40' : '#7a6a30';
 
   return (
-    <group ref={ref} position={[tile.x, baseY, tile.z]}>
-      <mesh>
-        <boxGeometry args={[0.2, 0.2, 0.2]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} roughness={0.3} metalness={0.2} />
+    <group ref={ref} position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+      {/* Chest body */}
+      <mesh position={[0, 0.08, 0]} castShadow>
+        <boxGeometry args={[0.28, 0.16, 0.2]} />
+        <meshStandardMaterial color={woodColor} roughness={0.85} />
       </mesh>
-      <pointLight color={color} intensity={0.6} distance={2} />
-      <Billboard position={[0, 0.28, 0]}>
+      {/* Chest lid (rounded top) */}
+      <mesh position={[0, 0.18, 0]} castShadow>
+        <boxGeometry args={[0.3, 0.06, 0.22]} />
+        <meshStandardMaterial color={woodColor} roughness={0.8} />
+      </mesh>
+      {/* Metal bands */}
+      <mesh position={[0, 0.08, 0.101]}>
+        <boxGeometry args={[0.3, 0.04, 0.005]} />
+        <meshStandardMaterial color={metalColor} metalness={0.6} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.08, -0.101]}>
+        <boxGeometry args={[0.3, 0.04, 0.005]} />
+        <meshStandardMaterial color={metalColor} metalness={0.6} roughness={0.3} />
+      </mesh>
+      {/* Lock / clasp */}
+      <mesh position={[0, 0.14, 0.11]}>
+        <boxGeometry args={[0.04, 0.06, 0.02]} />
+        <meshStandardMaterial color={metalColor} metalness={0.7} roughness={0.25} />
+      </mesh>
+      {/* Colored glow indicator */}
+      <mesh position={[0, 0.22, 0]}>
+        <sphereGeometry args={[0.04, 6, 6]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} transparent opacity={0.8} />
+      </mesh>
+      <pointLight color={color} intensity={0.4} distance={1.5} position={[0, 0.25, 0]} />
+      <Billboard position={[0, 0.35, 0]}>
         <Text fontSize={0.07} color={color} anchorX="center" anchorY="middle" font={undefined} outlineWidth={0.012} outlineColor="#000000">
           {tile.loot.icon} {tile.loot.name}
         </Text>

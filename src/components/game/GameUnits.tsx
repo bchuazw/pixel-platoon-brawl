@@ -593,7 +593,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
 
   const bootColor = '#2a2218';
 
-  if (!unit.isAlive && deathTimer.current >= 3) return null;
+  if (!unit.isAlive && deathTimer.current >= 5) return null;
 
   const hpPercent = unit.hp / unit.maxHp;
   const apDots = [];

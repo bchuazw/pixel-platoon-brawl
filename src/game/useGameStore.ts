@@ -716,9 +716,13 @@ export function useGameStore() {
     setState(createInitialState());
   }, []);
 
+  const clearMovePath = useCallback(() => {
+    setState(prev => ({ ...prev, movePath: null, movingUnitId: null }));
+  }, []);
+
   return {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
-    sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit,
+    sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
   };
 }

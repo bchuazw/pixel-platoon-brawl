@@ -18,8 +18,8 @@ interface GameBoardProps {
 }
 
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
-const CAM_DISTANCE = 24;
-const CAM_HEIGHT = 18;
+const CAM_DISTANCE = 34;
+const CAM_HEIGHT = 26;
 
 function getCameraPosition(angleIndex: number): [number, number, number] {
   const angle = (Math.PI / 4) + (angleIndex * Math.PI / 2);

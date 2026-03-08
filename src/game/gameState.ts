@@ -912,7 +912,7 @@ export function runAiUnitStep(
             if (unit.weapon.id === 'shotgun') score += dist <= 2 ? 10 : -dist * 2;
             if (unit.weapon.id === 'sniper_rifle' && dist < 3) score -= 15;
           } else {
-            const distToCenter = getManhattanDistance(t, { x: 10, z: 10 });
+            const distToCenter = getManhattanDistance(t, { x: Math.floor(GRID_SIZE / 2), z: Math.floor(GRID_SIZE / 2) });
             score += -distToCenter;
           }
 

@@ -273,12 +273,15 @@ function PropObject({ tile }: { tile: TileData }) {
   const qElev = quantizeElevation(tile.elevation);
   const baseY = qElev * 0.6 + SURFACE_H;
   const h = tileHash(tile.x, tile.z, 99);
+  // Per-prop variation: random scale and rotation offset
+  const scaleVar = 0.85 + tileHash(tile.x, tile.z, 200) * 0.3; // 0.85-1.15
+  const rotVar = tileHash(tile.x, tile.z, 201) * 0.3 - 0.15; // small tilt
 
   switch (tile.prop) {
     // Wooden supply crate — waist height (~0.35)
     case 'crate':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * 0.4, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * 0.4 + rotVar * 2, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           <mesh position={[0, 0.175, 0]} castShadow>
             <boxGeometry args={[0.42, 0.35, 0.42]} />
             <meshStandardMaterial color="#8a6a30" roughness={0.9} />
@@ -295,7 +298,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Oil drum / barrel — chest height (~0.45)
     case 'barrel':
       return (
-        <group position={[tile.x, baseY, tile.z]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.2, h * Math.PI, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           <mesh position={[0, 0.225, 0]} castShadow>
             <cylinderGeometry args={[0.18, 0.20, 0.45, 10]} />
             <meshStandardMaterial color="#4a6848" roughness={0.6} metalness={0.3} />
@@ -308,21 +311,24 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Sandbag wall — waist-high cover (~0.4)
-    case 'sandbag':
+    case 'sandbag': {
+      const sbColor1 = h > 0.5 ? '#c0a060' : '#b89858';
+      const sbColor2 = h > 0.3 ? '#c8a868' : '#baa058';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Bottom row */}
-          <mesh position={[-0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color="#c0a060" roughness={1} /></mesh>
-          <mesh position={[0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color="#b89858" roughness={1} /></mesh>
+          <mesh position={[-0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+          <mesh position={[0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
           {/* Top row — offset */}
-          <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.20]} /><meshStandardMaterial color="#c8a868" roughness={1} /></mesh>
+          <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.20]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
         </group>
       );
+    }
 
     // Natural boulder — knee to waist height
     case 'rock':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.5, h * Math.PI, rotVar * 0.3]} scale={[scaleVar, 0.8 + tileHash(tile.x, tile.z, 202) * 0.4, scaleVar]}>
           <mesh position={[0, 0.15, 0]} castShadow>
             <dodecahedronGeometry args={[0.25 + h * 0.1, 1]} />
             <meshStandardMaterial color="#7a7a82" roughness={0.95} />
@@ -338,12 +344,13 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Bush — knee height, wide spread
-    case 'bush':
+    case 'bush': {
+      const bushColor = h > 0.5 ? '#3a7a28' : '#2e7020';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]} scale={[scaleVar * (0.9 + h * 0.3), scaleVar, scaleVar * (0.9 + h * 0.3)]}>
           <mesh position={[0, 0.15, 0]} castShadow>
             <sphereGeometry args={[0.28, 8, 6]} />
-            <meshStandardMaterial color="#3a7a28" roughness={0.95} />
+            <meshStandardMaterial color={bushColor} roughness={0.95} />
           </mesh>
           <mesh position={[0.12, 0.10, 0.1]}>
             <sphereGeometry args={[0.2, 7, 5]} />
@@ -355,25 +362,29 @@ function PropObject({ tile }: { tile: TileData }) {
           </mesh>
         </group>
       );
+    }
 
     // Tree — 2-3x soldier height (1.5-2.2 total)
-    case 'tree':
+    case 'tree': {
+      const trunkColor = h > 0.5 ? '#5a3818' : '#4a2e14';
+      const leafColor1 = h > 0.6 ? '#2e7018' : '#1e6010';
+      const leafColor2 = h > 0.4 ? '#389222' : '#2a7a18';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.15, h * Math.PI * 2, rotVar * 0.1]} scale={[scaleVar, 0.85 + tileHash(tile.x, tile.z, 203) * 0.35, scaleVar]}>
           {/* Trunk */}
           <mesh position={[0, 0.35, 0]} castShadow>
             <cylinderGeometry args={[0.05, 0.09, 0.7, 7]} />
-            <meshStandardMaterial color="#5a3818" roughness={0.95} />
+            <meshStandardMaterial color={trunkColor} roughness={0.95} />
           </mesh>
           {/* Lower canopy — dense, wide */}
           <mesh position={[0, 0.85, 0]} castShadow>
             <sphereGeometry args={[0.42, 8, 6]} />
-            <meshStandardMaterial color="#2e7018" roughness={0.9} />
+            <meshStandardMaterial color={leafColor1} roughness={0.9} />
           </mesh>
           {/* Upper canopy */}
           <mesh position={[0.08, 1.15, 0.05]} castShadow>
             <sphereGeometry args={[0.32, 7, 6]} />
-            <meshStandardMaterial color="#389222" roughness={0.9} />
+            <meshStandardMaterial color={leafColor2} roughness={0.9} />
           </mesh>
           {/* Top cluster */}
           <mesh position={[-0.05, 1.38, -0.03]}>
@@ -383,15 +394,16 @@ function PropObject({ tile }: { tile: TileData }) {
           {/* Roots */}
           <mesh position={[0.06, 0.02, 0.06]} rotation={[0.3, 0, 0.4]}>
             <cylinderGeometry args={[0.03, 0.015, 0.15, 4]} />
-            <meshStandardMaterial color="#4a3018" roughness={0.95} />
+            <meshStandardMaterial color={trunkColor} roughness={0.95} />
           </mesh>
         </group>
       );
+    }
 
     // Ruined wall / building fragment — shoulder height with rubble
     case 'ruins':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Foundation slab */}
           <mesh position={[0, 0.04, 0]} castShadow>
             <boxGeometry args={[0.7, 0.08, 0.6]} />
@@ -416,12 +428,13 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Jersey barrier — proper concrete highway barrier (~0.45 tall)
-    case 'jersey_barrier':
+    case 'jersey_barrier': {
+      const jbColor = h > 0.5 ? '#a0a0a0' : '#909898';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar * 0.5 : Math.PI / 2 + rotVar * 0.5, 0]}>
           <mesh position={[0, 0.225, 0]} castShadow>
             <boxGeometry args={[0.72, 0.45, 0.28]} />
-            <meshStandardMaterial color="#a0a0a0" roughness={0.85} />
+            <meshStandardMaterial color={jbColor} roughness={0.85} />
           </mesh>
           {/* Sloped base */}
           <mesh position={[0, 0.04, 0]} castShadow>
@@ -430,11 +443,12 @@ function PropObject({ tile }: { tile: TileData }) {
           </mesh>
         </group>
       );
+    }
 
     // Burnt vehicle wreck — large cover, ~chest height
     case 'burnt_vehicle':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.15, h * Math.PI, rotVar * 0.1]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Chassis */}
           <mesh position={[0, 0.12, 0]} castShadow>
             <boxGeometry args={[0.82, 0.2, 0.44]} />
@@ -465,7 +479,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Concertina wire — ankle-shin height
     case 'wire':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Posts */}
           <mesh position={[-0.32, 0.12, 0]}>
             <cylinderGeometry args={[0.015, 0.015, 0.24, 4]} />
@@ -527,7 +541,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Czech hedgehog / tank trap — waist height, angular
     case 'tank_trap':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 3, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * Math.PI / 3, rotVar * 0.2]} scale={[scaleVar, scaleVar, scaleVar]}>
           <mesh position={[0, 0.2, 0]} rotation={[0, 0, Math.PI / 4]} castShadow>
             <boxGeometry args={[0.05, 0.48, 0.05]} />
             <meshStandardMaterial color="#4a4035" metalness={0.5} roughness={0.45} />
@@ -544,13 +558,14 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Broken brick/concrete wall — chest-head height cover
-    case 'broken_wall':
+    case 'broken_wall': {
+      const wallColor = h > 0.5 ? '#8a7a6a' : '#7a6a5e';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Main wall section */}
           <mesh position={[0, 0.25, 0]} castShadow>
             <boxGeometry args={[0.7, 0.5, 0.12]} />
-            <meshStandardMaterial color="#8a7a6a" roughness={0.92} />
+            <meshStandardMaterial color={wallColor} roughness={0.92} />
           </mesh>
           {/* Jagged top — broken edge */}
           <mesh position={[-0.15, 0.52, 0]} castShadow>
@@ -577,20 +592,22 @@ function PropObject({ tile }: { tile: TileData }) {
           </mesh>
         </group>
       );
+    }
 
     // Civilian wrecked car — good cover, realistic proportions
-    case 'wrecked_car':
+    case 'wrecked_car': {
+      const carColor = h > 0.7 ? '#4a3a2a' : h > 0.4 ? '#2a3a4a' : '#3a2a3a';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.1, h * Math.PI * 2, rotVar * 0.15]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Body/chassis */}
           <mesh position={[0, 0.14, 0]} castShadow>
             <boxGeometry args={[0.8, 0.22, 0.4]} />
-            <meshStandardMaterial color={h > 0.5 ? '#4a3a2a' : '#2a3a4a'} roughness={0.75} metalness={0.35} />
+            <meshStandardMaterial color={carColor} roughness={0.75} metalness={0.35} />
           </mesh>
           {/* Roof/cabin */}
           <mesh position={[0.05, 0.32, 0]} castShadow>
             <boxGeometry args={[0.4, 0.18, 0.36]} />
-            <meshStandardMaterial color={h > 0.5 ? '#3a2a1a' : '#1a2a3a'} roughness={0.7} metalness={0.4} />
+            <meshStandardMaterial color={darkenColor(carColor, 0.2)} roughness={0.7} metalness={0.4} />
           </mesh>
           {/* Windshield (broken) */}
           <mesh position={[0.26, 0.3, 0]} rotation={[0, 0, -0.2]}>
@@ -611,11 +628,12 @@ function PropObject({ tile }: { tile: TileData }) {
           </mesh>
         </group>
       );
+    }
 
     // Scattered rubble/debris — low cover
     case 'rubble_pile':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.4, h * Math.PI * 2, rotVar * 0.3]} scale={[scaleVar, scaleVar, scaleVar]}>
           <mesh position={[0, 0.06, 0]} castShadow>
             <dodecahedronGeometry args={[0.15, 0]} />
             <meshStandardMaterial color="#6a6058" roughness={0.95} />

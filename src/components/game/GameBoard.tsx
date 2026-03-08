@@ -175,7 +175,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
       >
         <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />
-        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} />
+        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} cameraAngleIndex={angleIndex} />
 
         {/* ── Sky — warm FFT-style gradient ── */}
         <color attach="background" args={['#1a2844']} />

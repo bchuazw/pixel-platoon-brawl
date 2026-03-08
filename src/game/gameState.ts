@@ -773,7 +773,17 @@ function updateAllUnitsCover(units: Unit[], grid: TileData[][]) {
 export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]): number {
   let chance = attacker.accuracy;
   const dist = getManhattanDistance(attacker.position, defender.position);
-  if (dist > 3) chance -= (dist - 3) * 5;
+  const weaponRange = attacker.weapon.range;
+
+  // Weapon range falloff — accuracy drops sharply beyond effective range
+  if (dist > weaponRange) {
+    chance -= (dist - weaponRange) * 15; // heavy penalty beyond range
+  } else if (dist > Math.ceil(weaponRange * 0.6)) {
+    chance -= (dist - Math.ceil(weaponRange * 0.6)) * 5; // mild penalty at long end
+  }
+
+  // Close range penalty for sniper
+  if (attacker.weapon.id === 'sniper_rifle' && dist <= 2) chance -= 25;
 
   const cover = getCoverFromDirection(defender.position, attacker.position, grid);
   if (cover === 'half') chance -= 25;
@@ -783,9 +793,10 @@ export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]
 
   const aElev = grid[attacker.position.x]?.[attacker.position.z]?.elevation || 0;
   const dElev = grid[defender.position.x]?.[defender.position.z]?.elevation || 0;
-  if (aElev > dElev + 0.3) chance += 15; // height advantage matters more with real hills
+  if (aElev > dElev + 0.3) chance += 15;
 
-  if (attacker.weapon.id === 'shotgun' && dist <= 2) chance += 15;
+  if (attacker.weapon.id === 'shotgun' && dist <= 1) chance += 20;
+  if (attacker.weapon.id === 'shotgun' && dist === 2) chance += 10;
 
   return Math.max(5, Math.min(95, chance));
 }

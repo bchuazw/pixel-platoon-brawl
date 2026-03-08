@@ -1,4 +1,4 @@
-import { useState, useRef, Suspense } from 'react';
+import { useState, useRef, Suspense, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { Unit, TEAM_COLORS, Team } from '@/game/types';
@@ -49,193 +49,263 @@ const CAMO_OPTIONS: { id: CamoPattern; name: string; colors: [string, string] }[
   { id: 'urban', name: 'Urban', colors: ['#6b6b6b', '#3d3d3d'] },
 ];
 
-// ── 3D Character Model ──
-function CharacterModel({ teamColor, customization }: { teamColor: string; customization: UnitCustomization }) {
+// ── Material helper (matching GameUnits.tsx) ──
+function getMat(color: string, metalness = 0.1, roughness = 0.7, emissive = '#000000', emissiveIntensity = 0): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({ color, metalness, roughness, emissive, emissiveIntensity });
+}
+
+// ── Game-accurate SoldierBody for customization preview ──
+function GameSoldierPreview({ teamColor, isMedic, customization }: { teamColor: string; isMedic: boolean; customization: UnitCustomization }) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((_, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.3;
+      groupRef.current.rotation.y += delta * 0.4;
     }
   });
 
-  const camoColors = CAMO_OPTIONS.find(c => c.id === customization.camo)?.colors || ['#556B2F', '#4a5f28'];
-  const bodyColor = camoColors[0];
-  const darkColor = camoColors[1];
-  const skinColor = '#d4a574';
+  const armorColor = useMemo(() => {
+    const c = new THREE.Color(teamColor);
+    return '#' + c.clone().lerp(new THREE.Color('#222222'), 0.25).getHexString();
+  }, [teamColor]);
+  const darkArmor = useMemo(() => {
+    const c = new THREE.Color(teamColor);
+    return '#' + c.clone().lerp(new THREE.Color('#111111'), 0.5).getHexString();
+  }, [teamColor]);
+
+  const torsoMat = useMemo(() => getMat(armorColor, 0.15, 0.55), [armorColor]);
+  const darkMat = useMemo(() => getMat(darkArmor, 0.1, 0.7), [darkArmor]);
+  const skinMat = useMemo(() => getMat('#c8a882', 0, 0.85), []);
+  const bootMat = useMemo(() => getMat('#1e1a14', 0.1, 0.7), []);
+  const gearMat = useMemo(() => getMat('#2e2e28', 0.15, 0.6), []);
+  const helmetMat = useMemo(() => getMat(armorColor, 0.25, 0.45), [armorColor]);
+  const visorMat = useMemo(() => getMat('#0a0a0a', 0.8, 0.15), []);
+
+  // Scaled up 3x from the game model for the preview
+  const s = 3;
 
   return (
-    <group ref={groupRef} position={[0, -1.2, 0]}>
-      {/* Legs */}
-      <mesh position={[-0.15, 0.4, 0]}>
-        <boxGeometry args={[0.22, 0.7, 0.22]} />
-        <meshStandardMaterial color={darkColor} />
+    <group ref={groupRef} position={[0, -1.0, 0]} scale={[s, s, s]}>
+      {/* ── LEGS ── */}
+      <mesh position={[-0.065, 0.12, 0]} material={darkMat}>
+        <boxGeometry args={[0.08, 0.22, 0.08]} />
       </mesh>
-      <mesh position={[0.15, 0.4, 0]}>
-        <boxGeometry args={[0.22, 0.7, 0.22]} />
-        <meshStandardMaterial color={darkColor} />
+      <mesh position={[0.065, 0.12, 0]} material={darkMat}>
+        <boxGeometry args={[0.08, 0.22, 0.08]} />
       </mesh>
 
-      {/* Boots */}
+      {/* ── BOOTS ── */}
       {customization.boots === 'combat' ? (
         <>
-          <mesh position={[-0.15, 0.15, 0.04]}>
-            <boxGeometry args={[0.26, 0.3, 0.32]} />
-            <meshStandardMaterial color="#1a1a1a" />
+          <mesh position={[-0.065, 0.04, 0.01]} material={bootMat}>
+            <boxGeometry args={[0.09, 0.1, 0.11]} />
           </mesh>
-          <mesh position={[0.15, 0.15, 0.04]}>
-            <boxGeometry args={[0.26, 0.3, 0.32]} />
-            <meshStandardMaterial color="#1a1a1a" />
+          <mesh position={[0.065, 0.04, 0.01]} material={bootMat}>
+            <boxGeometry args={[0.09, 0.1, 0.11]} />
           </mesh>
         </>
       ) : customization.boots === 'sneakers' ? (
         <>
-          <mesh position={[-0.15, 0.06, 0.04]}>
-            <boxGeometry args={[0.24, 0.12, 0.3]} />
+          <mesh position={[-0.065, 0.015, 0.01]}>
+            <boxGeometry args={[0.085, 0.04, 0.1]} />
             <meshStandardMaterial color="#333344" />
           </mesh>
-          <mesh position={[0.15, 0.06, 0.04]}>
-            <boxGeometry args={[0.24, 0.12, 0.3]} />
+          <mesh position={[0.065, 0.015, 0.01]}>
+            <boxGeometry args={[0.085, 0.04, 0.1]} />
             <meshStandardMaterial color="#333344" />
           </mesh>
         </>
       ) : (
         <>
-          <mesh position={[-0.15, 0.1, 0.04]}>
-            <boxGeometry args={[0.24, 0.2, 0.3]} />
-            <meshStandardMaterial color="#2a2a1a" />
+          <mesh position={[-0.065, 0.03, 0.01]} material={bootMat}>
+            <boxGeometry args={[0.085, 0.07, 0.1]} />
           </mesh>
-          <mesh position={[0.15, 0.1, 0.04]}>
-            <boxGeometry args={[0.24, 0.2, 0.3]} />
-            <meshStandardMaterial color="#2a2a1a" />
+          <mesh position={[0.065, 0.03, 0.01]} material={bootMat}>
+            <boxGeometry args={[0.085, 0.07, 0.1]} />
           </mesh>
         </>
       )}
 
-      {/* Torso */}
-      <mesh position={[0, 1.1, 0]}>
-        <boxGeometry args={[0.55, 0.7, 0.3]} />
-        <meshStandardMaterial color={bodyColor} />
+      {/* ── TORSO (game-accurate) ── */}
+      <mesh position={[0, 0.44, 0]} castShadow material={torsoMat}>
+        <boxGeometry args={[0.28, 0.24, 0.16]} />
       </mesh>
 
-      {/* Vest */}
-      {customization.vest === 'heavy' && (
-        <mesh position={[0, 1.15, 0]}>
-          <boxGeometry args={[0.62, 0.6, 0.38]} />
-          <meshStandardMaterial color="#2a2a2a" />
+      {/* ── VEST VARIANTS ── */}
+      {customization.vest === 'light' && (
+        <mesh position={[0, 0.46, 0.045]} material={gearMat}>
+          <boxGeometry args={[0.26, 0.2, 0.04]} />
         </mesh>
+      )}
+      {customization.vest === 'heavy' && (
+        <>
+          <mesh position={[0, 0.46, 0.045]} material={gearMat}>
+            <boxGeometry args={[0.28, 0.22, 0.06]} />
+          </mesh>
+          <mesh position={[0, 0.44, -0.1]} material={gearMat}>
+            <boxGeometry args={[0.26, 0.2, 0.04]} />
+          </mesh>
+        </>
       )}
       {customization.vest === 'tactical' && (
         <>
-          <mesh position={[0, 1.15, 0]}>
-            <boxGeometry args={[0.58, 0.55, 0.34]} />
-            <meshStandardMaterial color="#3a3a2a" />
+          <mesh position={[0, 0.46, 0.045]} material={gearMat}>
+            <boxGeometry args={[0.26, 0.2, 0.04]} />
           </mesh>
           {/* Pouches */}
-          <mesh position={[0.22, 1.0, 0.18]}>
-            <boxGeometry args={[0.1, 0.12, 0.08]} />
-            <meshStandardMaterial color={darkColor} />
+          <mesh position={[-0.12, 0.38, 0.07]} material={darkMat}>
+            <boxGeometry args={[0.05, 0.06, 0.03]} />
           </mesh>
-          <mesh position={[-0.22, 1.0, 0.18]}>
-            <boxGeometry args={[0.1, 0.12, 0.08]} />
-            <meshStandardMaterial color={darkColor} />
+          <mesh position={[0.12, 0.38, 0.07]} material={darkMat}>
+            <boxGeometry args={[0.05, 0.06, 0.03]} />
+          </mesh>
+          <mesh position={[0, 0.36, 0.07]} material={darkMat}>
+            <boxGeometry args={[0.06, 0.04, 0.03]} />
           </mesh>
         </>
       )}
       {customization.vest === 'medic' && (
         <>
-          <mesh position={[0, 1.15, 0]}>
-            <boxGeometry args={[0.58, 0.55, 0.34]} />
-            <meshStandardMaterial color="#f0f0f0" />
+          <mesh position={[0, 0.46, 0.045]}>
+            <boxGeometry args={[0.26, 0.2, 0.04]} />
+            <meshStandardMaterial color="#dddddd" metalness={0.05} roughness={0.7} />
           </mesh>
           {/* Red cross */}
-          <mesh position={[0, 1.2, 0.18]}>
-            <boxGeometry args={[0.2, 0.06, 0.01]} />
-            <meshStandardMaterial color="#cc2222" />
+          <mesh position={[0, 0.48, 0.069]}>
+            <boxGeometry args={[0.06, 0.02, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.3} />
           </mesh>
-          <mesh position={[0, 1.2, 0.18]}>
-            <boxGeometry args={[0.06, 0.2, 0.01]} />
-            <meshStandardMaterial color="#cc2222" />
+          <mesh position={[0, 0.48, 0.069]}>
+            <boxGeometry args={[0.02, 0.06, 0.002]} />
+            <meshStandardMaterial color="#cc2222" emissive="#cc2222" emissiveIntensity={0.3} />
           </mesh>
         </>
       )}
-      {customization.vest === 'light' && (
-        <mesh position={[0, 1.15, 0]}>
-          <boxGeometry args={[0.56, 0.45, 0.32]} />
-          <meshStandardMaterial color={bodyColor} opacity={0.8} transparent />
+
+      {/* Belt */}
+      <mesh position={[0, 0.32, 0]} material={bootMat}>
+        <boxGeometry args={[0.27, 0.03, 0.15]} />
+      </mesh>
+
+      {/* Team color stripe on chest */}
+      <mesh position={[0, 0.48, 0.066]}>
+        <boxGeometry args={[0.08, 0.08, 0.002]} />
+        <meshStandardMaterial color={teamColor} emissive={teamColor} emissiveIntensity={0.3} />
+      </mesh>
+
+      {/* ── HEAD ── */}
+      <group position={[0, 0.64, 0]}>
+        {/* Neck */}
+        <mesh position={[0, -0.04, 0]} material={skinMat}>
+          <cylinderGeometry args={[0.04, 0.045, 0.05, 6]} />
         </mesh>
-      )}
-
-      {/* Arms */}
-      <mesh position={[-0.38, 1.1, 0]}>
-        <boxGeometry args={[0.18, 0.65, 0.18]} />
-        <meshStandardMaterial color={bodyColor} />
-      </mesh>
-      <mesh position={[0.38, 1.1, 0]}>
-        <boxGeometry args={[0.18, 0.65, 0.18]} />
-        <meshStandardMaterial color={bodyColor} />
-      </mesh>
-
-      {/* Hands */}
-      <mesh position={[-0.38, 0.72, 0]}>
-        <boxGeometry args={[0.14, 0.12, 0.14]} />
-        <meshStandardMaterial color={skinColor} />
-      </mesh>
-      <mesh position={[0.38, 0.72, 0]}>
-        <boxGeometry args={[0.14, 0.12, 0.14]} />
-        <meshStandardMaterial color={skinColor} />
-      </mesh>
-
-      {/* Head */}
-      <mesh position={[0, 1.65, 0]}>
-        <boxGeometry args={[0.32, 0.32, 0.3]} />
-        <meshStandardMaterial color={skinColor} />
-      </mesh>
-
-      {/* Neck */}
-      <mesh position={[0, 1.48, 0]}>
-        <cylinderGeometry args={[0.08, 0.1, 0.1, 8]} />
-        <meshStandardMaterial color={skinColor} />
-      </mesh>
-
-      {/* Team armband */}
-      <mesh position={[0.38, 1.3, 0]}>
-        <cylinderGeometry args={[0.12, 0.12, 0.06, 8]} />
-        <meshStandardMaterial color={teamColor} />
-      </mesh>
-
-      {/* Helmet */}
-      {customization.helmet === 'standard' && (
-        <mesh position={[0, 1.85, 0]}>
-          <boxGeometry args={[0.38, 0.15, 0.36]} />
-          <meshStandardMaterial color="#3a3a2a" />
+        {/* Head */}
+        <mesh position={[0, 0.04, 0]} castShadow material={skinMat}>
+          <boxGeometry args={[0.12, 0.12, 0.11]} />
         </mesh>
-      )}
-      {customization.helmet === 'tactical' && (
+
+        {/* ── HELMET VARIANTS ── */}
+        {customization.helmet === 'standard' && (
+          <>
+            <mesh position={[0, 0.09, 0]} castShadow material={helmetMat}>
+              <sphereGeometry args={[0.085, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
+            </mesh>
+            <mesh position={[0, 0.06, 0]} material={helmetMat}>
+              <cylinderGeometry args={[0.088, 0.088, 0.018, 8]} />
+            </mesh>
+          </>
+        )}
+        {customization.helmet === 'tactical' && (
+          <>
+            <mesh position={[0, 0.09, 0]} castShadow material={helmetMat}>
+              <sphereGeometry args={[0.085, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
+            </mesh>
+            <mesh position={[0, 0.06, 0]} material={helmetMat}>
+              <cylinderGeometry args={[0.088, 0.088, 0.018, 8]} />
+            </mesh>
+            {/* NVG mount */}
+            <mesh position={[0, 0.08, 0.07]}>
+              <boxGeometry args={[0.03, 0.025, 0.04]} />
+              <meshStandardMaterial color="#1a1a1a" metalness={0.6} roughness={0.3} />
+            </mesh>
+            {/* NVG tubes */}
+            <mesh position={[-0.012, 0.075, 0.095]}>
+              <cylinderGeometry args={[0.008, 0.008, 0.03, 6]} />
+              <meshStandardMaterial color="#0a0a0a" metalness={0.7} roughness={0.2} />
+            </mesh>
+            <mesh position={[0.012, 0.075, 0.095]}>
+              <cylinderGeometry args={[0.008, 0.008, 0.03, 6]} />
+              <meshStandardMaterial color="#0a0a0a" metalness={0.7} roughness={0.2} />
+            </mesh>
+          </>
+        )}
+        {customization.helmet === 'beret' && (
+          <mesh position={[0.02, 0.09, 0]}>
+            <cylinderGeometry args={[0.08, 0.07, 0.03, 8]} />
+            <meshStandardMaterial color="#8b1a1a" />
+          </mesh>
+        )}
+        {customization.helmet === 'bandana' && (
+          <mesh position={[0, 0.08, 0]}>
+            <boxGeometry args={[0.13, 0.025, 0.12]} />
+            <meshStandardMaterial color={teamColor} emissive={teamColor} emissiveIntensity={0.15} />
+          </mesh>
+        )}
+
+        {/* Visor */}
+        <mesh position={[0, 0.05, 0.055]} material={visorMat}>
+          <boxGeometry args={[0.1, 0.025, 0.02]} />
+        </mesh>
+      </group>
+
+      {/* ── BACKPACK ── */}
+      <mesh position={[0, 0.44, -0.12]} material={gearMat} castShadow>
+        <boxGeometry args={[0.18, 0.18, 0.08]} />
+      </mesh>
+
+      {/* ── SHOULDER PADS (team colored) ── */}
+      <mesh position={[-0.17, 0.52, 0]} castShadow material={helmetMat}>
+        <boxGeometry args={[0.06, 0.07, 0.12]} />
+      </mesh>
+      <mesh position={[0.17, 0.52, 0]} castShadow material={helmetMat}>
+        <boxGeometry args={[0.06, 0.07, 0.12]} />
+      </mesh>
+
+      {/* ── ARMS ── */}
+      <group position={[-0.19, 0.44, 0]}>
+        <mesh material={torsoMat}><boxGeometry args={[0.06, 0.2, 0.06]} /></mesh>
+        <mesh position={[0, -0.12, 0]} material={skinMat}><boxGeometry args={[0.05, 0.05, 0.05]} /></mesh>
+      </group>
+      <group position={[0.19, 0.44, 0]}>
+        <mesh material={torsoMat}><boxGeometry args={[0.06, 0.2, 0.06]} /></mesh>
+        <mesh position={[0, -0.12, 0]} material={skinMat}><boxGeometry args={[0.05, 0.05, 0.05]} /></mesh>
+      </group>
+
+      {/* ── Medic cross (game-accurate) ── */}
+      {isMedic && (
         <>
-          <mesh position={[0, 1.85, 0]}>
-            <sphereGeometry args={[0.22, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
-            <meshStandardMaterial color="#2a2a2a" />
+          <mesh position={[0, 0.48, 0.069]}>
+            <boxGeometry args={[0.06, 0.02, 0.002]} />
+            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
           </mesh>
-          {/* NVG mount */}
-          <mesh position={[0, 1.92, 0.18]}>
-            <boxGeometry args={[0.08, 0.06, 0.12]} />
-            <meshStandardMaterial color="#1a1a1a" />
+          <mesh position={[0, 0.48, 0.069]}>
+            <boxGeometry args={[0.02, 0.06, 0.002]} />
+            <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} />
           </mesh>
         </>
       )}
-      {customization.helmet === 'beret' && (
-        <mesh position={[0.06, 1.84, 0]}>
-          <cylinderGeometry args={[0.2, 0.18, 0.06, 8]} />
-          <meshStandardMaterial color="#8b1a1a" />
-        </mesh>
-      )}
-      {customization.helmet === 'bandana' && (
-        <mesh position={[0, 1.8, 0]}>
-          <boxGeometry args={[0.36, 0.06, 0.34]} />
-          <meshStandardMaterial color={teamColor} />
-        </mesh>
-      )}
+
+      {/* ── WEAPON (pistol default) ── */}
+      <group position={[0.19, 0.32, 0.08]}>
+        <mesh><boxGeometry args={[0.025, 0.04, 0.14]} /><meshStandardMaterial color="#2a2a2a" metalness={0.7} roughness={0.3} /></mesh>
+        <mesh position={[0, -0.02, -0.05]}><boxGeometry args={[0.022, 0.055, 0.06]} /><meshStandardMaterial color="#3a2818" /></mesh>
+      </group>
+
+      {/* ── Selection ring ── */}
+      <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.15, 0.18, 16]} />
+        <meshStandardMaterial color={teamColor} emissive={teamColor} emissiveIntensity={0.5} transparent opacity={0.6} side={THREE.DoubleSide} />
+      </mesh>
     </group>
   );
 }
@@ -246,13 +316,11 @@ function GearSelector<T extends string>({
   options,
   value,
   onChange,
-  teamColor,
 }: {
   label: string;
   options: { id: T; name: string; desc?: string }[];
   value: T;
   onChange: (v: T) => void;
-  teamColor: string;
 }) {
   const idx = options.findIndex(o => o.id === value);
   const prev = () => onChange(options[(idx - 1 + options.length) % options.length].id);
@@ -303,17 +371,22 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
         style={{ borderColor: teamColor + '50' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* 3D Viewer */}
+        {/* 3D Viewer — using the actual game model */}
         <div className="w-full sm:w-[300px] h-[280px] sm:h-[420px] bg-card/90 relative shrink-0">
           <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
             style={{ background: `linear-gradient(180deg, ${teamColor}15, transparent)` }} />
 
-          <Canvas camera={{ position: [0, 0.5, 3], fov: 45 }}>
+          <Canvas camera={{ position: [0, 0.5, 2.8], fov: 45 }}>
             <ambientLight intensity={0.5} />
             <directionalLight position={[3, 5, 3]} intensity={1} />
             <directionalLight position={[-2, 3, -1]} intensity={0.3} />
+            <pointLight position={[0, 2, 2]} intensity={0.4} color={teamColor} />
             <Suspense fallback={null}>
-              <CharacterModel teamColor={teamColor} customization={localCustom} />
+              <GameSoldierPreview
+                teamColor={teamColor}
+                isMedic={unit.unitClass === 'medic'}
+                customization={localCustom}
+              />
             </Suspense>
             <OrbitControls
               enableZoom={false}
@@ -353,21 +426,18 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
               options={HELMET_OPTIONS}
               value={localCustom.helmet}
               onChange={v => updateField('helmet', v)}
-              teamColor={teamColor}
             />
             <GearSelector
               label="VEST"
               options={VEST_OPTIONS}
               value={localCustom.vest}
               onChange={v => updateField('vest', v)}
-              teamColor={teamColor}
             />
             <GearSelector
               label="BOOTS"
               options={BOOT_OPTIONS}
               value={localCustom.boots}
               onChange={v => updateField('boots', v)}
-              teamColor={teamColor}
             />
 
             {/* Camo Pattern - visual grid */}

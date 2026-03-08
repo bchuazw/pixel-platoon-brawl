@@ -1,13 +1,14 @@
 import { Unit, TEAM_COLORS, WEAPONS, WeaponId, LootItem } from '@/game/types';
 import { X, Heart, Swords, Shield, Crosshair, Eye, Footprints, Zap, MapPin, Package, Target } from 'lucide-react';
-import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
-import portraitSoldierRed from '@/assets/portrait-soldier-red.png';
-import portraitSoldierGreen from '@/assets/portrait-soldier-green.png';
-import portraitSoldierYellow from '@/assets/portrait-soldier-yellow.png';
-import portraitMedicBlue from '@/assets/portrait-medic-blue.png';
-import portraitMedicRed from '@/assets/portrait-medic-red.png';
-import portraitMedicGreen from '@/assets/portrait-medic-green.png';
-import portraitMedicYellow from '@/assets/portrait-medic-yellow.png';
+
+import fullbodySoldierBlue from '@/assets/fullbody-soldier-blue.png';
+import fullbodySoldierRed from '@/assets/fullbody-soldier-red.png';
+import fullbodySoldierGreen from '@/assets/fullbody-soldier-green.png';
+import fullbodySoldierYellow from '@/assets/fullbody-soldier-yellow.png';
+import fullbodyMedicBlue from '@/assets/fullbody-medic-blue.png';
+import fullbodyMedicRed from '@/assets/fullbody-medic-red.png';
+import fullbodyMedicGreen from '@/assets/fullbody-medic-green.png';
+import fullbodyMedicYellow from '@/assets/fullbody-medic-yellow.png';
 
 export type SponsorAction = 'reveal_enemies' | 'reveal_loot' | 'gift_rifle' | 'gift_sniper' | 'gift_shotgun' | 'gift_rocket' | 'gift_medkit' | 'gift_armor';
 
@@ -31,15 +32,15 @@ export const SPONSOR_OPTIONS: SponsorOption[] = [
   { id: 'gift_armor', name: 'Armor Vest', description: 'Grant +8 armor, +4 defense', icon: '🛡️', cost: 3, category: 'supply' },
 ];
 
-const PORTRAITS: Record<string, string> = {
-  'blue-soldier': portraitSoldierBlue,
-  'red-soldier': portraitSoldierRed,
-  'green-soldier': portraitSoldierGreen,
-  'yellow-soldier': portraitSoldierYellow,
-  'blue-medic': portraitMedicBlue,
-  'red-medic': portraitMedicRed,
-  'green-medic': portraitMedicGreen,
-  'yellow-medic': portraitMedicYellow,
+const FULLBODY: Record<string, string> = {
+  'blue-soldier': fullbodySoldierBlue,
+  'red-soldier': fullbodySoldierRed,
+  'green-soldier': fullbodySoldierGreen,
+  'yellow-soldier': fullbodySoldierYellow,
+  'blue-medic': fullbodyMedicBlue,
+  'red-medic': fullbodyMedicRed,
+  'green-medic': fullbodyMedicGreen,
+  'yellow-medic': fullbodyMedicYellow,
 };
 
 interface CharacterPanelProps {
@@ -51,7 +52,7 @@ interface CharacterPanelProps {
 
 export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: CharacterPanelProps) {
   const teamColor = TEAM_COLORS[unit.team];
-  const portrait = PORTRAITS[unit.id] || PORTRAITS[`${unit.team}-${unit.unitClass}`];
+  const fullbody = FULLBODY[unit.id] || FULLBODY[`${unit.team}-${unit.unitClass}`];
   const hpPercent = (unit.hp / unit.maxHp) * 100;
 
   const statRows = [
@@ -73,9 +74,9 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
         style={{ borderColor: teamColor + '60' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Left: Portrait */}
+        {/* Left: Full-body character art */}
         <div
-          className="w-[220px] relative flex flex-col items-center justify-end shrink-0"
+          className="w-[220px] relative flex flex-col items-center justify-end shrink-0 overflow-hidden"
           style={{ background: `linear-gradient(180deg, ${teamColor}15 0%, ${teamColor}08 50%, hsl(220, 20%, 8%) 100%)` }}
         >
           {/* Team color glow */}
@@ -83,12 +84,14 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
             className="absolute top-0 left-0 right-0 h-20 opacity-30"
             style={{ background: `radial-gradient(ellipse at center top, ${teamColor}, transparent 70%)` }}
           />
-          <img
-            src={portrait}
-            alt={unit.unitClass}
-            className="relative z-10 w-[180px] h-auto object-contain drop-shadow-2xl"
-            style={{ filter: `drop-shadow(0 0 20px ${teamColor}40)` }}
-          />
+          {fullbody && (
+            <img
+              src={fullbody}
+              alt={unit.name}
+              className="relative z-10 w-[200px] h-auto object-contain drop-shadow-2xl"
+              style={{ filter: `drop-shadow(0 0 20px ${teamColor}40)` }}
+            />
+          )}
           {/* Name plate */}
           <div className="relative z-10 w-full bg-card/90 backdrop-blur-sm py-2 px-3 text-center border-t border-border/30">
             <div className="text-[11px] font-bold text-foreground">{unit.name}</div>

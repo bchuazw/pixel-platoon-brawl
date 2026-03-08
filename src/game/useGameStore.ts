@@ -376,6 +376,7 @@ export function useGameStore() {
       const grid = prev.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null })));
 
       const movingUnit = units.find(u => u.id === prev.selectedUnitId)!;
+      const path = findPath(movingUnit.position, pos, prev);
       movingUnit.position = pos;
       movingUnit.ap -= AP_MOVE_COST;
 
@@ -409,6 +410,8 @@ export function useGameStore() {
         selectedUnitId: unit.isAlive && (attackable.length > 0 || unit.ap > 0) ? prev.selectedUnitId : null,
         log: [...log, ...owEvents.map(e => e.message)],
         combatEvents: [...prev.combatEvents, ...owEvents, ...newEvents],
+        movePath: path,
+        movingUnitId: prev.selectedUnitId,
       };
     });
   }, []);

@@ -3,7 +3,7 @@ import {
   CLASS_STATS, CLASS_ABILITIES, TileType, PropType, CombatEvent,
   AP_MOVE_COST, AP_ATTACK_COST, AttackPreview, AbilityId,
   WEAPONS, WeaponId, LootItem, LootType, Weapon, VISION_RANGE,
-  KillstreakId,
+  KillstreakId, AirdropData,
 } from './types';
 
 // ── Random ──
@@ -139,7 +139,7 @@ export function findPath(from: Position, to: Position, state: GameState): Positi
 }
 
 // ── Random spawn point generation ──
-const MIN_SPAWN_DISTANCE = 10; // minimum manhattan distance between team spawns
+const MIN_SPAWN_DISTANCE = 8; // minimum manhattan distance between team spawns
 
 function generateSpawnPoints(rand: () => number): Position[] {
   const margin = 3; // keep away from edges
@@ -401,7 +401,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
   }
 
   // ═══ SPAWN LOOT ═══
-  const lootCount = 25 + Math.floor(rand() * 12);
+  const lootCount = 18 + Math.floor(rand() * 8);
   let placed = 0;
   let attempts = 0;
   while (placed < lootCount && attempts < 500) {
@@ -599,6 +599,47 @@ export function teamCanSee(team: Team, targetPos: Position, units: Unit[]): bool
   return units.some(u => u.team === team && u.isAlive && canUnitSee(u, targetPos));
 }
 
+// ── Airdrop Generation ──
+export function generateAirdrops(grid: TileData[][]): AirdropData[] {
+  const count = 1 + (Math.random() < 0.4 ? 1 : 0); // 1-2 airdrops
+  const drops: AirdropData[] = [];
+  const margin = 3;
+  
+  for (let i = 0; i < count; i++) {
+    let attempts = 0;
+    while (attempts < 50) {
+      attempts++;
+      const x = margin + Math.floor(Math.random() * (GRID_SIZE - margin * 2));
+      const z = margin + Math.floor(Math.random() * (GRID_SIZE - margin * 2));
+      const tile = grid[x]?.[z];
+      if (!tile || tile.isBlocked || tile.type === 'water' || tile.loot) continue;
+      // Don't drop too close to another drop
+      if (drops.some(d => Math.abs(d.targetPos.x - x) + Math.abs(d.targetPos.z - z) < 5)) continue;
+      
+      const loot = generateAirdropLoot();
+      drops.push({
+        id: `airdrop-${Date.now()}-${i}`,
+        targetPos: { x, z },
+        startTime: Date.now(),
+        phase: 'flying',
+        loot,
+      });
+      break;
+    }
+  }
+  return drops;
+}
+
+function generateAirdropLoot(): LootItem {
+  const roll = Math.random();
+  if (roll < 0.25) return { type: 'weapon', weaponId: 'sniper_rifle', value: 0, icon: '🎯', name: 'Sniper Rifle' };
+  if (roll < 0.45) return { type: 'weapon', weaponId: 'rocket_launcher', value: 0, icon: '🚀', name: 'Rocket Launcher' };
+  if (roll < 0.6) return { type: 'medkit', value: 60, icon: '❤️', name: 'Field Surgery Kit' };
+  if (roll < 0.75) return { type: 'armor', value: 15, icon: '🛡️', name: 'Heavy Armor' };
+  if (roll < 0.88) return { type: 'killstreak', killstreakId: 'airstrike', value: 0, icon: '✈️', name: 'Airstrike' };
+  return { type: 'killstreak', killstreakId: 'supply_drop', value: 0, icon: '📦', name: 'Supply Drop' };
+}
+
 export function getVisibleEnemies(unit: Unit, allUnits: Unit[]): Unit[] {
   return allUnits.filter(u =>
     u.isAlive && u.team !== unit.team &&
@@ -676,6 +717,7 @@ export function createInitialState(): GameState {
     movePath: null,
     movingUnitId: null,
     killCam: null,
+    airdrops: [],
   };
 }
 

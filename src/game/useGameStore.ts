@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team, KillCamData,
+  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team, KillCamData, AirdropData,
 } from './types';
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
   performAttack, getNextTeam, getAliveTeams, runAiTurn, runAiUnitStep, isInZone,
   checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot, findPath,
-  activateKillstreak, tickKillstreakEffects, applyExplosionDamage,
+  activateKillstreak, tickKillstreakEffects, applyExplosionDamage, generateAirdrops,
 } from './gameState';
 import { startBgMusic, stopBgMusic, playPickup, playHeal, playMove } from './sounds';
 import { SponsorAction } from '@/components/game/CharacterPanel';
@@ -353,6 +353,15 @@ export function useGameStore() {
           log.push(`═══════════════════════════`);
           log.push(`» ROUND ${turn}`);
           log.push(`» ${newState.units.filter(u => u.isAlive).length} combatants remaining`);
+
+          // Trigger supply airdrops every 3 rounds starting from round 3
+          if (turn >= 3 && turn % 3 === 0) {
+            const newDrops = generateAirdrops(newState.grid);
+            if (newDrops.length > 0) {
+              newState.airdrops = [...(newState.airdrops || []), ...newDrops];
+              log.push(`✈️ INCOMING SUPPLY DROP! ${newDrops.length} crate${newDrops.length > 1 ? 's' : ''} inbound!`);
+            }
+          }
         }
 
         // Tick killstreak effects at start of each new round
@@ -841,10 +850,29 @@ export function useGameStore() {
     setState(prev => ({ ...prev, movePath: null, movingUnitId: null }));
   }, []);
 
+  const handleAirdropLanded = useCallback((airdrop: AirdropData) => {
+    setState(prev => {
+      const grid = prev.grid.map(row => row.map(t => ({ ...t })));
+      const tile = grid[airdrop.targetPos.x]?.[airdrop.targetPos.z];
+      if (tile && !tile.loot) {
+        tile.loot = airdrop.loot;
+      }
+      const airdrops = prev.airdrops.map(a =>
+        a.id === airdrop.id ? { ...a, phase: 'landed' as const } : a
+      );
+      return {
+        ...prev,
+        grid,
+        airdrops,
+        log: [...prev.log, `📦 Supply crate landed at (${airdrop.targetPos.x}, ${airdrop.targetPos.z})! Contains: ${airdrop.loot.name}`],
+      };
+    });
+  }, []);
+
   return {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
-    placeBet, betTeam, betAmount, collectBetPayout,
+    placeBet, betTeam, betAmount, collectBetPayout, handleAirdropLanded,
   };
 }

@@ -9,7 +9,8 @@ import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
 import { ScreenShake } from './ScreenShake';
 import { AutoFollowCamera } from './AutoFollowCamera';
-import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
+import { AirdropVFX } from './AirdropVFX';
+import { GameState, Position, GRID_SIZE, KillCamData, AirdropData } from '@/game/types';
 import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
 
@@ -19,13 +20,14 @@ interface GameBoardProps {
   onUnitClick: (unitId: string) => void;
   onTileHover: (pos: Position | null) => void;
   onMoveComplete?: () => void;
+  onAirdropLanded?: (airdrop: AirdropData) => void;
 }
 
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
 
 // FFT-style isometric camera — high angle, moderate distance
-const CAM_DISTANCE = 28;
-const CAM_HEIGHT = 22;
+const CAM_DISTANCE = 22;
+const CAM_HEIGHT = 18;
 
 function getCameraPosition(angleIndex: number): [number, number, number] {
   const angle = (Math.PI / 4) + (angleIndex * Math.PI / 2);
@@ -147,7 +149,7 @@ function LoadingFallback() {
   );
 }
 
-export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete }: GameBoardProps) {
+export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete, onAirdropLanded }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
   const [autoFollow, setAutoFollow] = useState(true);
   const orbitRef = useRef<any>(null);
@@ -239,6 +241,9 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
             onMoveComplete={onMoveComplete}
           />
           <CombatVFX events={state.combatEvents} />
+          {state.airdrops && state.airdrops.length > 0 && onAirdropLanded && (
+            <AirdropVFX airdrops={state.airdrops} grid={state.grid} onAirdropLanded={onAirdropLanded} />
+          )}
         </Suspense>
 
         <ZoneBorder shrinkLevel={state.shrinkLevel} />

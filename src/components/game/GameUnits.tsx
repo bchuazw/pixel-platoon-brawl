@@ -9,11 +9,11 @@ import * as THREE from 'three';
 // Get the Y position where units should stand (on TOP of the tile)
 function getUnitBaseY(grid: TileData[][], x: number, z: number): number {
   const tile = grid[x]?.[z];
-  if (!tile) return 0.15;
+  if (!tile) return 0.08;
   const tileY = getTileY(tile.elevation);
   const isTrench = tile.type === 'trench';
-  const height = tile.type === 'water' ? 0.06 : isTrench ? 0.06 : 0.18 + tile.elevation * 0.1;
-  return tileY + height / 2;
+  const surfaceH = tile.type === 'water' ? 0.03 : isTrench ? 0.04 : 0.08;
+  return tileY + surfaceH;
 }
 
 interface GameUnitsProps {

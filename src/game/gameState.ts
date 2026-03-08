@@ -1284,9 +1284,12 @@ export function runAiTurn(state: GameState): { state: GameState; events: CombatE
   let currentState = state;
   const allEvents: CombatEvent[] = [];
   for (const unit of sorted) {
-    const result = runAiUnitStep(unit.id, currentState);
-    currentState = result.state;
-    allEvents.push(...result.events);
+    const moveResult = runAiUnitStep(unit.id, currentState, 'move');
+    currentState = moveResult.state;
+    allEvents.push(...moveResult.events);
+    const combatResult = runAiUnitStep(unit.id, currentState, 'combat');
+    currentState = combatResult.state;
+    allEvents.push(...combatResult.events);
   }
   return { state: currentState, events: allEvents };
 }

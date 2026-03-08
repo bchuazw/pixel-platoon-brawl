@@ -173,9 +173,9 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
             )}
 
             {/* Status effects */}
-            <div className="flex gap-2 mt-2">
-              {unit.isOnOverwatch && (
-                <span className="text-[7px] bg-[#44aaff]/20 text-[#44aaff] px-2 py-0.5 rounded">👁 OVERWATCH</span>
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {unit.isHunkered && (
+                <span className="text-[7px] bg-accent/20 text-accent px-2 py-0.5 rounded">🛡 HUNKERED</span>
               )}
               {unit.isSuppressed && (
                 <span className="text-[7px] bg-destructive/20 text-destructive px-2 py-0.5 rounded">⛔ SUPPRESSED</span>

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team, KillCamData, AirdropData,
+  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team, KillCamData, AirdropData, GRID_SIZE,
 } from './types';
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
@@ -699,8 +699,8 @@ export function useGameStore() {
         case 'smoke': {
           const radius = ability.aoeRadius || 1;
           const grid = prev.grid.map(row => row.map(t => ({ ...t })));
-          for (let x = 0; x < 20; x++) {
-            for (let z = 0; z < 20; z++) {
+          for (let x = 0; x < GRID_SIZE; x++) {
+            for (let z = 0; z < GRID_SIZE; z++) {
               if (getManhattanDistance({ x, z }, pos) <= radius) {
                 grid[x][z].hasSmoke = true;
               }

@@ -14,6 +14,7 @@ interface GridTilesProps {
   movePath: Position[] | null;
   onTileClick: (pos: Position) => void;
   onTileHover: (pos: Position | null) => void;
+  weaponRangeTiles?: Position[];
 }
 
 // ── Naturalistic terrain palette ──
@@ -72,9 +73,9 @@ function darkenColor(hex: string, amount: number): string {
 }
 
 // ── Tile Component ──
-function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isOnPath, hasSmoke, onClick, onHover }: {
+function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isOnPath, hasSmoke, isWeaponRange, onClick, onHover }: {
   tile: TileData; isMovable: boolean; isAttackable: boolean; isAbilityTarget: boolean;
-  isOutOfZone: boolean; isOnPath: boolean; hasSmoke: boolean; onClick: () => void; onHover: (hover: boolean) => void;
+  isOutOfZone: boolean; isOnPath: boolean; hasSmoke: boolean; isWeaponRange: boolean; onClick: () => void; onHover: (hover: boolean) => void;
 }) {
   const topRef = useRef<THREE.Mesh>(null);
   const t = TERRAIN[tile.type] || TERRAIN.grass;
@@ -91,6 +92,7 @@ function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isO
   if (isOutOfZone) { emissive = '#cc2222'; emI = 0.25; }
   if (isMovable) { emissive = '#2299ff'; emI = 0.3; }
   if (isOnPath) { emissive = '#44ddff'; emI = 0.45; }
+  if (isWeaponRange && !isMovable && !isAttackable) { emissive = '#ff8800'; emI = 0.18; }
   if (isAttackable) { emissive = '#ff3333'; emI = 0.4; }
   if (isAbilityTarget) { emissive = '#ffaa00'; emI = 0.35; }
 
@@ -794,12 +796,13 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
 }
 
 // ── Main GridTiles ──
-export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTiles, shrinkLevel, movePath, onTileClick, onTileHover }: GridTilesProps) {
+export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTiles, shrinkLevel, movePath, onTileClick, onTileHover, weaponRangeTiles }: GridTilesProps) {
   const lootTiles = useMemo(() => grid.flat().filter(t => t.loot !== null), [grid]);
   const movableSet = useMemo(() => new Set(movableTiles.map(t => `${t.x},${t.z}`)), [movableTiles]);
   const attackableSet = useMemo(() => new Set(attackableTiles.map(t => `${t.x},${t.z}`)), [attackableTiles]);
   const abilitySet = useMemo(() => new Set(abilityTargetTiles.map(t => `${t.x},${t.z}`)), [abilityTargetTiles]);
   const pathSet = useMemo(() => new Set(movePath ? movePath.map(p => `${p.x},${p.z}`) : []), [movePath]);
+  const weaponRangeSet = useMemo(() => new Set(weaponRangeTiles ? weaponRangeTiles.map(t => `${t.x},${t.z}`) : []), [weaponRangeTiles]);
 
   return (
     <group>
@@ -820,6 +823,7 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
             isOutOfZone={!isInZone(x, z, shrinkLevel) && shrinkLevel > 0}
             isOnPath={pathSet.has(key)}
             hasSmoke={tile.hasSmoke}
+            isWeaponRange={weaponRangeSet.has(key)}
             onClick={() => onTileClick({ x, z })}
             onHover={(hover) => onTileHover(hover ? { x, z } : null)}
           />

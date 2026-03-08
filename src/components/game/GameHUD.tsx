@@ -4,6 +4,7 @@ import { Play, Pause, RotateCcw, Heart, Shield, Crosshair, Home, Target, Skull }
 import { isInZone } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import { PreGameScreen } from './PreGameScreen';
+import { TacticalMinimap } from './TacticalMinimap';
 
 import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
 import portraitSoldierRed from '@/assets/portrait-soldier-red.png';
@@ -36,6 +37,7 @@ interface GameHUDProps {
   onMainMenu?: () => void;
   sponsorPoints?: number;
   onUnitInspect?: (unitId: string) => void;
+  inspectedUnitId?: string | null;
 }
 
 /* ── Unit Card ── */
@@ -83,7 +85,7 @@ function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; 
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-[9px] text-muted-foreground/60 font-mono">{unit.hp}/{unit.maxHp}</span>
-          {unit.isOnOverwatch && <span className="text-[9px] text-[#4488ff]">◉</span>}
+          {/* overwatch removed — only hunker shows */}
           {unit.isHunkered && <span className="text-[9px] text-accent">🛡</span>}
           {unit.coverType !== 'none' && (
             <span className={`text-[8px] ${unit.coverType === 'full' ? 'text-[#4488ff]' : 'text-accent/60'}`}>
@@ -400,7 +402,7 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
 }
 
 /* ── Main HUD ── */
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, inspectedUnitId }: GameHUDProps) {
   const isPreGame = state.phase === 'pre_game';
   const isGameOver = state.phase === 'game_over';
   const aliveUnits = state.units.filter(u => u.isAlive);
@@ -486,6 +488,11 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {/* ── Sidebars ── */}
       {!isPreGame && <TeamRoster state={state} onUnitInspect={onUnitInspect} />}
       {!isPreGame && <CombatFeed log={state.log} />}
+
+      {/* ── Tactical Minimap ── */}
+      {!isPreGame && !isGameOver && (
+        <TacticalMinimap state={state} inspectedUnitId={inspectedUnitId ?? null} />
+      )}
 
       {/* ── Kill Feed ── */}
       <div className="absolute top-16 right-[280px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[280px]">

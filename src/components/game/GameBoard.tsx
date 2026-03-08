@@ -56,6 +56,7 @@ interface GameBoardProps {
   onTileHover: (pos: Position | null) => void;
   onMoveComplete?: () => void;
   onAirdropLanded?: (airdrop: AirdropData) => void;
+  inspectedUnitId?: string | null;
 }
 
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
@@ -185,7 +186,7 @@ function LoadingFallback() {
   );
 }
 
-export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete, onAirdropLanded }: GameBoardProps) {
+export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete, onAirdropLanded, inspectedUnitId }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
   const [autoFollow, setAutoFollow] = useState(true);
   const orbitRef = useRef<any>(null);
@@ -266,6 +267,19 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
             movePath={state.movePath}
             onTileClick={onTileClick}
             onTileHover={onTileHover}
+            weaponRangeTiles={(() => {
+              if (!inspectedUnitId) return undefined;
+              const u = state.units.find(u => u.id === inspectedUnitId && u.isAlive);
+              if (!u) return undefined;
+              const tiles: Position[] = [];
+              for (let x = 0; x < GRID_SIZE; x++) {
+                for (let z = 0; z < GRID_SIZE; z++) {
+                  const dist = Math.abs(x - u.position.x) + Math.abs(z - u.position.z);
+                  if (dist > 0 && dist <= u.attackRange) tiles.push({ x, z });
+                }
+              }
+              return tiles;
+            })()}
           />
           <GameUnits
             units={state.units}

@@ -625,10 +625,10 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
       )}
 
       {/* Status icons */}
-      {unit.isOnOverwatch && (
+      {unit.isHunkered && (
         <Billboard position={[-0.22, 0.72, 0]}>
-          <Text fontSize={0.09} color="#44aaff" anchorX="center" anchorY="middle" font={undefined}
-            outlineWidth={0.012} outlineColor="#000000">👁</Text>
+          <Text fontSize={0.09} color="#ffaa00" anchorX="center" anchorY="middle" font={undefined}
+            outlineWidth={0.012} outlineColor="#000000">🛡</Text>
         </Billboard>
       )}
       {unit.isSuppressed && (
@@ -660,11 +660,11 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
         </mesh>
       )}
 
-      {/* Overwatch range */}
-      {unit.isOnOverwatch && (
+      {/* Attack range ring when hunkered */}
+      {unit.isHunkered && (
         <mesh position={[0, 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[unit.attackRange - 0.08, unit.attackRange + 0.08, 20]} />
-          <meshBasicMaterial color="#44aaff" transparent opacity={0.12} side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#ffaa00" transparent opacity={0.1} side={THREE.DoubleSide} />
         </mesh>
       )}
     </group>

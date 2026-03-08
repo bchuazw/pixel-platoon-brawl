@@ -92,6 +92,7 @@ const Index = () => {
         onTileHover={handleTileHover}
         onMoveComplete={handleMoveComplete}
         onAirdropLanded={handleAirdropLanded}
+        inspectedUnitId={inspectedUnitId}
       />
       <GameHUD
         state={state}
@@ -104,6 +105,7 @@ const Index = () => {
         onMainMenu={restart}
         sponsorPoints={sponsorPoints}
         onUnitInspect={inspectUnit}
+        inspectedUnitId={inspectedUnitId}
       />
       {/* Broadcast overlay for cinematic announcements */}
       {state.autoPlay && <BroadcastOverlay state={state} />}

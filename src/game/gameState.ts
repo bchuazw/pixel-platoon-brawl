@@ -1508,7 +1508,7 @@ export function runAiUnitStep(
               if (score > bestScore) { bestTile = t; bestScore = score; }
             }
 
-            if (bestTile.x !== unit.position.x || bestTile.z !== unit.position.z && bestScore > currentScore) {
+            if ((bestTile.x !== unit.position.x || bestTile.z !== unit.position.z) && bestScore > currentScore) {
               // Check path for mid-movement target detection
               const stopTile = findBestStopAlongPath(unit.position, bestTile);
               if (stopTile) {

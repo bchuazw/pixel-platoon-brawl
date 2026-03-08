@@ -9,7 +9,8 @@ import { ZoneBorder } from './ZoneBorder';
 import { CombatVFX } from './CombatVFX';
 import { ScreenShake } from './ScreenShake';
 import { AutoFollowCamera } from './AutoFollowCamera';
-import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
+import { AirdropVFX } from './AirdropVFX';
+import { GameState, Position, GRID_SIZE, KillCamData, AirdropData } from '@/game/types';
 import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
 

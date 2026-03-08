@@ -115,6 +115,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
             units={state.units}
             selectedUnitId={state.selectedUnitId}
             onUnitClick={onUnitClick}
+            combatEvents={state.combatEvents}
           />
           <CombatVFX events={state.combatEvents} />
         </Suspense>

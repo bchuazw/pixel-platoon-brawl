@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team,
+  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team, KillCamData,
 } from './types';
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,

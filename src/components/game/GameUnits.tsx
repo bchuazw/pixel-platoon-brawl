@@ -235,6 +235,17 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
       const dt = deathTimer.current;
       innerRef.current.rotation.z = Math.min(Math.PI / 2, dt * 4);
       innerRef.current.position.y = -dt * 0.3;
+
+      // Animate death sprite row
+      const deathFps = ANIM_FPS['dying'];
+      frameTimer.current += delta;
+      if (frameTimer.current >= 1 / deathFps) {
+        frameTimer.current = 0;
+        currentFrame.current = Math.min(currentFrame.current + 1, SPRITE_COLS - 1);
+      }
+      const deathRow = ANIM_ROW['dying'];
+      processedTexture.offset.set(currentFrame.current * FRAME_W, 1 - (deathRow + 1) * FRAME_H);
+
       if (spriteRef.current) {
         const mat = spriteRef.current.material as THREE.MeshBasicMaterial;
         mat.opacity = Math.max(0, 1 - dt * 0.8);

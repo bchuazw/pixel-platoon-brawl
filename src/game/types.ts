@@ -25,11 +25,18 @@ export interface Unit {
   xp: number;
 }
 
+export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand';
+export type PropType = 'crate' | 'barrel' | 'sandbag' | 'rock' | 'bush' | 'tree' | 'ruins' | null;
+
 export interface TileData {
   x: number;
   z: number;
   elevation: number;
-  type: 'ground' | 'wall' | 'water' | 'cover';
+  type: TileType;
+  prop: PropType;
+  isBlocked: boolean; // can't walk through
+  givesCover: boolean; // adjacent tiles get defense bonus
+  variant: number; // for visual variety
 }
 
 export type GamePhase = 'select' | 'move' | 'attack' | 'enemy_turn' | 'game_over';

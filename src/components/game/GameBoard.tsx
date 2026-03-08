@@ -143,7 +143,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
         <directionalLight position={[-10, 15, -10]} intensity={0.12} color="#6688cc" />
         <hemisphereLight intensity={0.3} color="#556677" groundColor="#1a2a12" />
-        <fog attach="fog" args={['#0c1a12', 20, 50]} />
+        <fog attach="fog" args={['#0c1a12', 25, 65]} />
 
         <DustParticles />
 

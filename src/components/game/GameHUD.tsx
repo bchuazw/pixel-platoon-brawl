@@ -398,7 +398,7 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
       `}</style>
     </div>
   );
-
+}
 
 export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect }: GameHUDProps) {
   const logRef = useRef<HTMLDivElement>(null);

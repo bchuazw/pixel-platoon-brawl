@@ -624,19 +624,17 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
         if (abilitySet.has(key)) highlight = 'rgba(68,204,68,0.25)';
 
         // Draw tile
-        drawIsoTile(ctx, sx, sy, colors, tile.elevation, outOfZone, highlight);
+        const noiseVal = tileNoise(x, z, 7);
+        drawIsoTile(ctx, sx, sy, colors, tile.elevation, outOfZone, highlight, tile.type, noiseVal);
 
-        // Tile edge outline
-        ctx.strokeStyle = outOfZone ? '#1a0808' : 'rgba(0,0,0,0.15)';
-        ctx.lineWidth = 0.5;
-        const hw = TILE_W / 2, hh = TILE_H / 2;
-        ctx.beginPath();
-        ctx.moveTo(sx, sy - hh); ctx.lineTo(sx + hw, sy); ctx.lineTo(sx, sy + hh); ctx.lineTo(sx - hw, sy); ctx.closePath();
-        ctx.stroke();
-
-        // Terrain decorations
-        if (!outOfZone && !tile.prop) {
-          drawTileDecor(ctx, tile.type, sx, sy, tile.variant);
+        // Subtle tile edge — only on elevation changes for depth, not every tile
+        if (tile.elevation > 0) {
+          ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+          ctx.lineWidth = 0.5;
+          const hw = TILE_W / 2, hh = TILE_H / 2;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - hh); ctx.lineTo(sx + hw, sy); ctx.lineTo(sx, sy + hh); ctx.lineTo(sx - hw, sy); ctx.closePath();
+          ctx.stroke();
         }
 
         // Smoke

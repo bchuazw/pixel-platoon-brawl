@@ -137,6 +137,8 @@ export interface GameState {
   attackPreview: AttackPreview | null;
   hoveredTile: Position | null;
   autoPlay: boolean;
+  movePath: Position[] | null; // path animation: array of tiles the moving unit walks through
+  movingUnitId: string | null; // which unit is currently animating movement
 }
 
 export const GRID_SIZE = 20;

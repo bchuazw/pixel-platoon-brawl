@@ -17,6 +17,51 @@ const globalRand = () => Math.random();
 let eventCounter = 0;
 function makeEventId() { return `evt-${++eventCounter}-${Date.now()}`; }
 
+// ── Simple noise for terrain ──
+function simpleNoise(x: number, z: number, seed: number): number {
+  const n = Math.sin(x * 127.1 + z * 311.7 + seed * 43758.5453) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function smoothNoise(x: number, z: number, scale: number, seed: number): number {
+  const sx = x / scale;
+  const sz = z / scale;
+  const ix = Math.floor(sx);
+  const iz = Math.floor(sz);
+  const fx = sx - ix;
+  const fz = sz - iz;
+  // Smoothstep
+  const u = fx * fx * (3 - 2 * fx);
+  const v = fz * fz * (3 - 2 * fz);
+
+  const a = simpleNoise(ix, iz, seed);
+  const b = simpleNoise(ix + 1, iz, seed);
+  const c = simpleNoise(ix, iz + 1, seed);
+  const d = simpleNoise(ix + 1, iz + 1, seed);
+
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+
+function getTerrainElevation(x: number, z: number, seed: number): number {
+  // Multi-octave noise for natural hills
+  let elev = 0;
+  elev += smoothNoise(x, z, 6, seed) * 1.2;       // big hills
+  elev += smoothNoise(x, z, 3, seed + 100) * 0.5;  // medium features
+  elev += smoothNoise(x, z, 1.5, seed + 200) * 0.15; // small bumps
+
+  // Flatten near corners (spawn areas)
+  const corners = [[0, 0], [0, GRID_SIZE - 1], [GRID_SIZE - 1, 0], [GRID_SIZE - 1, GRID_SIZE - 1]];
+  for (const [cx, cz] of corners) {
+    const dist = Math.sqrt((x - cx) ** 2 + (z - cz) ** 2);
+    if (dist < 5) {
+      elev *= Math.min(1, dist / 5);
+    }
+  }
+
+  // Clamp
+  return Math.max(0, Math.min(1.8, elev));
+}
+
 // ── Loot Generation ──
 function generateLootItem(rand: () => number): LootItem {
   const roll = rand();
@@ -39,10 +84,56 @@ function generateLootItem(rand: () => number): LootItem {
   }
 }
 
+// ── BFS Pathfinding ──
+export function findPath(from: Position, to: Position, state: GameState): Position[] {
+  if (from.x === to.x && from.z === to.z) return [to];
+
+  const visited = new Set<string>();
+  const parent = new Map<string, string>();
+  const queue: Position[] = [from];
+  visited.add(`${from.x},${from.z}`);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const key = `${current.x},${current.z}`;
+
+    if (current.x === to.x && current.z === to.z) {
+      // Reconstruct path
+      const path: Position[] = [];
+      let cur = `${to.x},${to.z}`;
+      while (cur !== `${from.x},${from.z}`) {
+        const [px, pz] = cur.split(',').map(Number);
+        path.unshift({ x: px, z: pz });
+        cur = parent.get(cur)!;
+      }
+      return path;
+    }
+
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = current.x + dx;
+      const nz = current.z + dz;
+      const nKey = `${nx},${nz}`;
+      if (nx < 0 || nx >= GRID_SIZE || nz < 0 || nz >= GRID_SIZE) continue;
+      if (visited.has(nKey)) continue;
+      if (state.grid[nx][nz].isBlocked) continue;
+      if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz &&
+        !(nx === to.x && nz === to.z))) continue;
+
+      visited.add(nKey);
+      parent.set(nKey, key);
+      queue.push({ x: nx, z: nz });
+    }
+  }
+
+  // No path found, direct move
+  return [to];
+}
+
 // ── Grid Generation ──
 function createGrid(): TileData[][] {
   const grid: TileData[][] = [];
   const rand = seededRandom(Date.now());
+  const terrainSeed = Date.now() % 10000;
 
   for (let x = 0; x < GRID_SIZE; x++) {
     grid[x] = [];
@@ -51,7 +142,7 @@ function createGrid(): TileData[][] {
       const r = rand();
 
       let type: TileType = 'grass';
-      let elevation = 0;
+      let elevation = getTerrainElevation(x, z, terrainSeed);
 
       const onHorizPath = Math.abs(z - 10) <= 1 && x > 3 && x < 17;
       const onVertPath = Math.abs(x - 10) <= 1 && z > 3 && z < 17;
@@ -59,15 +150,17 @@ function createGrid(): TileData[][] {
       const onDiagPath2 = Math.abs(x - (GRID_SIZE - 1 - z)) <= 1;
 
       if (onHorizPath || onVertPath) {
-        type = 'dirt'; elevation = 0;
+        type = 'dirt'; elevation = Math.max(0, elevation * 0.3); // flatten paths
       } else if ((onDiagPath1 || onDiagPath2) && r < 0.4) {
-        type = 'sand'; elevation = 0;
+        type = 'sand'; elevation = Math.max(0, elevation * 0.4);
       } else if (distFromCenter < 3 && r < 0.3) {
-        type = 'stone'; elevation = 0.1;
-      } else if (r < 0.04) {
+        type = 'stone'; elevation = elevation + 0.1;
+      } else if (elevation < 0.15 && r < 0.08) {
         type = 'water'; elevation = -0.15;
-      } else if (r < 0.07 && distFromCenter > 4) {
-        type = 'stone'; elevation = 0.15;
+      } else if (elevation > 1.2) {
+        type = 'stone'; // high ground is rocky
+      } else if (r < 0.04 && distFromCenter > 4) {
+        type = 'water'; elevation = -0.15;
       }
 
       let prop: PropType = null;
@@ -91,7 +184,7 @@ function createGrid(): TileData[][] {
         } else if (propRoll < 0.14 && distFromCenter > 5) {
           prop = 'sandbag'; coverValue = 2;
         } else if (propRoll < 0.155 && distFromCenter > 6) {
-          prop = 'ruins'; isBlocked = true; coverValue = 2; elevation = 0.3;
+          prop = 'ruins'; isBlocked = true; coverValue = 2; elevation += 0.3;
         }
       }
 
@@ -310,6 +403,8 @@ export function createInitialState(): GameState {
     shrinkLevel: 0, zoneTimer: 6,
     combatEvents: [], attackPreview: null, hoveredTile: null,
     autoPlay: false,
+    movePath: null,
+    movingUnitId: null,
   };
 }
 
@@ -366,7 +461,7 @@ export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]
 
   const aElev = grid[attacker.position.x]?.[attacker.position.z]?.elevation || 0;
   const dElev = grid[defender.position.x]?.[defender.position.z]?.elevation || 0;
-  if (aElev > dElev) chance += 10;
+  if (aElev > dElev + 0.3) chance += 15; // height advantage matters more with real hills
 
   if (attacker.weapon.id === 'shotgun' && dist <= 2) chance += 15;
 
@@ -493,12 +588,11 @@ export function isInZone(x: number, z: number, shrinkLevel: number): boolean {
 // ── Zone-aware movement scoring ──
 function getZonePenalty(pos: Position, shrinkLevel: number): number {
   if (shrinkLevel === 0) return 0;
-  if (!isInZone(pos.x, pos.z, shrinkLevel)) return -100; // NEVER move outside zone
-  // Also penalize being close to the edge (anticipate next shrink)
+  if (!isInZone(pos.x, pos.z, shrinkLevel)) return -100;
   const nextMargin = (shrinkLevel + 1) * 2;
   if (pos.x < nextMargin || pos.x >= GRID_SIZE - nextMargin ||
       pos.z < nextMargin || pos.z >= GRID_SIZE - nextMargin) {
-    return -15; // near the edge of next shrink
+    return -15;
   }
   return 0;
 }
@@ -615,36 +709,45 @@ export function runAiUnitStep(
     }
   }
 
+  // Helper to move unit and return path
+  const moveToTile = (bestTile: Position) => {
+    const path = findPath(unit.position, bestTile, newState);
+    unit.position = bestTile;
+    unit.ap -= AP_MOVE_COST;
+
+    // Set move path for animation
+    newState.movePath = path;
+    newState.movingUnitId = unit.id;
+
+    // Pickup loot at destination
+    const arrivalTile = newState.grid[bestTile.x][bestTile.z];
+    if (arrivalTile.loot) {
+      const { picked, message } = pickupLoot(unit, arrivalTile);
+      if (picked) {
+        allEvents.push({ id: makeEventId(), type: 'loot', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message, timestamp: Date.now() });
+        newState.log = [...newState.log, message];
+      }
+    }
+  };
+
   // ── Currently outside zone? FLEE TO SAFETY FIRST ──
   const currentlyOutsideZone = newState.shrinkLevel > 0 && !isInZone(unit.position.x, unit.position.z, newState.shrinkLevel);
 
   if (currentlyOutsideZone && unit.ap >= AP_MOVE_COST && !unit.isSuppressed) {
     const movable = getMovableTiles(unit, newState);
     if (movable.length > 0) {
-      // Find tile closest to center that is in zone
       const center = { x: Math.floor(GRID_SIZE / 2), z: Math.floor(GRID_SIZE / 2) };
       let bestTile = movable[0];
       let bestScore = -Infinity;
       for (const t of movable) {
         let score = 0;
-        if (isInZone(t.x, t.z, newState.shrinkLevel)) score += 200; // huge bonus for getting in zone
-        score -= getManhattanDistance(t, center); // closer to center = better
+        if (isInZone(t.x, t.z, newState.shrinkLevel)) score += 200;
+        score -= getManhattanDistance(t, center);
         if (score > bestScore) { bestTile = t; bestScore = score; }
       }
-      unit.position = bestTile;
-      unit.ap -= AP_MOVE_COST;
-
-      // Pickup loot while fleeing
-      const arrivalTile = newState.grid[bestTile.x][bestTile.z];
-      if (arrivalTile.loot) {
-        const { picked, message } = pickupLoot(unit, arrivalTile);
-        if (picked) {
-          allEvents.push({ id: makeEventId(), type: 'loot', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message, timestamp: Date.now() });
-          newState.log = [...newState.log, message];
-        }
-      }
+      moveToTile(bestTile);
     }
-    // After fleeing, still try to attack if possible
+    // After fleeing, still try to attack
     if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
       const visAfterFlee = getVisibleEnemies(unit, newState.units);
       const inRange = visAfterFlee.filter(e => getManhattanDistance(unit.position, e.position) <= unit.attackRange);
@@ -718,22 +821,14 @@ export function runAiUnitStep(
               score += newState.grid[nx][nz].coverValue * 4;
             }
           }
+          // Prefer higher ground
+          score += newState.grid[t.x][t.z].elevation * 3;
           const tileData = newState.grid[t.x][t.z];
           if (tileData.loot) score += 12;
           if (score > bestScore) { bestTile = t; bestScore = score; }
         }
 
-        unit.position = bestTile;
-        unit.ap -= AP_MOVE_COST;
-
-        const arrivalTile = newState.grid[bestTile.x][bestTile.z];
-        if (arrivalTile.loot) {
-          const { picked, message } = pickupLoot(unit, arrivalTile);
-          if (picked) {
-            allEvents.push({ id: makeEventId(), type: 'loot', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message, timestamp: Date.now() });
-            newState.log = [...newState.log, message];
-          }
-        }
+        moveToTile(bestTile);
       }
     }
 
@@ -798,6 +893,10 @@ export function runAiUnitStep(
             if (tileData.loot.type === 'weapon') score += 12;
           }
 
+          // Prefer higher ground for snipers
+          score += newState.grid[t.x][t.z].elevation * 4;
+          if (unit.weapon.id === 'sniper_rifle') score += newState.grid[t.x][t.z].elevation * 8;
+
           for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
             const nx = t.x + dx, nz = t.z + dz;
             if (nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE) {
@@ -808,17 +907,7 @@ export function runAiUnitStep(
           if (score > bestScore) { bestTile = t; bestScore = score; }
         }
 
-        unit.position = bestTile;
-        unit.ap -= AP_MOVE_COST;
-
-        const arrivalTile = newState.grid[bestTile.x][bestTile.z];
-        if (arrivalTile.loot) {
-          const { picked, message } = pickupLoot(unit, arrivalTile);
-          if (picked) {
-            allEvents.push({ id: makeEventId(), type: 'loot', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message, timestamp: Date.now() });
-            newState.log = [...newState.log, message];
-          }
-        }
+        moveToTile(bestTile);
       }
     }
 

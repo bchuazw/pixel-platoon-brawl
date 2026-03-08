@@ -64,20 +64,31 @@ const SPRITE_MAP: Record<string, string> = {
 
 type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';
 
-function CoverShield({ coverType }: { coverType: 'none' | 'half' | 'full' }) {
+function CoverProp({ coverType }: { coverType: 'none' | 'half' | 'full' }) {
   if (coverType === 'none') return null;
+  const texture = useLoader(THREE.TextureLoader, coverType === 'half' ? coverHalfImg : coverFullImg);
+  const processedTex = useMemo(() => {
+    const tex = texture.clone();
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }, [texture]);
+
+  const height = coverType === 'full' ? 0.7 : 0.45;
+  const width = coverType === 'full' ? 0.7 : 0.55;
+
   return (
-    <Billboard position={[0.35, 0.3, 0]}>
+    <Billboard position={[0, height * 0.5, 0.25]} renderOrder={10}>
       <mesh>
-        <planeGeometry args={[0.18, 0.18]} />
+        <planeGeometry args={[width, height]} />
         <meshBasicMaterial
-          color={coverType === 'full' ? '#4488ff' : '#ffaa44'}
-          transparent opacity={0.8}
+          map={processedTex}
+          transparent
+          alphaTest={0.1}
+          side={THREE.DoubleSide}
         />
       </mesh>
-      <Text fontSize={0.1} color="#ffffff" anchorX="center" anchorY="middle" position={[0, 0, 0.01]} font={undefined}>
-        {coverType === 'full' ? '🛡' : '◐'}
-      </Text>
     </Billboard>
   );
 }

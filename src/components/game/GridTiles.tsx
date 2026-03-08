@@ -394,10 +394,11 @@ function PropObject({ tile }: { tile: TileData }) {
           {/* Roots */}
           <mesh position={[0.06, 0.02, 0.06]} rotation={[0.3, 0, 0.4]}>
             <cylinderGeometry args={[0.03, 0.015, 0.15, 4]} />
-            <meshStandardMaterial color="#4a3018" roughness={0.95} />
+            <meshStandardMaterial color={trunkColor} roughness={0.95} />
           </mesh>
         </group>
       );
+    }
 
     // Ruined wall / building fragment — shoulder height with rubble
     case 'ruins':

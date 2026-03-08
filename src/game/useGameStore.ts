@@ -334,11 +334,16 @@ export function useGameStore() {
   useEffect(() => {
     autoPlayRef.current = state.autoPlay;
     if (state.autoPlay && state.phase !== 'game_over' && state.phase !== 'pre_game') {
-      // Shorter delay if just switching teams (no queue), longer for unit actions
       const hasQueue = unitQueueRef.current.length > 0;
-      const delay = hasQueue ? 1400 : 600; // 1.4s per unit action, 0.6s for team switch
+      const isKillCam = state.killCam !== null;
+      // 3s pause for killcam, normal delays otherwise
+      const delay = isKillCam ? 3000 : hasQueue ? 1400 : 600;
       autoPlayTimerRef.current = setTimeout(() => {
         if (autoPlayRef.current) {
+          // Clear killcam before next step
+          if (isKillCam) {
+            setState(prev => ({ ...prev, killCam: null }));
+          }
           runSingleUnitStep();
         }
       }, delay);
@@ -346,7 +351,7 @@ export function useGameStore() {
     return () => {
       if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
     };
-  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, state.units, state.selectedUnitId, runSingleUnitStep]);
+  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, state.units, state.selectedUnitId, state.killCam, runSingleUnitStep]);
 
   const startAutoPlay = useCallback(() => {
     startBgMusic();

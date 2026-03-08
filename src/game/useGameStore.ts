@@ -823,6 +823,8 @@ export function useGameStore() {
     unitQueueRef.current = [];
     setSponsorPoints(5);
     setInspectedUnitId(null);
+    setBetTeam(null);
+    setBetAmount(0);
     setState(createInitialState());
   }, []);
 

@@ -240,7 +240,19 @@ export function createInitialState(): GameState {
   const soldierNames = ['Marco', 'Ralf', 'Knox', 'Hawk', 'Blaze', 'Steel', 'Rex', 'Ace'];
   const medicNames = ['Mercy', 'Patch', 'Doc', 'Vita', 'Sage', 'Pulse', 'Angel', 'Fern'];
 
-  const pickName = (pool: string[]) => pool[Math.floor(globalRand() * pool.length)];
+  // Shuffle to guarantee no duplicates
+  const shuffle = (arr: string[]) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(globalRand() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const shuffledSoldiers = shuffle(soldierNames);
+  const shuffledMedics = shuffle(medicNames);
+  let soldierIdx = 0;
+  let medicIdx = 0;
 
   // Spawn positions: 2 units near each corner
   const cornerSpawns: Record<Team, Position[]> = {

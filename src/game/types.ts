@@ -6,7 +6,7 @@ export interface Position {
   z: number;
 }
 
-export type AbilityId = 'grenade' | 'overwatch' | 'heal' | 'suppress' | 'smoke' | 'first_aid';
+export type AbilityId = 'grenade' | 'hunker_down' | 'heal' | 'suppress' | 'smoke' | 'first_aid';
 
 export interface Ability {
   id: AbilityId;
@@ -89,7 +89,8 @@ export interface Unit {
   xp: number;
   abilities: Ability[];
   cooldowns: Record<string, number>;
-  isOnOverwatch: boolean;
+  isOnOverwatch: boolean; // legacy, kept for compat but unused
+  isHunkered: boolean;
   isSuppressed: boolean;
   coverType: 'none' | 'half' | 'full';
   kills: number;
@@ -125,7 +126,7 @@ export type GamePhase = 'select' | 'move' | 'attack' | 'ability' | 'enemy_turn' 
 
 export interface CombatEvent {
   id: string;
-  type: 'damage' | 'miss' | 'crit' | 'kill' | 'heal' | 'ability' | 'overwatch' | 'loot';
+  type: 'damage' | 'miss' | 'crit' | 'kill' | 'heal' | 'ability' | 'overwatch' | 'loot' | 'hunker';
   attackerPos: Position;
   targetPos: Position;
   value?: number;
@@ -200,8 +201,8 @@ export const SOLDIER_ABILITIES: Ability[] = [{
   id: 'grenade', name: 'FRAG GRENADE', description: 'Explosive dealing 25 dmg in 2-tile radius',
   apCost: 1, cooldown: 3, range: 4, aoeRadius: 2, icon: '💣',
 }, {
-  id: 'overwatch', name: 'OVERWATCH', description: 'Shoot first enemy that moves in range',
-  apCost: 1, cooldown: 0, range: 0, icon: '👁',
+  id: 'hunker_down', name: 'HUNKER DOWN', description: 'Brace for impact: +50% defense, much harder to hit until next turn',
+  apCost: 1, cooldown: 0, range: 0, icon: '🛡',
 }];
 
 export const MEDIC_ABILITIES: Ability[] = [{
@@ -217,8 +218,8 @@ export const CLASS_STATS: Record<UnitClass, {
   hp: number; attack: number; defense: number; accuracy: number;
   moveRange: number; attackRange: number; maxAp: number;
 }> = {
-  soldier: { hp: 90, attack: 15, defense: 8, accuracy: 72, moveRange: 3, attackRange: 3, maxAp: 2 },
-  medic: { hp: 70, attack: 12, defense: 5, accuracy: 65, moveRange: 3, attackRange: 2, maxAp: 3 },
+  soldier: { hp: 90, attack: 15, defense: 8, accuracy: 72, moveRange: 2, attackRange: 3, maxAp: 2 },
+  medic: { hp: 70, attack: 12, defense: 5, accuracy: 65, moveRange: 2, attackRange: 2, maxAp: 3 },
 };
 
 // Legacy compat

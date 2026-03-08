@@ -440,7 +440,7 @@ function createUnit(id: string, name: string, unitClass: UnitClass, team: Team, 
     ap: stats.maxAp, maxAp: stats.maxAp,
     isAlive: true, level: 1, xp: 0,
     abilities: [...CLASS_ABILITIES[unitClass]],
-    cooldowns: {}, isOnOverwatch: false, isSuppressed: false,
+    cooldowns: {}, isOnOverwatch: false, isHunkered: false, isSuppressed: false,
     coverType: 'none', kills: 0,
     weapon: pistol,
     visionRange: VISION_RANGE,
@@ -789,6 +789,9 @@ export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]
   if (cover === 'half') chance -= 25;
   if (cover === 'full') chance -= 45;
 
+  // Hunker down bonus — significantly harder to hit
+  if (defender.isHunkered) chance -= 30;
+
   if (attacker.isSuppressed) chance -= 30;
 
   const aElev = grid[attacker.position.x]?.[attacker.position.z]?.elevation || 0;
@@ -907,7 +910,7 @@ export function getAbilityTargetTiles(unit: Unit, abilityId: AbilityId, state: G
         }
       }
       break;
-    case 'overwatch':
+    case 'hunker_down':
       tiles.push(unit.position);
       break;
   }
@@ -1149,14 +1152,19 @@ function scoreTacticalPosition(pos: Position, unit: Unit, enemies: Unit[], state
     if (weakest.hp < 30) score += 15;
   }
 
-  // ── Maintain optimal engagement distance — don't rush in ──
+  // ── Maintain optimal engagement distance — stay at MAX weapon range ──
   for (const enemy of visibleEnemies) {
     const dist = getManhattanDistance(pos, enemy.position);
     // Too close — penalize heavily (ranged units shouldn't melee)
-    if (dist <= 1) score -= 25;
-    else if (dist === 2 && unit.weapon.id !== 'shotgun') score -= 10;
-    // Sweet spot: at weapon range
-    if (dist >= Math.max(2, Math.ceil(weaponRange * 0.6)) && dist <= weaponRange) score += 12;
+    if (dist <= 1) score -= 35;
+    else if (dist === 2 && unit.weapon.id !== 'shotgun') score -= 15;
+    // Best position: at weapon's max range (can still shoot but far away)
+    if (dist === weaponRange) score += 20;
+    else if (dist === weaponRange - 1 && weaponRange >= 3) score += 12;
+    // Bonus for being farther from enemies while still in range
+    if (dist >= Math.max(2, weaponRange - 1) && dist <= weaponRange) score += 15;
+    // Penalty for being within half weapon range (too close for comfort)
+    if (dist <= Math.ceil(weaponRange * 0.4) && unit.weapon.id !== 'shotgun') score -= 10;
   }
 
   // Weapon-specific positioning
@@ -1536,13 +1544,14 @@ export function runAiUnitStep(
       }
     }
 
-    // Overwatch (only if didn't shoot — still has AP)
-    if (unit.ap >= 1 && !unit.isOnOverwatch && visibleAfterMove.length > 0) {
-      const owAbility = unit.abilities.find(a => a.id === 'overwatch');
-      if (owAbility && (!unit.cooldowns['overwatch'] || unit.cooldowns['overwatch'] <= 0)) {
-        unit.isOnOverwatch = true;
+    // Hunker down (only if didn't shoot — still has AP and enemies visible)
+    if (unit.ap >= 1 && !unit.isHunkered && visibleAfterMove.length > 0 && unit.coverType !== 'none') {
+      const hunkerAbility = unit.abilities.find(a => a.id === 'hunker_down');
+      if (hunkerAbility) {
+        unit.isHunkered = true;
         unit.ap -= 1;
-        allEvents.push({ id: makeEventId(), type: 'overwatch', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `👁 ${unit.name} goes on OVERWATCH`, timestamp: Date.now() });
+        allEvents.push({ id: makeEventId(), type: 'hunker', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `🛡 ${unit.name} HUNKERS DOWN!`, timestamp: Date.now() });
+        newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
       }
     }
   }

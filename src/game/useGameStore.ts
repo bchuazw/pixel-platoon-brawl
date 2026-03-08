@@ -170,7 +170,7 @@ export function useGameStore() {
             for (const [k, v] of Object.entries(u.cooldowns)) {
               if (v > 0) newCooldowns[k] = v - 1;
             }
-            return { ...u, ap: u.maxAp, isSuppressed: false, isOnOverwatch: false, cooldowns: newCooldowns, weapon: { ...u.weapon } };
+            return { ...u, ap: u.maxAp, isSuppressed: false, isOnOverwatch: false, isHunkered: false, cooldowns: newCooldowns, weapon: { ...u.weapon } };
           }
           return { ...u, weapon: { ...u.weapon } };
         });
@@ -402,15 +402,19 @@ export function useGameStore() {
     });
   }, []);
 
-  // Auto-play loop - ticks per unit with delay
+  // Auto-play loop — uses onMoveComplete for sequencing instead of fixed timer for walk
   useEffect(() => {
     autoPlayRef.current = state.autoPlay;
     if (state.autoPlay && state.phase !== 'game_over' && state.phase !== 'pre_game') {
       const hasPendingCombat = pendingCombatUnitRef.current !== null;
       const hasQueue = unitQueueRef.current.length > 0;
       const isKillCam = state.killCam !== null;
-      // Delays: killcam 3s, pending combat 1.2s (wait for walk anim), normal unit 1.4s, team switch 0.6s
-      const delay = isKillCam ? 3000 : hasPendingCombat ? 1200 : hasQueue ? 1400 : 600;
+
+      // If there's a pending combat, don't use a timer — wait for onMoveComplete callback
+      if (hasPendingCombat) return;
+
+      // Delays: killcam 3s, normal unit 1.2s, team switch 0.6s
+      const delay = isKillCam ? 3000 : hasQueue ? 1200 : 600;
       autoPlayTimerRef.current = setTimeout(() => {
         if (autoPlayRef.current) {
           if (isKillCam) {
@@ -582,17 +586,17 @@ export function useGameStore() {
       if (!unit) return prev;
 
       const tiles = getAbilityTargetTiles(unit, abilityId, prev);
-      if (abilityId === 'overwatch' && tiles.length > 0) {
+      if (abilityId === 'hunker_down') {
         const units = prev.units.map(u => {
           if (u.id === prev.selectedUnitId) {
-            return { ...u, isOnOverwatch: true, ap: u.ap - 1, cooldowns: { ...u.cooldowns } };
+            return { ...u, isHunkered: true, ap: u.ap - 1, cooldowns: { ...u.cooldowns } };
           }
           return u;
         });
         const evt: CombatEvent = {
-          id: `evt-${Date.now()}`, type: 'overwatch',
+          id: `evt-${Date.now()}`, type: 'hunker',
           attackerPos: unit.position, targetPos: unit.position,
-          message: `👁 ${unit.name} goes on OVERWATCH`,
+          message: `🛡 ${unit.name} HUNKERS DOWN`,
           timestamp: Date.now(),
         };
         return {
@@ -771,7 +775,7 @@ export function useGameStore() {
             for (const [k, v] of Object.entries(u.cooldowns)) {
               if (v > 0) newCooldowns[k] = v - 1;
             }
-            return { ...u, ap: u.maxAp, isSuppressed: false, cooldowns: newCooldowns, weapon: { ...u.weapon } };
+            return { ...u, ap: u.maxAp, isSuppressed: false, isHunkered: false, cooldowns: newCooldowns, weapon: { ...u.weapon } };
           }
           return { ...u, weapon: { ...u.weapon } };
         }),
@@ -849,7 +853,16 @@ export function useGameStore() {
 
   const clearMovePath = useCallback(() => {
     setState(prev => ({ ...prev, movePath: null, movingUnitId: null }));
-  }, []);
+    // If auto-playing and there's a pending combat unit, trigger combat now
+    if (autoPlayRef.current && pendingCombatUnitRef.current) {
+      // Small delay to let animation settle, then run combat
+      setTimeout(() => {
+        if (autoPlayRef.current) {
+          runSingleUnitStep();
+        }
+      }, 300);
+    }
+  }, [runSingleUnitStep]);
 
   const handleAirdropLanded = useCallback((airdrop: AirdropData) => {
     setState(prev => {

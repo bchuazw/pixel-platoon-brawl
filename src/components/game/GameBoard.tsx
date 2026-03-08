@@ -35,34 +35,28 @@ function getCameraPosition(angleIndex: number): [number, number, number] {
 
 const ANGLE_LABELS = ['SW', 'SE', 'NE', 'NW'];
 
-function CameraController({ angleIndex }: { angleIndex: number }) {
+function CameraController({ angleIndex, orbitRef }: { angleIndex: number; orbitRef: React.RefObject<any> }) {
   const { camera } = useThree();
-  const targetPos = useRef(new THREE.Vector3());
-  const animating = useRef(false);
   const progress = useRef(1);
+  const startPos = useRef(new THREE.Vector3());
+  const targetPos = useRef(new THREE.Vector3());
 
   useEffect(() => {
     const [x, y, z] = getCameraPosition(angleIndex);
+    startPos.current.copy(camera.position);
     targetPos.current.set(x, y, z);
     progress.current = 0;
-    animating.current = true;
-  }, [angleIndex]);
+  }, [angleIndex, camera]);
 
-  useEffect(() => {
-    let raf: number;
-    const animate = () => {
-      if (animating.current && progress.current < 1) {
-        progress.current = Math.min(1, progress.current + 0.04);
-        const t = 1 - Math.pow(1 - progress.current, 3);
-        camera.position.lerp(targetPos.current, t > 0.99 ? 1 : 0.08);
-        camera.lookAt(CENTER);
-        if (progress.current >= 1) animating.current = false;
-      }
-      raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [camera, angleIndex]);
+  useFrame(() => {
+    if (progress.current >= 1) return;
+    progress.current = Math.min(1, progress.current + 0.03);
+    const t = 1 - Math.pow(1 - progress.current, 3);
+    camera.position.lerpVectors(startPos.current, targetPos.current, t);
+    if (orbitRef.current) {
+      orbitRef.current.update();
+    }
+  });
 
   return null;
 }
@@ -179,6 +173,8 @@ function LoadingFallback() {
 export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
   const [autoFollow, setAutoFollow] = useState(true);
+  const orbitRef = useRef<any>(null);
+
   const rotateCamera = useCallback(() => {
     setAngleIndex(prev => (prev + 1) % 4);
   }, []);
@@ -196,9 +192,9 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         }}
         shadows
       >
-        <CameraController angleIndex={angleIndex} />
+        <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />
-        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} />
+        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} />
         <color attach="background" args={['#0e1a2e']} />
         <Stars radius={80} depth={50} count={2500} factor={3} saturation={0.4} fade speed={0.3} />
 
@@ -297,24 +293,29 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <ZoneBorder shrinkLevel={state.shrinkLevel} />
 
         <OrbitControls
+          ref={orbitRef}
           target={[CENTER.x, 0, CENTER.z]}
-          enableRotate={false}
+          enableRotate={true}
           enablePan={true}
           enableZoom={true}
-          minDistance={8}
-          maxDistance={40}
-          maxPolarAngle={Math.PI / 2.3}
-          minPolarAngle={Math.PI / 8}
-          panSpeed={1.2}
+          minDistance={10}
+          maxDistance={45}
+          maxPolarAngle={Math.PI / 2.5}
+          minPolarAngle={Math.PI / 6}
+          rotateSpeed={0.5}
+          panSpeed={0.8}
+          zoomSpeed={0.8}
+          enableDamping={true}
+          dampingFactor={0.08}
           screenSpacePanning={false}
           mouseButtons={{
             LEFT: THREE.MOUSE.PAN,
             MIDDLE: THREE.MOUSE.DOLLY,
-            RIGHT: THREE.MOUSE.PAN,
+            RIGHT: THREE.MOUSE.ROTATE,
           }}
           touches={{
             ONE: THREE.TOUCH.PAN,
-            TWO: THREE.TOUCH.DOLLY_PAN,
+            TWO: THREE.TOUCH.DOLLY_ROTATE,
           }}
         />
       </Canvas>

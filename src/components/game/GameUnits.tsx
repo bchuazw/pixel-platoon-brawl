@@ -180,6 +180,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
         ).normalize();
         animState.current = 'aiming';
         animTimer.current = 0;
+        currentFrame.current = 0;
       }
       if (e.targetPos.x === unit.position.x && e.targetPos.z === unit.position.z &&
           (e.type === 'damage' || e.type === 'crit')) {

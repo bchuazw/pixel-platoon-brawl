@@ -94,6 +94,7 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
   const teams: Team[] = ['blue', 'red', 'green', 'yellow'];
   const [audioStarted, setAudioStarted] = useState(false);
   const [titleRevealed, setTitleRevealed] = useState(0);
+  const [showParticles, setShowParticles] = useState(false);
   const title = 'WARGAMING';
 
   const handleClick = useCallback(() => {
@@ -113,9 +114,46 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
     return () => clearTimeout(timer);
   }, [titleRevealed]);
 
+  useEffect(() => {
+    const t = setTimeout(() => setShowParticles(true), 300);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Animated particle dots
+  const particles = useMemo(() => 
+    Array.from({ length: 40 }, (_, i) => ({
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: 1 + Math.random() * 2,
+      speed: 0.3 + Math.random() * 0.7,
+      delay: Math.random() * 5,
+      opacity: 0.1 + Math.random() * 0.2,
+    })), []);
+
   return (
     <div className="absolute inset-0 z-30 pointer-events-auto overflow-y-auto" onClick={handleClick}>
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+      {/* Dark cinematic backdrop */}
+      <div className="absolute inset-0 bg-background/85 backdrop-blur-md" />
+      
+      {/* Animated gradient backdrop */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 20%, hsl(142 70% 45% / 0.06) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, hsl(0 75% 55% / 0.04) 0%, transparent 50%), radial-gradient(ellipse at 20% 70%, hsl(210 70% 55% / 0.04) 0%, transparent 50%)',
+        }}
+      />
+
+      {/* Floating particle dots */}
+      {showParticles && particles.map((p, i) => (
+        <div key={i} className="absolute rounded-full pointer-events-none"
+          style={{
+            left: `${p.x}%`, top: `${p.y}%`,
+            width: p.size, height: p.size,
+            backgroundColor: 'hsl(142 70% 45%)',
+            opacity: p.opacity,
+            animation: `float-particle ${8 / p.speed}s ease-in-out ${p.delay}s infinite alternate`,
+          }}
+        />
+      ))}
 
       {/* Subtle scanlines */}
       <div className="absolute inset-0 pointer-events-none z-20 opacity-[0.02]"
@@ -124,26 +162,59 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
           backgroundSize: '100% 4px',
         }} />
 
+      {/* Horizontal accent lines */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] z-20" style={{ background: 'linear-gradient(90deg, transparent 10%, hsl(142 70% 45% / 0.3) 50%, transparent 90%)' }} />
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] z-20" style={{ background: 'linear-gradient(90deg, transparent 10%, hsl(0 75% 55% / 0.3) 50%, transparent 90%)' }} />
+
       <div className="relative z-10 flex flex-col items-center w-full max-w-4xl mx-auto px-8 py-12 min-h-full">
-        {/* Title */}
+        {/* Title section */}
         <div className="text-center space-y-4 mb-10">
-          <h1 className="text-5xl font-display font-black text-primary glow-text tracking-[0.4em] select-none">
+          {/* Pre-title line */}
+          <Reveal delay={200}>
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <div className="w-12 h-[1px]" style={{ background: 'linear-gradient(to right, transparent, hsl(142 70% 45% / 0.4))' }} />
+              <span className="text-[8px] tracking-[0.5em] text-muted-foreground/30 font-display">TACTICAL BATTLE ROYALE</span>
+              <div className="w-12 h-[1px]" style={{ background: 'linear-gradient(to left, transparent, hsl(142 70% 45% / 0.4))' }} />
+            </div>
+          </Reveal>
+
+          <h1 className="text-6xl font-display font-black text-primary glow-text tracking-[0.5em] select-none">
             {title.split('').map((char, i) => (
-              <span key={i} className={`inline-block transition-all duration-200 ${i < titleRevealed ? 'opacity-100' : 'opacity-0'}`}
-                style={{ transform: i < titleRevealed ? 'translateY(0)' : 'translateY(-8px)' }}>
+              <span key={i} className={`inline-block transition-all duration-300 ${i < titleRevealed ? 'opacity-100' : 'opacity-0'}`}
+                style={{ 
+                  transform: i < titleRevealed ? 'translateY(0) scale(1)' : 'translateY(-12px) scale(0.8)',
+                  textShadow: i < titleRevealed ? '0 0 40px hsl(142 70% 45% / 0.5), 0 0 80px hsl(142 70% 45% / 0.2)' : 'none',
+                }}>
                 {i === titleRevealed ? '▮' : char}
               </span>
             ))}
           </h1>
+
           <Reveal delay={500}>
-            <p className="text-base text-muted-foreground tracking-[0.15em] font-display">
-              4 SQUADS • 8 COMBATANTS • 1 TEAM SURVIVES
-            </p>
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <Swords className="w-4 h-4 text-destructive/60" />
+                <span className="text-sm text-muted-foreground tracking-[0.12em] font-display">4 SQUADS</span>
+              </div>
+              <div className="w-1 h-1 rounded-full bg-muted-foreground/20" />
+              <div className="flex items-center gap-1.5">
+                <Crosshair className="w-4 h-4 text-primary/60" />
+                <span className="text-sm text-muted-foreground tracking-[0.12em] font-display">8 COMBATANTS</span>
+              </div>
+              <div className="w-1 h-1 rounded-full bg-muted-foreground/20" />
+              <div className="flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-accent/60" />
+                <span className="text-sm text-muted-foreground tracking-[0.12em] font-display">1 SURVIVES</span>
+              </div>
+            </div>
           </Reveal>
+
           <Reveal delay={650}>
-            <p className="text-sm text-accent tracking-[0.1em]">
-              EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE
-            </p>
+            <div className="glass-panel rounded-lg px-6 py-2 inline-flex items-center gap-3">
+              <span className="text-[10px] text-accent tracking-[0.1em] font-display">
+                EACH SQUAD: 1 SOLDIER + 1 MEDIC • FIND LOOT TO UPGRADE
+              </span>
+            </div>
           </Reveal>
         </div>
 
@@ -156,11 +227,11 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
                 <Reveal delay={750 + ti * 80}>
                   <div className="flex items-center gap-3 justify-center mb-2">
                     <div className="h-px flex-1 max-w-[80px]" style={{ background: `linear-gradient(to right, transparent, ${TEAM_COLORS[team]}30)` }} />
-                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team] }} />
+                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
                     <span className="text-xs font-bold tracking-[0.25em] font-display" style={{ color: TEAM_COLORS[team] }}>
                       {TEAM_NAMES[team]}
                     </span>
-                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team] }} />
+                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: TEAM_COLORS[team], boxShadow: `0 0 8px ${TEAM_COLORS[team]}40` }} />
                     <div className="h-px flex-1 max-w-[80px]" style={{ background: `linear-gradient(to left, transparent, ${TEAM_COLORS[team]}30)` }} />
                   </div>
                 </Reveal>
@@ -176,19 +247,30 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
 
         {/* Start Button */}
         <Reveal delay={1800}>
-          <div className="text-center space-y-3">
+          <div className="text-center space-y-4">
             <button onClick={onStartAutoPlay}
-              className="group px-14 py-4 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-all text-base tracking-[0.25em] flex items-center gap-4 mx-auto relative overflow-hidden font-display font-bold">
+              className="group px-16 py-5 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-all text-base tracking-[0.25em] flex items-center gap-4 mx-auto relative overflow-hidden font-display font-bold shadow-[0_0_30px_hsl(142_70%_45%/0.2)]">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
               <Play className="w-6 h-6 relative z-10" />
               <span className="relative z-10">START BATTLE</span>
             </button>
-            <p className="text-xs text-muted-foreground">
-              AI commands each squad • Fog of War active • Medics heal allies
-            </p>
+            <div className="flex items-center justify-center gap-4 text-[10px] text-muted-foreground/40">
+              <span>🤖 AI commands each squad</span>
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/20" />
+              <span>🌫️ Fog of War active</span>
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/20" />
+              <span>💊 Medics heal allies</span>
+            </div>
           </div>
         </Reveal>
       </div>
+
+      <style>{`
+        @keyframes float-particle {
+          0% { transform: translateY(0) translateX(0); }
+          100% { transform: translateY(-20px) translateX(10px); }
+        }
+      `}</style>
     </div>
   );
 }

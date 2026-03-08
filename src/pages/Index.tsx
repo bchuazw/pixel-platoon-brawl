@@ -3,13 +3,15 @@ import { GameBoard } from '@/components/game/GameBoard';
 import { GameHUD } from '@/components/game/GameHUD';
 import { useGameStore } from '@/game/useGameStore';
 import { CharacterPanel, SponsorAction } from '@/components/game/CharacterPanel';
-import { Position, AbilityId } from '@/game/types';
+import { BroadcastOverlay } from '@/components/game/BroadcastOverlay';
+import { Position, AbilityId, Team } from '@/game/types';
 
 const Index = () => {
   const {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
+    placeBet, betTeam, betAmount, collectBetPayout,
   } = useGameStore();
 
   const handleTileClick = useCallback((pos: Position) => {
@@ -61,6 +63,10 @@ const Index = () => {
     clearMovePath();
   }, [clearMovePath]);
 
+  const handlePlaceBet = useCallback((team: Team, amount: number) => {
+    placeBet(team, amount);
+  }, [placeBet]);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (inspectedUnitId && e.key === 'Escape') { inspectUnit(null); return; }
@@ -100,7 +106,13 @@ const Index = () => {
         onMainMenu={restart}
         sponsorPoints={sponsorPoints}
         onUnitInspect={inspectUnit}
+        onPlaceBet={handlePlaceBet}
+        betTeam={betTeam}
+        betAmount={betAmount}
+        collectBetPayout={collectBetPayout}
       />
+      {/* Broadcast overlay for cinematic announcements */}
+      {state.autoPlay && <BroadcastOverlay state={state} />}
       {inspectedUnit && (
         <CharacterPanel
           unit={inspectedUnit}

@@ -359,8 +359,7 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
           walkProgress.current = 0;
           walkFrom.current.copy(walkTo.current);
           const nextTarget = pathRef.current[pathIndex.current];
-          const nextElev = grid[nextTarget.x]?.[nextTarget.z]?.elevation || 0;
-          walkTo.current.set(nextTarget.x, getTileY(nextElev) + 0.01, nextTarget.z);
+          walkTo.current.set(nextTarget.x, getUnitBaseY(grid, nextTarget.x, nextTarget.z), nextTarget.z);
         } else {
           animState.current = 'idle';
           pathRef.current = null;

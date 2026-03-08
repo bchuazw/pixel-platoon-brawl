@@ -543,6 +543,98 @@ function PropObject({ tile }: { tile: TileData }) {
         </group>
       );
 
+    // Broken brick/concrete wall — chest-head height cover
+    case 'broken_wall':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+          {/* Main wall section */}
+          <mesh position={[0, 0.25, 0]} castShadow>
+            <boxGeometry args={[0.7, 0.5, 0.12]} />
+            <meshStandardMaterial color="#8a7a6a" roughness={0.92} />
+          </mesh>
+          {/* Jagged top — broken edge */}
+          <mesh position={[-0.15, 0.52, 0]} castShadow>
+            <boxGeometry args={[0.25, 0.08, 0.12]} />
+            <meshStandardMaterial color="#7a6a5a" roughness={0.95} />
+          </mesh>
+          <mesh position={[0.22, 0.56, 0]} castShadow>
+            <boxGeometry args={[0.15, 0.12, 0.11]} />
+            <meshStandardMaterial color="#8a7a6a" roughness={0.92} />
+          </mesh>
+          {/* Rubble at base */}
+          <mesh position={[0.3, 0.04, 0.1]} rotation={[0.2, 0.4, 0.1]}>
+            <boxGeometry args={[0.12, 0.06, 0.08]} />
+            <meshStandardMaterial color="#7a7068" roughness={0.95} />
+          </mesh>
+          <mesh position={[-0.25, 0.03, 0.08]}>
+            <boxGeometry args={[0.08, 0.05, 0.06]} />
+            <meshStandardMaterial color="#6a6058" roughness={0.95} />
+          </mesh>
+          {/* Exposed rebar */}
+          <mesh position={[0.28, 0.45, 0]} rotation={[0, 0, 0.2]}>
+            <cylinderGeometry args={[0.008, 0.008, 0.2, 4]} />
+            <meshStandardMaterial color="#5a4a3a" metalness={0.6} roughness={0.4} />
+          </mesh>
+        </group>
+      );
+
+    // Civilian wrecked car — good cover, realistic proportions
+    case 'wrecked_car':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+          {/* Body/chassis */}
+          <mesh position={[0, 0.14, 0]} castShadow>
+            <boxGeometry args={[0.8, 0.22, 0.4]} />
+            <meshStandardMaterial color={h > 0.5 ? '#4a3a2a' : '#2a3a4a'} roughness={0.75} metalness={0.35} />
+          </mesh>
+          {/* Roof/cabin */}
+          <mesh position={[0.05, 0.32, 0]} castShadow>
+            <boxGeometry args={[0.4, 0.18, 0.36]} />
+            <meshStandardMaterial color={h > 0.5 ? '#3a2a1a' : '#1a2a3a'} roughness={0.7} metalness={0.4} />
+          </mesh>
+          {/* Windshield (broken) */}
+          <mesh position={[0.26, 0.3, 0]} rotation={[0, 0, -0.2]}>
+            <boxGeometry args={[0.005, 0.14, 0.32]} />
+            <meshStandardMaterial color="#445566" metalness={0.3} roughness={0.2} transparent opacity={0.5} />
+          </mesh>
+          {/* Wheels */}
+          {[[-0.28, 0.06, 0.22], [-0.28, 0.06, -0.22], [0.28, 0.06, 0.22], [0.28, 0.06, -0.22]].map((p, i) => (
+            <mesh key={i} position={p as [number, number, number]} rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[0.07, 0.07, 0.04, 8]} />
+              <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+            </mesh>
+          ))}
+          {/* Damage dent */}
+          <mesh position={[-0.3, 0.18, 0.15]} rotation={[0, 0.5, 0]}>
+            <boxGeometry args={[0.08, 0.1, 0.08]} />
+            <meshStandardMaterial color="#1a1510" roughness={0.95} />
+          </mesh>
+        </group>
+      );
+
+    // Scattered rubble/debris — low cover
+    case 'rubble_pile':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+          <mesh position={[0, 0.06, 0]} castShadow>
+            <dodecahedronGeometry args={[0.15, 0]} />
+            <meshStandardMaterial color="#6a6058" roughness={0.95} />
+          </mesh>
+          <mesh position={[0.12, 0.04, 0.08]} rotation={[0.3, 0.5, 0]}>
+            <boxGeometry args={[0.14, 0.06, 0.1]} />
+            <meshStandardMaterial color="#7a7068" roughness={0.95} />
+          </mesh>
+          <mesh position={[-0.1, 0.03, -0.06]} rotation={[0.1, 0.8, 0.2]}>
+            <boxGeometry args={[0.1, 0.05, 0.08]} />
+            <meshStandardMaterial color="#5a5048" roughness={0.95} />
+          </mesh>
+          <mesh position={[0.05, 0.08, -0.12]}>
+            <dodecahedronGeometry args={[0.08, 0]} />
+            <meshStandardMaterial color="#8a7a70" roughness={0.95} />
+          </mesh>
+        </group>
+      );
+
     default: return null;
   }
 }

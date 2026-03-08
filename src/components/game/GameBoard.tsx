@@ -169,13 +169,14 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           near: 0.1,
           far: 200,
         }}
-        shadows="soft"
+        shadows
         gl={{
-          antialias: true,
+          antialias: false,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.1,
+          powerPreference: 'high-performance',
         }}
-        dpr={[1, 1.5]}
+        dpr={[1, 1.25]}
       >
         <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
         <KillCamController killCam={state.killCam} />

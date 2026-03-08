@@ -907,7 +907,7 @@ export function getAbilityTargetTiles(unit: Unit, abilityId: AbilityId, state: G
         }
       }
       break;
-    case 'overwatch':
+    case 'hunker_down':
       tiles.push(unit.position);
       break;
   }

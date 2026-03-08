@@ -192,8 +192,8 @@ export const SOLDIER_ABILITIES: Ability[] = [{
 }];
 
 export const MEDIC_ABILITIES: Ability[] = [{
-  id: 'first_aid', name: 'FIRST AID', description: 'Heal self or adjacent ally for 35 HP. 2-turn cooldown.',
-  apCost: 1, cooldown: 2, range: 2, icon: '💊',
+  id: 'first_aid', name: 'FIRST AID', description: 'Heal self or adjacent ally for 35 HP. 5-turn cooldown.',
+  apCost: 1, cooldown: 5, range: 2, icon: '💊',
 }, {
   id: 'smoke', name: 'SMOKE SCREEN', description: 'Deploy smoke for concealment in area',
   apCost: 1, cooldown: 3, range: 3, aoeRadius: 1, icon: '💨',

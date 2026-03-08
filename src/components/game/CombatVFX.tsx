@@ -138,32 +138,26 @@ function ImpactEffect({ event }: { event: CombatEvent }) {
 }
 
 function TracerLine({ event }: { event: CombatEvent }) {
-  const ref = useRef<THREE.Line>(null);
   const age = (Date.now() - event.timestamp) / 1000;
-
-  useFrame(() => {
-    if (!ref.current) return;
-    const t = (Date.now() - event.timestamp) / 1000;
-    (ref.current.material as THREE.LineBasicMaterial).opacity = Math.max(0, 0.8 - t * 2);
-  });
 
   if (age > 0.4 || event.type === 'heal' || event.type === 'overwatch' || event.type === 'ability') return null;
 
-  const points = [
-    new THREE.Vector3(event.attackerPos.x, 0.7, event.attackerPos.z),
-    new THREE.Vector3(event.targetPos.x, 0.5, event.targetPos.z),
-  ];
-  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const midX = (event.attackerPos.x + event.targetPos.x) / 2;
+  const midZ = (event.attackerPos.z + event.targetPos.z) / 2;
+  const dx = event.targetPos.x - event.attackerPos.x;
+  const dz = event.targetPos.z - event.attackerPos.z;
+  const len = Math.sqrt(dx * dx + dz * dz);
+  const angle = Math.atan2(dz, dx);
 
   return (
-    <line ref={ref as any} geometry={geometry}>
-      <lineBasicMaterial
+    <mesh position={[midX, 0.6, midZ]} rotation={[0, -angle, 0]}>
+      <boxGeometry args={[len, 0.02, 0.02]} />
+      <meshBasicMaterial
         color={event.type === 'miss' ? '#666666' : '#ffdd00'}
         transparent
-        opacity={0.8}
-        linewidth={2}
+        opacity={Math.max(0, 0.8 - age * 2)}
       />
-    </line>
+    </mesh>
   );
 }
 

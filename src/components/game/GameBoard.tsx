@@ -62,6 +62,63 @@ function CameraController({ angleIndex }: { angleIndex: number }) {
   return null;
 }
 
+// ── KILL CAM: Cinematic zoom to elimination ──
+function KillCamController({ killCam }: { killCam: KillCamData | null }) {
+  const { camera } = useThree();
+  const savedPos = useRef(new THREE.Vector3());
+  const isActive = useRef(false);
+  const progress = useRef(0);
+  const targetLook = useRef(new THREE.Vector3());
+  const targetCamPos = useRef(new THREE.Vector3());
+
+  useEffect(() => {
+    if (killCam && !isActive.current) {
+      // Save current camera position
+      savedPos.current.copy(camera.position);
+      isActive.current = true;
+      progress.current = 0;
+
+      // Compute kill cam position: look from attacker toward target, offset up and to side
+      const midX = (killCam.attackerPos.x + killCam.targetPos.x) / 2;
+      const midZ = (killCam.attackerPos.z + killCam.targetPos.z) / 2;
+      targetLook.current.set(killCam.targetPos.x, 0.5, killCam.targetPos.z);
+
+      const dx = killCam.targetPos.x - killCam.attackerPos.x;
+      const dz = killCam.targetPos.z - killCam.attackerPos.z;
+      const len = Math.sqrt(dx * dx + dz * dz) || 1;
+      // Position camera perpendicular to attack direction, elevated
+      const perpX = -dz / len;
+      const perpZ = dx / len;
+      targetCamPos.current.set(
+        midX + perpX * 3,
+        4,
+        midZ + perpZ * 3
+      );
+    } else if (!killCam && isActive.current) {
+      isActive.current = false;
+      progress.current = 0;
+    }
+  }, [killCam, camera]);
+
+  useFrame(() => {
+    if (!isActive.current || !killCam) return;
+    progress.current = Math.min(1, progress.current + 0.04);
+    const t = 1 - Math.pow(1 - progress.current, 3); // ease out cubic
+
+    camera.position.lerp(targetCamPos.current, t > 0.95 ? 1 : 0.1);
+    camera.lookAt(targetLook.current);
+  });
+
+  // Restore camera when killcam ends
+  useEffect(() => {
+    if (!killCam && savedPos.current.lengthSq() > 0) {
+      // Will be naturally overridden by CameraController lerp
+    }
+  }, [killCam]);
+
+  return null;
+}
+
 function DustParticles() {
   const count = 60;
   const ref = useRef<THREE.Points>(null);

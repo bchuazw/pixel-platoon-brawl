@@ -5,7 +5,7 @@ import {
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
   performAttack, getNextTeam, getAliveTeams, runAiTurn, runAiUnitStep, isInZone,
-  checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot,
+  checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot, findPath,
 } from './gameState';
 import { startBgMusic, stopBgMusic, playPickup, playHeal, playMove } from './sounds';
 import { SponsorAction } from '@/components/game/CharacterPanel';

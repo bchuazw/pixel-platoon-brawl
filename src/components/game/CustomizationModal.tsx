@@ -438,6 +438,9 @@ export function CustomizationModal({ unit, onClose, customization, onCustomizati
     onCustomizationChange(updated);
   };
 
+  // Replace camo with shoulder
+  const handleShoulderChange = (v: ShoulderStyle) => updateField('shoulder', v);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-auto" onClick={onClose}>
       <div className="absolute inset-0 bg-background/80 backdrop-blur-md" />

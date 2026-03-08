@@ -141,7 +141,7 @@ export interface GameState {
   movingUnitId: string | null; // which unit is currently animating movement
 }
 
-export const GRID_SIZE = 20;
+export const GRID_SIZE = 30;
 export const AP_MOVE_COST = 1;
 export const AP_ATTACK_COST = 1;
 export const VISION_RANGE = 7;

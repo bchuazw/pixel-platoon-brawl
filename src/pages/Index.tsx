@@ -104,6 +104,7 @@ const Index = () => {
         onMainMenu={restart}
         sponsorPoints={sponsorPoints}
         onUnitInspect={inspectUnit}
+        inspectedUnitId={inspectedUnitId}
       />
       {/* Broadcast overlay for cinematic announcements */}
       {state.autoPlay && <BroadcastOverlay state={state} />}

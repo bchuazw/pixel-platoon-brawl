@@ -117,7 +117,6 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
           prevX: unit.position.x, prevZ: unit.position.z,
         };
       }
-      }
     }
   }, [state.units]);
 

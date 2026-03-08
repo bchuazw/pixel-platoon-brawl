@@ -101,8 +101,9 @@ export interface Unit {
   empTurnsLeft: number;
 }
 
-export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand';
-export type PropType = 'crate' | 'barrel' | 'sandbag' | 'rock' | 'bush' | 'tree' | 'ruins' | null;
+export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand' | 'trench';
+export type PropType = 'crate' | 'barrel' | 'sandbag' | 'rock' | 'bush' | 'tree' | 'ruins'
+  | 'wire' | 'jersey_barrier' | 'burnt_vehicle' | 'foxhole' | 'hesco' | 'tank_trap' | null;
 
 export interface TileData {
   x: number;

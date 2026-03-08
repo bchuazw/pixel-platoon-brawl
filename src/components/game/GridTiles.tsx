@@ -369,17 +369,55 @@ function PropObject({ tile }: { tile: TileData }) {
         </group>
       );
 
-    // Sandbag wall — waist-high cover (~0.4)
+    // Sandbag wall — waist-high cover (~0.4) with variations
     case 'sandbag': {
       const sbColor1 = h > 0.5 ? '#c0a060' : '#b89858';
       const sbColor2 = h > 0.3 ? '#c8a868' : '#baa058';
+      const sbColor3 = h > 0.7 ? '#b09050' : '#a88848';
+      const variant = Math.floor(h * 5); // 0-4 variants
       return (
         <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
-          {/* Bottom row */}
-          <mesh position={[-0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
-          <mesh position={[0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
-          {/* Top row — offset */}
-          <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.20]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+          {variant === 0 && (
+            <>
+              {/* Standard L-shape */}
+              <mesh position={[-0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+              <mesh position={[0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.20]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+            </>
+          )}
+          {variant === 1 && (
+            <>
+              {/* Staggered pile */}
+              <mesh position={[-0.12, 0.07, -0.08]} castShadow rotation={[0, 0.2, 0]}><boxGeometry args={[0.3, 0.12, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              <mesh position={[0.1, 0.07, 0.06]} castShadow rotation={[0, -0.15, 0]}><boxGeometry args={[0.26, 0.12, 0.2]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
+              <mesh position={[0, 0.19, -0.02]} castShadow rotation={[0, 0.1, 0]}><boxGeometry args={[0.24, 0.12, 0.18]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+            </>
+          )}
+          {variant === 2 && (
+            <>
+              {/* Single tall stack */}
+              <mesh position={[0, 0.07, 0]} castShadow><boxGeometry args={[0.32, 0.12, 0.24]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+              <mesh position={[0.02, 0.19, -0.01]} castShadow><boxGeometry args={[0.3, 0.12, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              <mesh position={[-0.01, 0.31, 0.01]} castShadow><boxGeometry args={[0.26, 0.12, 0.2]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
+            </>
+          )}
+          {variant === 3 && (
+            <>
+              {/* Corner / V-shape */}
+              <mesh position={[-0.15, 0.08, -0.1]} castShadow rotation={[0, 0.3, 0]}><boxGeometry args={[0.28, 0.14, 0.18]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+              <mesh position={[0.05, 0.08, 0.12]} castShadow rotation={[0, -0.4, 0]}><boxGeometry args={[0.28, 0.14, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              <mesh position={[-0.05, 0.22, 0]} castShadow><boxGeometry args={[0.22, 0.12, 0.16]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
+            </>
+          )}
+          {variant >= 4 && (
+            <>
+              {/* Scattered with one toppled */}
+              <mesh position={[-0.18, 0.07, 0]} castShadow><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
+              <mesh position={[0.12, 0.07, 0.05]} castShadow><boxGeometry args={[0.26, 0.12, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
+              {/* Toppled bag */}
+              <mesh position={[0.2, 0.04, -0.14]} castShadow rotation={[0, 0.8, 0.4]}><boxGeometry args={[0.24, 0.1, 0.16]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
+            </>
+          )}
         </group>
       );
     }

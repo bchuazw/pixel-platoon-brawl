@@ -128,11 +128,20 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
   const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
   const moveCompleted = useRef(false);
 
+  // Sprite sheet frame tracking
+  const frameTimer = useRef(0);
+  const currentFrame = useRef(0);
+
   const texture = useLoader(THREE.TextureLoader, SPRITE_MAP[unit.team]);
   const processedTexture = useMemo(() => {
     const tex = texture.clone();
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.NearestFilter;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    // Set initial UV to show first frame (top-left)
+    tex.repeat.set(FRAME_W, FRAME_H);
+    tex.offset.set(0, 1 - FRAME_H); // Row 0, Col 0 (UV origin is bottom-left)
     tex.needsUpdate = true;
     return tex;
   }, [texture]);

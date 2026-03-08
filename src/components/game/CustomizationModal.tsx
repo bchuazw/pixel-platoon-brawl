@@ -5,6 +5,22 @@ import { Unit, TEAM_COLORS, Team } from '@/game/types';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as THREE from 'three';
 
+import fullbodySoldierBlue from '@/assets/fullbody-soldier-blue.png';
+import fullbodySoldierRed from '@/assets/fullbody-soldier-red.png';
+import fullbodySoldierGreen from '@/assets/fullbody-soldier-green.png';
+import fullbodySoldierYellow from '@/assets/fullbody-soldier-yellow.png';
+import fullbodyMedicBlue from '@/assets/fullbody-medic-blue.png';
+import fullbodyMedicRed from '@/assets/fullbody-medic-red.png';
+import fullbodyMedicGreen from '@/assets/fullbody-medic-green.png';
+import fullbodyMedicYellow from '@/assets/fullbody-medic-yellow.png';
+
+const FULLBODY_MAP: Record<string, string> = {
+  'blue-soldier': fullbodySoldierBlue, 'red-soldier': fullbodySoldierRed,
+  'green-soldier': fullbodySoldierGreen, 'yellow-soldier': fullbodySoldierYellow,
+  'blue-medic': fullbodyMedicBlue, 'red-medic': fullbodyMedicRed,
+  'green-medic': fullbodyMedicGreen, 'yellow-medic': fullbodyMedicYellow,
+};
+
 // ── Customization Types ──
 export type HelmetStyle = 'standard' | 'tactical' | 'beret' | 'bandana';
 export type VestStyle = 'light' | 'heavy' | 'tactical' | 'medic';

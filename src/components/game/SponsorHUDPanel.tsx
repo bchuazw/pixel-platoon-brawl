@@ -6,7 +6,7 @@ import { Lock, Gift } from 'lucide-react';
  */
 export function SponsorHUDPanel() {
   return (
-    <div className="pointer-events-auto absolute right-2 sm:right-4 bottom-12 sm:bottom-16 w-48 sm:w-56 z-20">
+    <div className="pointer-events-auto absolute left-0 sm:left-2 bottom-10 sm:bottom-12 w-44 sm:w-56 z-20">
       <div className="glass-panel rounded-xl p-3 relative overflow-hidden">
         {/* WIP overlay */}
         <div className="absolute inset-0 z-10 bg-background/50 backdrop-blur-[1px] flex flex-col items-center justify-center rounded-xl">

@@ -126,7 +126,7 @@ export type GamePhase = 'select' | 'move' | 'attack' | 'ability' | 'enemy_turn' 
 
 export interface CombatEvent {
   id: string;
-  type: 'damage' | 'miss' | 'crit' | 'kill' | 'heal' | 'ability' | 'overwatch' | 'loot';
+  type: 'damage' | 'miss' | 'crit' | 'kill' | 'heal' | 'ability' | 'overwatch' | 'loot' | 'hunker';
   attackerPos: Position;
   targetPos: Position;
   value?: number;

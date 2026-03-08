@@ -157,7 +157,7 @@ function CombatFeed({ log }: { log: string[] }) {
     if (msg.includes('ZONE') || msg.includes('DANGER')) return 'text-destructive';
     if (msg.includes('MISSED')) return 'text-muted-foreground/25 italic';
     if (msg.includes('heals') || msg.includes('💊')) return 'text-primary';
-    if (msg.includes('OVERWATCH')) return 'text-[#44aaff]';
+    if (msg.includes('HUNKER')) return 'text-accent';
     if (msg.includes('picks up') || msg.includes('equips')) return 'text-accent/80';
     if (msg.includes('»')) return 'text-foreground/60';
     return 'text-muted-foreground/40';

@@ -28,7 +28,8 @@ function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; 
 
   return (
     <div
-      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all ${
+      onClick={onClick}
+      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all ${onClick ? 'cursor-pointer hover:bg-secondary/60' : ''} ${
         isActive
           ? 'bg-secondary/80 border-primary/40 shadow-[0_0_15px_hsl(142_70%_45%/0.15)]'
           : 'bg-card/60 border-border/20'

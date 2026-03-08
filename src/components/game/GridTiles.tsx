@@ -558,9 +558,10 @@ function PropObject({ tile }: { tile: TileData }) {
       );
 
     // Broken brick/concrete wall — chest-head height cover
-    case 'broken_wall':
+    case 'broken_wall': {
+      const wallColor = h > 0.5 ? '#8a7a6a' : '#7a6a5e';
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Main wall section */}
           <mesh position={[0, 0.25, 0]} castShadow>
             <boxGeometry args={[0.7, 0.5, 0.12]} />

@@ -99,11 +99,13 @@ function UnitCard({ unit, isActive, onClick }: { unit: Unit; isActive: boolean; 
 }
 
 /* ── Left Sidebar: Team Roster ── */
-function TeamRoster({ state, onUnitInspect }: { state: GameState; onUnitInspect?: (id: string) => void }) {
+function TeamRoster({ state, onUnitInspect, visible }: { state: GameState; onUnitInspect?: (id: string) => void; visible: boolean }) {
   const teams = (['blue', 'red', 'green', 'yellow'] as const);
 
   return (
-    <div className="pointer-events-auto absolute left-0 top-12 sm:top-14 bottom-8 w-44 sm:w-56 flex flex-col overflow-hidden"
+    <div className={`pointer-events-auto absolute left-0 top-12 sm:top-14 bottom-8 w-44 sm:w-56 flex flex-col overflow-hidden transition-transform duration-300 ${
+      visible ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'
+    }`}
       style={{
         background: 'linear-gradient(90deg, rgba(8,12,18,0.95) 0%, rgba(8,12,18,0.88) 75%, rgba(8,12,18,0) 100%)',
       }}>

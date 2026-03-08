@@ -350,7 +350,7 @@ function PropObject({ tile }: { tile: TileData }) {
         <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]} scale={[scaleVar * (0.9 + h * 0.3), scaleVar, scaleVar * (0.9 + h * 0.3)]}>
           <mesh position={[0, 0.15, 0]} castShadow>
             <sphereGeometry args={[0.28, 8, 6]} />
-            <meshStandardMaterial color="#3a7a28" roughness={0.95} />
+            <meshStandardMaterial color={bushColor} roughness={0.95} />
           </mesh>
           <mesh position={[0.12, 0.10, 0.1]}>
             <sphereGeometry args={[0.2, 7, 5]} />
@@ -362,6 +362,7 @@ function PropObject({ tile }: { tile: TileData }) {
           </mesh>
         </group>
       );
+    }
 
     // Tree — 2-3x soldier height (1.5-2.2 total)
     case 'tree':

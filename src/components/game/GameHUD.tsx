@@ -37,6 +37,7 @@ interface GameHUDProps {
   onMainMenu?: () => void;
   sponsorPoints?: number;
   onUnitInspect?: (unitId: string) => void;
+  inspectedUnitId?: string | null;
 }
 
 /* ── Unit Card ── */

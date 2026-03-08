@@ -394,13 +394,13 @@ export function useGameStore() {
   useEffect(() => {
     autoPlayRef.current = state.autoPlay;
     if (state.autoPlay && state.phase !== 'game_over' && state.phase !== 'pre_game') {
+      const hasPendingCombat = pendingCombatUnitRef.current !== null;
       const hasQueue = unitQueueRef.current.length > 0;
       const isKillCam = state.killCam !== null;
-      // 3s pause for killcam, normal delays otherwise
-      const delay = isKillCam ? 3000 : hasQueue ? 1400 : 600;
+      // Delays: killcam 3s, pending combat 1.2s (wait for walk anim), normal unit 1.4s, team switch 0.6s
+      const delay = isKillCam ? 3000 : hasPendingCombat ? 1200 : hasQueue ? 1400 : 600;
       autoPlayTimerRef.current = setTimeout(() => {
         if (autoPlayRef.current) {
-          // Clear killcam before next step
           if (isKillCam) {
             setState(prev => ({ ...prev, killCam: null }));
           }

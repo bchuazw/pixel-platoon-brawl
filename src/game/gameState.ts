@@ -123,7 +123,8 @@ export function findPath(from: Position, to: Position, state: GameState): Positi
       const nKey = `${nx},${nz}`;
       if (nx < 0 || nx >= GRID_SIZE || nz < 0 || nz >= GRID_SIZE) continue;
       if (visited.has(nKey)) continue;
-      if (state.grid[nx][nz].isBlocked) continue;
+      const nextTile = state.grid[nx][nz];
+      if (nextTile.isBlocked || nextTile.prop || nextTile.type === 'water') continue;
       if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz &&
         !(nx === to.x && nz === to.z))) continue;
 

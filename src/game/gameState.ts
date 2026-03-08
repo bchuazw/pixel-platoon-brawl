@@ -280,9 +280,8 @@ export function createInitialState(): GameState {
   for (const team of teams) {
     const spawns = cornerSpawns[team];
     // Soldier
-    units.push(createUnit(`${team}-soldier`, pickName(soldierNames), 'soldier', team, spawns[0]));
-    // Medic
-    units.push(createUnit(`${team}-medic`, pickName(medicNames), 'medic', team, spawns[1]));
+    units.push(createUnit(`${team}-soldier`, shuffledSoldiers[soldierIdx++], 'soldier', team, spawns[0]));
+    units.push(createUnit(`${team}-medic`, shuffledMedics[medicIdx++], 'medic', team, spawns[1]));
   }
 
   // Ensure no two units share a tile

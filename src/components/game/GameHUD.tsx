@@ -4,7 +4,7 @@ import { Play, Pause, RotateCcw, Swords, Shield, Heart, Crosshair, Eye, Home, Tr
 import { isInZone, getManhattanDistance } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import bgTactical from '@/assets/bg-tactical.png';
-
+import { CryptoBettingPanel } from './CryptoBettingPanel';
 
 interface GameHUDProps {
   state: GameState;

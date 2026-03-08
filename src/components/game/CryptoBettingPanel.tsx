@@ -97,7 +97,7 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
               style={{
                 borderColor: isSelected ? teamColor : `${teamColor}30`,
                 backgroundColor: `${teamColor}08`,
-                ringColor: teamColor,
+                ...(isSelected ? { boxShadow: `0 0 0 1px ${teamColor}` } : {}),
               }}
             >
               {/* Team color accent bar */}

@@ -15,6 +15,8 @@ export function useGameStore() {
   const [state, setState] = useState<GameState>(createInitialState);
   const [sponsorPoints, setSponsorPoints] = useState(5);
   const [inspectedUnitId, setInspectedUnitId] = useState<string | null>(null);
+  const [betTeam, setBetTeam] = useState<Team | null>(null);
+  const [betAmount, setBetAmount] = useState(0);
   const autoPlayRef = useRef(false);
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -413,6 +415,26 @@ export function useGameStore() {
     };
   }, [state.autoPlay, state.phase, state.currentTeam, state.turn, state.units, state.selectedUnitId, state.killCam, runSingleUnitStep]);
 
+  const placeBet = useCallback((team: Team, amount: number) => {
+    if (amount > sponsorPoints) return;
+    setBetTeam(team);
+    setBetAmount(amount);
+    setSponsorPoints(prev => prev - amount);
+  }, [sponsorPoints]);
+
+  const collectBetPayout = useCallback(() => {
+    if (!betTeam || betAmount === 0) return 0;
+    const winningTeam = (['blue', 'red', 'green', 'yellow'] as const).find(t =>
+      state.units.some(u => u.team === t && u.isAlive)
+    );
+    if (winningTeam === betTeam) {
+      const payout = betAmount * 3;
+      setSponsorPoints(prev => prev + payout);
+      return payout;
+    }
+    return 0;
+  }, [betTeam, betAmount, state.units]);
+
   const startAutoPlay = useCallback(() => {
     startBgMusic();
     unitQueueRef.current = [];
@@ -424,9 +446,10 @@ export function useGameStore() {
         '» AUTO-BATTLE ENGAGED! All teams controlled by AI.',
         '» Units act one at a time — Soldier first, then Medic.',
         '» 🎁 You are now a SPONSOR — click any unit to send gifts!',
+        ...(betTeam ? [`» 🎰 Your bet: ⭐${betAmount} on ${betTeam.toUpperCase()} team — 3x payout if they win!`] : []),
       ],
     }));
-  }, []);
+  }, [betTeam, betAmount]);
 
   const stopAutoPlay = useCallback(() => {
     unitQueueRef.current = [];
@@ -800,6 +823,8 @@ export function useGameStore() {
     unitQueueRef.current = [];
     setSponsorPoints(5);
     setInspectedUnitId(null);
+    setBetTeam(null);
+    setBetAmount(0);
     setState(createInitialState());
   }, []);
 
@@ -811,5 +836,6 @@ export function useGameStore() {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
+    placeBet, betTeam, betAmount, collectBetPayout,
   };
 }

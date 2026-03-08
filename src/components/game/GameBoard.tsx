@@ -12,6 +12,7 @@ import { EmberParticles, LightShafts, GroundFog, DistantTrees } from './Environm
 import { GameState, Position, GRID_SIZE, KillCamData } from '@/game/types';
 import { RotateCw } from 'lucide-react';
 import * as THREE from 'three';
+import { AutoFollowCamera } from './AutoFollowCamera';
 
 interface GameBoardProps {
   state: GameState;
@@ -197,6 +198,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
       >
         <CameraController angleIndex={angleIndex} />
         <KillCamController killCam={state.killCam} />
+        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay} />
         <color attach="background" args={['#0e1a2e']} />
         <Stars radius={80} depth={50} count={2500} factor={3} saturation={0.4} fade speed={0.3} />
 

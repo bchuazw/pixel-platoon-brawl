@@ -547,6 +547,14 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
     }
   });
 
+  // Arm materials (must be before early return)
+  const limbColor = useMemo(() => {
+    const c = new THREE.Color(color);
+    return '#' + c.clone().lerp(new THREE.Color('#333333'), 0.4).getHexString();
+  }, [color]);
+
+  const bootColor = '#2a2218';
+
   if (!unit.isAlive && deathTimer.current >= 3) return null;
 
   const hpPercent = unit.hp / unit.maxHp;
@@ -554,14 +562,6 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
   for (let i = 0; i < unit.maxAp; i++) {
     apDots.push(i < unit.ap);
   }
-
-  // Arm materials
-  const limbColor = useMemo(() => {
-    const c = new THREE.Color(color);
-    return '#' + c.clone().lerp(new THREE.Color('#333333'), 0.4).getHexString();
-  }, [color]);
-
-  const bootColor = '#2a2218';
 
   return (
     <group

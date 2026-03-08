@@ -448,7 +448,7 @@ function PropObject({ tile }: { tile: TileData }) {
     // Burnt vehicle wreck — large cover, ~chest height
     case 'burnt_vehicle':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.15, h * Math.PI, rotVar * 0.1]} scale={[scaleVar, scaleVar, scaleVar]}>
           {/* Chassis */}
           <mesh position={[0, 0.12, 0]} castShadow>
             <boxGeometry args={[0.82, 0.2, 0.44]} />

@@ -4,7 +4,7 @@ import { GameHUD } from '@/components/game/GameHUD';
 import { useGameStore } from '@/game/useGameStore';
 import { CharacterPanel, SponsorAction } from '@/components/game/CharacterPanel';
 import { BroadcastOverlay } from '@/components/game/BroadcastOverlay';
-import { Position, AbilityId, Team } from '@/game/types';
+import { Position, AbilityId } from '@/game/types';
 
 const Index = () => {
   const {

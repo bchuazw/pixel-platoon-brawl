@@ -4,7 +4,7 @@ import { Play, Pause, RotateCcw, Swords, Shield, Heart, Crosshair, Eye, Home, Tr
 import { isInZone, getManhattanDistance } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import bgTactical from '@/assets/bg-tactical.png';
-
+import { CryptoBettingPanel } from './CryptoBettingPanel';
 
 interface GameHUDProps {
   state: GameState;
@@ -425,7 +425,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
           <div className="absolute inset-0 bg-background/80" />
 
           {/* Side-by-side layout: center content + right betting panel */}
-          <div className="relative z-10 flex items-start justify-center gap-8 w-full max-w-4xl px-6">
+          <div className="relative z-10 flex items-start justify-center gap-6 w-full max-w-5xl px-6">
             {/* Main content (center) */}
             <div className="text-center space-y-6 flex-1">
             <div className="space-y-3">
@@ -469,6 +469,10 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
               </div>
             </div>
 
+            {/* Crypto Betting Panel (right side) */}
+            <div className="w-[320px] shrink-0 pt-2">
+              <CryptoBettingPanel disabled />
+            </div>
           </div>
         </div>
       )}

@@ -14,6 +14,7 @@ interface GameBoardProps {
   onTileClick: (pos: Position) => void;
   onUnitClick: (unitId: string) => void;
   onTileHover: (pos: Position | null) => void;
+  onMoveComplete?: () => void;
 }
 
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
@@ -61,7 +62,6 @@ function CameraController({ angleIndex }: { angleIndex: number }) {
   return null;
 }
 
-// Floating dust particles
 function DustParticles() {
   const count = 60;
   const ref = useRef<THREE.Points>(null);
@@ -85,7 +85,6 @@ function DustParticles() {
       pos.array[i3] += Math.sin(t * 0.3 + i) * 0.003;
       pos.array[i3 + 1] += Math.sin(t * 0.2 + i * 0.5) * 0.002;
       pos.array[i3 + 2] += Math.cos(t * 0.25 + i) * 0.003;
-      // Wrap around
       if (pos.array[i3 + 1] > 7) pos.array[i3 + 1] = 0.5;
     }
     pos.needsUpdate = true;
@@ -115,7 +114,7 @@ function LoadingFallback() {
   );
 }
 
-export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: GameBoardProps) {
+export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
 
   const rotateCamera = useCallback(() => {
@@ -136,24 +135,16 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
         shadows
       >
         <CameraController angleIndex={angleIndex} />
-
-        {/* Sky gradient via background color */}
         <color attach="background" args={['#0c1a12']} />
-        
-        {/* Stars in the sky */}
         <Stars radius={80} depth={40} count={800} factor={2} saturation={0.1} fade speed={0.5} />
 
-        {/* Lighting - atmospheric battlefield */}
         <ambientLight intensity={0.35} color="#8899aa" />
         <directionalLight position={[15, 25, 15]} intensity={0.7} castShadow color="#ffd8a0"
           shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
         <directionalLight position={[-10, 15, -10]} intensity={0.12} color="#6688cc" />
         <hemisphereLight intensity={0.3} color="#556677" groundColor="#1a2a12" />
-        
-        {/* Atmospheric fog */}
         <fog attach="fog" args={['#0c1a12', 20, 50]} />
 
-        {/* Dust particles */}
         <DustParticles />
 
         <Suspense fallback={<LoadingFallback />}>
@@ -163,6 +154,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
             attackableTiles={state.attackableTiles}
             abilityTargetTiles={state.abilityTargetTiles}
             shrinkLevel={state.shrinkLevel}
+            movePath={state.movePath}
             onTileClick={onTileClick}
             onTileHover={onTileHover}
           />
@@ -171,6 +163,10 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
             selectedUnitId={state.selectedUnitId}
             onUnitClick={onUnitClick}
             combatEvents={state.combatEvents}
+            movePath={state.movePath}
+            movingUnitId={state.movingUnitId}
+            grid={state.grid}
+            onMoveComplete={onMoveComplete}
           />
           <CombatVFX events={state.combatEvents} />
         </Suspense>
@@ -200,7 +196,6 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover }: Game
         />
       </Canvas>
 
-      {/* Rotate Camera Button */}
       <button
         onClick={rotateCamera}
         className="absolute bottom-36 right-4 z-20 pointer-events-auto bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 text-foreground hover:bg-secondary transition-colors"

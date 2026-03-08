@@ -5,7 +5,7 @@ import {
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
   performAttack, getNextTeam, getAliveTeams, runAiTurn, runAiUnitStep, isInZone,
-  checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot,
+  checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot, findPath,
 } from './gameState';
 import { startBgMusic, stopBgMusic, playPickup, playHeal, playMove } from './sounds';
 import { SponsorAction } from '@/components/game/CharacterPanel';
@@ -376,6 +376,7 @@ export function useGameStore() {
       const grid = prev.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null })));
 
       const movingUnit = units.find(u => u.id === prev.selectedUnitId)!;
+      const path = findPath(movingUnit.position, pos, prev);
       movingUnit.position = pos;
       movingUnit.ap -= AP_MOVE_COST;
 
@@ -409,6 +410,8 @@ export function useGameStore() {
         selectedUnitId: unit.isAlive && (attackable.length > 0 || unit.ap > 0) ? prev.selectedUnitId : null,
         log: [...log, ...owEvents.map(e => e.message)],
         combatEvents: [...prev.combatEvents, ...owEvents, ...newEvents],
+        movePath: path,
+        movingUnitId: prev.selectedUnitId,
       };
     });
   }, []);
@@ -713,9 +716,13 @@ export function useGameStore() {
     setState(createInitialState());
   }, []);
 
+  const clearMovePath = useCallback(() => {
+    setState(prev => ({ ...prev, movePath: null, movingUnitId: null }));
+  }, []);
+
   return {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
-    sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit,
+    sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
   };
 }

@@ -1,7 +1,8 @@
 import { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
-import { Unit, TEAM_COLORS, CombatEvent } from '@/game/types';
+import { Unit, TEAM_COLORS, CombatEvent, Position, TileData } from '@/game/types';
+import { getTileY } from './GridTiles';
 import { playMove } from '@/game/sounds';
 import * as THREE from 'three';
 
@@ -15,6 +16,10 @@ interface GameUnitsProps {
   selectedUnitId: string | null;
   onUnitClick: (unitId: string) => void;
   combatEvents: CombatEvent[];
+  movePath: Position[] | null;
+  movingUnitId: string | null;
+  grid: TileData[][];
+  onMoveComplete?: () => void;
 }
 
 const SPRITE_MAP: Record<string, string> = {
@@ -24,7 +29,7 @@ const SPRITE_MAP: Record<string, string> = {
   yellow: medicYellowImg,
 };
 
-type AnimState = 'idle' | 'moving' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';
+type AnimState = 'idle' | 'walking' | 'aiming' | 'shooting' | 'recoil' | 'hit' | 'dying' | 'healing';
 
 function CoverShield({ coverType }: { coverType: 'none' | 'half' | 'full' }) {
   if (coverType === 'none') return null;
@@ -63,8 +68,9 @@ function StatusIcons({ unit }: { unit: Unit }) {
   );
 }
 
-function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
+function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isMoving, grid, onMoveComplete }: {
   unit: Unit; isSelected: boolean; onClick: () => void; combatEvents: CombatEvent[];
+  movePath: Position[] | null; isMoving: boolean; grid: TileData[][]; onMoveComplete?: () => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const innerRef = useRef<THREE.Group>(null);
@@ -75,13 +81,21 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
   // Animation state
   const animState = useRef<AnimState>('idle');
   const animTimer = useRef(0);
-  const animatedPos = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
   const prevPos = useRef({ x: unit.position.x, z: unit.position.z });
   const prevHp = useRef(unit.hp);
   const prevAlive = useRef(unit.isAlive);
   const deathTimer = useRef(0);
-  const targetDir = useRef(new THREE.Vector2(1, 0)); // direction to face when shooting
+  const targetDir = useRef(new THREE.Vector2(1, 0));
   const flashIntensity = useRef(0);
+
+  // Path walking state
+  const pathRef = useRef<Position[] | null>(null);
+  const pathIndex = useRef(0);
+  const walkProgress = useRef(1); // 0-1 progress between path nodes
+  const walkFrom = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
+  const walkTo = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
+  const currentVisualPos = useRef(new THREE.Vector3(unit.position.x, 0.1, unit.position.z));
+  const moveCompleted = useRef(false);
 
   const texture = useLoader(THREE.TextureLoader, SPRITE_MAP[unit.team]);
   const processedTexture = useMemo(() => {
@@ -92,11 +106,32 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
     return tex;
   }, [texture]);
 
+  // Start walking along a new path
+  useEffect(() => {
+    if (movePath && isMoving && movePath.length > 0) {
+      pathRef.current = movePath;
+      pathIndex.current = 0;
+      walkProgress.current = 0;
+      moveCompleted.current = false;
+      animState.current = 'walking';
+      animTimer.current = 0;
+
+      // Set initial walk segment
+      const fromElev = grid[prevPos.current.x]?.[prevPos.current.z]?.elevation || 0;
+      walkFrom.current.set(prevPos.current.x, getTileY(fromElev) + 0.1, prevPos.current.z);
+
+      const firstTarget = movePath[0];
+      const toElev = grid[firstTarget.x]?.[firstTarget.z]?.elevation || 0;
+      walkTo.current.set(firstTarget.x, getTileY(toElev) + 0.1, firstTarget.z);
+
+      playMove();
+    }
+  }, [movePath, isMoving]);
+
   // Detect combat events targeting this unit
   useEffect(() => {
     const recent = combatEvents.filter(e => Date.now() - e.timestamp < 300);
     for (const e of recent) {
-      // This unit is attacking
       if (e.attackerPos.x === unit.position.x && e.attackerPos.z === unit.position.z &&
           (e.type === 'damage' || e.type === 'crit' || e.type === 'kill' || e.type === 'miss')) {
         targetDir.current.set(
@@ -106,13 +141,11 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
         animState.current = 'aiming';
         animTimer.current = 0;
       }
-      // This unit is being hit
       if (e.targetPos.x === unit.position.x && e.targetPos.z === unit.position.z &&
           (e.type === 'damage' || e.type === 'crit')) {
         animState.current = 'hit';
         animTimer.current = 0;
       }
-      // This unit is being healed
       if (e.targetPos.x === unit.position.x && e.targetPos.z === unit.position.z && e.type === 'heal') {
         animState.current = 'healing';
         animTimer.current = 0;
@@ -138,196 +171,187 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
     prevHp.current = unit.hp;
   }, [unit.hp, unit.isAlive]);
 
+  // Update prevPos when position changes (but not during path walking)
+  useEffect(() => {
+    if (!pathRef.current || pathRef.current.length === 0) {
+      prevPos.current = { x: unit.position.x, z: unit.position.z };
+    }
+  }, [unit.position.x, unit.position.z]);
+
+  const WALK_SPEED = 4.0; // tiles per second
+
   useFrame(({ clock }, delta) => {
     if (!groupRef.current || !innerRef.current) return;
     const t = clock.getElapsedTime();
     animTimer.current += delta;
 
+    // Get elevation-aware Y for unit's logical position
+    const unitElev = grid[unit.position.x]?.[unit.position.z]?.elevation || 0;
+    const unitBaseY = getTileY(unitElev) + 0.1;
+
     // ── Death animation ──
     if (animState.current === 'dying' || (!unit.isAlive && deathTimer.current < 2)) {
       deathTimer.current += delta;
       const dt = deathTimer.current;
-
-      // Fall over
       innerRef.current.rotation.z = Math.min(Math.PI / 2, dt * 4);
-      // Sink down
       innerRef.current.position.y = -dt * 0.3;
-      // Fade out
       if (spriteRef.current) {
         const mat = spriteRef.current.material as THREE.MeshBasicMaterial;
         mat.opacity = Math.max(0, 1 - dt * 0.8);
       }
-      groupRef.current.position.set(unit.position.x, 0.1, unit.position.z);
+      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
       return;
     }
 
     if (!unit.isAlive) return;
 
-    // ── Movement detection ──
-    if (prevPos.current.x !== unit.position.x || prevPos.current.z !== unit.position.z) {
-      prevPos.current = { x: unit.position.x, z: unit.position.z };
-      animState.current = 'moving';
-      animTimer.current = 0;
-      playMove();
-    }
+    // ── Path walking animation ──
+    if (animState.current === 'walking' && pathRef.current && pathRef.current.length > 0) {
+      walkProgress.current += delta * WALK_SPEED;
 
-    // ── State machine ──
-    switch (animState.current) {
-      case 'moving': {
-        const moveT = Math.min(1, animTimer.current / 0.5);
-        const eased = 1 - Math.pow(1 - moveT, 3);
+      if (walkProgress.current >= 1) {
+        // Arrived at current path node
+        const currentTarget = pathRef.current[pathIndex.current];
+        currentVisualPos.current.copy(walkTo.current);
 
-        animatedPos.current.x = THREE.MathUtils.lerp(animatedPos.current.x, unit.position.x, eased);
-        animatedPos.current.z = THREE.MathUtils.lerp(animatedPos.current.z, unit.position.z, eased);
+        pathIndex.current++;
 
-        // Hop arc
-        const hopHeight = Math.sin(moveT * Math.PI) * 0.35;
-        groupRef.current.position.set(animatedPos.current.x, 0.1 + hopHeight, animatedPos.current.z);
-
-        // Run lean + bob
-        innerRef.current.rotation.x = Math.sin(moveT * Math.PI) * 0.2;
-        innerRef.current.rotation.z = Math.sin(moveT * Math.PI * 6) * 0.1;
-        // Scale squash on land
-        const squash = moveT > 0.85 ? 1 + (1 - moveT) * 1.5 : 1;
-        innerRef.current.scale.set(squash, 1 / squash, 1);
-
-        if (moveT >= 1) {
+        if (pathIndex.current < pathRef.current.length) {
+          // Move to next segment
+          walkProgress.current = 0;
+          walkFrom.current.copy(walkTo.current);
+          const nextTarget = pathRef.current[pathIndex.current];
+          const nextElev = grid[nextTarget.x]?.[nextTarget.z]?.elevation || 0;
+          walkTo.current.set(nextTarget.x, getTileY(nextElev) + 0.1, nextTarget.z);
+        } else {
+          // Path complete
           animState.current = 'idle';
-          animatedPos.current.set(unit.position.x, 0.1, unit.position.z);
+          pathRef.current = null;
+          prevPos.current = { x: unit.position.x, z: unit.position.z };
+          currentVisualPos.current.set(unit.position.x, unitBaseY, unit.position.z);
           innerRef.current.rotation.x = 0;
           innerRef.current.rotation.z = 0;
           innerRef.current.scale.set(1, 1, 1);
+
+          if (!moveCompleted.current && onMoveComplete) {
+            moveCompleted.current = true;
+            onMoveComplete();
+          }
         }
-        break;
       }
 
-      case 'aiming': {
-        // Wind up for 0.3s, lean toward target
-        const aimT = Math.min(1, animTimer.current / 0.3);
-        const leanX = targetDir.current.x * 0.15 * aimT;
-        innerRef.current.position.x = leanX;
-        innerRef.current.rotation.z = -targetDir.current.x * 0.1 * aimT;
-        // Squint (scale down slightly)
-        const aimScale = 1 - aimT * 0.05;
-        innerRef.current.scale.set(aimScale, aimScale, 1);
+      if (animState.current === 'walking') {
+        const p = Math.min(1, walkProgress.current);
+        const eased = p; // linear for consistent walking speed
 
-        if (aimT >= 1) {
-          animState.current = 'shooting';
-          animTimer.current = 0;
-        }
-        groupRef.current.position.set(unit.position.x, 0.1, unit.position.z);
-        break;
-      }
+        // Interpolate position
+        currentVisualPos.current.lerpVectors(walkFrom.current, walkTo.current, eased);
 
-      case 'shooting': {
-        // Quick recoil burst 0.15s
-        const shootT = Math.min(1, animTimer.current / 0.15);
-
-        // Recoil kick back
-        const recoilAmt = Math.sin(shootT * Math.PI) * 0.2;
-        innerRef.current.position.x = -targetDir.current.x * recoilAmt;
-        innerRef.current.position.y = Math.sin(shootT * Math.PI) * 0.08;
-
-        // Flash scale burst
-        const burstScale = 1 + Math.sin(shootT * Math.PI) * 0.2;
-        innerRef.current.scale.set(burstScale, burstScale, 1);
-
-        // Sprite shake
-        innerRef.current.rotation.z = Math.sin(shootT * Math.PI * 8) * 0.06;
-
-        flashIntensity.current = Math.max(0, 1 - shootT);
-
-        if (shootT >= 1) {
-          animState.current = 'recoil';
-          animTimer.current = 0;
-        }
-        groupRef.current.position.set(unit.position.x, 0.1, unit.position.z);
-        break;
-      }
-
-      case 'recoil': {
-        // Recovery 0.3s
-        const recoilT = Math.min(1, animTimer.current / 0.3);
-        const ease = 1 - Math.pow(1 - recoilT, 2);
-        innerRef.current.position.x = THREE.MathUtils.lerp(innerRef.current.position.x, 0, ease);
-        innerRef.current.position.y = THREE.MathUtils.lerp(innerRef.current.position.y, 0, ease);
-        innerRef.current.rotation.z = THREE.MathUtils.lerp(innerRef.current.rotation.z, 0, ease);
-        innerRef.current.scale.set(
-          THREE.MathUtils.lerp(innerRef.current.scale.x, 1, ease),
-          THREE.MathUtils.lerp(innerRef.current.scale.y, 1, ease),
-          1
+        // Hop arc per step
+        const hopHeight = Math.sin(p * Math.PI) * 0.15;
+        groupRef.current.position.set(
+          currentVisualPos.current.x,
+          currentVisualPos.current.y + hopHeight,
+          currentVisualPos.current.z
         );
 
-        if (recoilT >= 1) {
-          animState.current = 'idle';
-          innerRef.current.position.set(0, 0, 0);
-          innerRef.current.scale.set(1, 1, 1);
-        }
-        groupRef.current.position.set(unit.position.x, 0.1, unit.position.z);
-        break;
-      }
-
-      case 'hit': {
-        // Flinch back 0.4s
-        const hitT = Math.min(1, animTimer.current / 0.4);
-
-        // Knockback
-        const knockback = Math.sin(hitT * Math.PI) * 0.15;
-        innerRef.current.position.x = knockback;
-        // Flash red
-        flashIntensity.current = Math.max(0, Math.sin(hitT * Math.PI * 3));
-        // Shake
-        innerRef.current.rotation.z = Math.sin(hitT * Math.PI * 10) * 0.12 * (1 - hitT);
-        // Squash on impact
-        const hitSquash = 1 + Math.sin(hitT * Math.PI) * 0.1;
-        innerRef.current.scale.set(hitSquash, 1 / hitSquash, 1);
-
-        if (hitT >= 1) {
-          animState.current = 'idle';
-          innerRef.current.position.set(0, 0, 0);
-          innerRef.current.rotation.z = 0;
-          innerRef.current.scale.set(1, 1, 1);
-          flashIntensity.current = 0;
-        }
-        groupRef.current.position.set(unit.position.x, 0.1, unit.position.z);
-        break;
-      }
-
-      case 'healing': {
-        // Rise up with glow 0.6s
-        const healT = Math.min(1, animTimer.current / 0.6);
-        innerRef.current.position.y = Math.sin(healT * Math.PI) * 0.15;
-        const healScale = 1 + Math.sin(healT * Math.PI) * 0.08;
-        innerRef.current.scale.set(healScale, healScale, 1);
-
-        if (healT >= 1) {
-          animState.current = 'idle';
-          innerRef.current.position.set(0, 0, 0);
-          innerRef.current.scale.set(1, 1, 1);
-        }
-        groupRef.current.position.set(unit.position.x, 0.1, unit.position.z);
-        break;
-      }
-
-      default: {
-        // ── Idle animation ──
-        groupRef.current.position.set(unit.position.x, 0.1, unit.position.z);
-        const bounce = Math.sin(t * 2.5 + unit.position.x * 1.5) * 0.04;
-        innerRef.current.position.y = bounce;
-        innerRef.current.position.x = 0;
-        innerRef.current.rotation.x = 0;
-        innerRef.current.rotation.z = Math.sin(t * 1.5) * 0.02;
+        // Walking bobbing animation
+        const walkCycle = t * 12;
+        innerRef.current.rotation.x = Math.sin(walkCycle) * 0.08;
+        innerRef.current.rotation.z = Math.sin(walkCycle * 0.5) * 0.06;
+        // Slight lean in direction of travel
+        const dx = walkTo.current.x - walkFrom.current.x;
+        innerRef.current.rotation.z += dx * 0.1;
         innerRef.current.scale.set(1, 1, 1);
+      }
+    } else if (animState.current === 'aiming') {
+      const aimT = Math.min(1, animTimer.current / 0.3);
+      const leanX = targetDir.current.x * 0.15 * aimT;
+      innerRef.current.position.x = leanX;
+      innerRef.current.rotation.z = -targetDir.current.x * 0.1 * aimT;
+      const aimScale = 1 - aimT * 0.05;
+      innerRef.current.scale.set(aimScale, aimScale, 1);
 
-        // Suppressed shake
-        if (unit.isSuppressed) {
-          innerRef.current.position.x = Math.sin(t * 15) * 0.03;
-          innerRef.current.rotation.z = Math.sin(t * 12) * 0.04;
-        }
+      if (aimT >= 1) {
+        animState.current = 'shooting';
+        animTimer.current = 0;
+      }
+      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+    } else if (animState.current === 'shooting') {
+      const shootT = Math.min(1, animTimer.current / 0.15);
+      const recoilAmt = Math.sin(shootT * Math.PI) * 0.2;
+      innerRef.current.position.x = -targetDir.current.x * recoilAmt;
+      innerRef.current.position.y = Math.sin(shootT * Math.PI) * 0.08;
+      const burstScale = 1 + Math.sin(shootT * Math.PI) * 0.2;
+      innerRef.current.scale.set(burstScale, burstScale, 1);
+      innerRef.current.rotation.z = Math.sin(shootT * Math.PI * 8) * 0.06;
+      flashIntensity.current = Math.max(0, 1 - shootT);
+
+      if (shootT >= 1) {
+        animState.current = 'recoil';
+        animTimer.current = 0;
+      }
+      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+    } else if (animState.current === 'recoil') {
+      const recoilT = Math.min(1, animTimer.current / 0.3);
+      const ease = 1 - Math.pow(1 - recoilT, 2);
+      innerRef.current.position.x = THREE.MathUtils.lerp(innerRef.current.position.x, 0, ease);
+      innerRef.current.position.y = THREE.MathUtils.lerp(innerRef.current.position.y, 0, ease);
+      innerRef.current.rotation.z = THREE.MathUtils.lerp(innerRef.current.rotation.z, 0, ease);
+      innerRef.current.scale.set(
+        THREE.MathUtils.lerp(innerRef.current.scale.x, 1, ease),
+        THREE.MathUtils.lerp(innerRef.current.scale.y, 1, ease), 1
+      );
+      if (recoilT >= 1) {
+        animState.current = 'idle';
+        innerRef.current.position.set(0, 0, 0);
+        innerRef.current.scale.set(1, 1, 1);
+      }
+      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+    } else if (animState.current === 'hit') {
+      const hitT = Math.min(1, animTimer.current / 0.4);
+      const knockback = Math.sin(hitT * Math.PI) * 0.15;
+      innerRef.current.position.x = knockback;
+      flashIntensity.current = Math.max(0, Math.sin(hitT * Math.PI * 3));
+      innerRef.current.rotation.z = Math.sin(hitT * Math.PI * 10) * 0.12 * (1 - hitT);
+      const hitSquash = 1 + Math.sin(hitT * Math.PI) * 0.1;
+      innerRef.current.scale.set(hitSquash, 1 / hitSquash, 1);
+      if (hitT >= 1) {
+        animState.current = 'idle';
+        innerRef.current.position.set(0, 0, 0);
+        innerRef.current.rotation.z = 0;
+        innerRef.current.scale.set(1, 1, 1);
+        flashIntensity.current = 0;
+      }
+      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+    } else if (animState.current === 'healing') {
+      const healT = Math.min(1, animTimer.current / 0.6);
+      innerRef.current.position.y = Math.sin(healT * Math.PI) * 0.15;
+      const healScale = 1 + Math.sin(healT * Math.PI) * 0.08;
+      innerRef.current.scale.set(healScale, healScale, 1);
+      if (healT >= 1) {
+        animState.current = 'idle';
+        innerRef.current.position.set(0, 0, 0);
+        innerRef.current.scale.set(1, 1, 1);
+      }
+      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+    } else {
+      // ── Idle animation ──
+      groupRef.current.position.set(unit.position.x, unitBaseY, unit.position.z);
+      const bounce = Math.sin(t * 2.5 + unit.position.x * 1.5) * 0.04;
+      innerRef.current.position.y = bounce;
+      innerRef.current.position.x = 0;
+      innerRef.current.rotation.x = 0;
+      innerRef.current.rotation.z = Math.sin(t * 1.5) * 0.02;
+      innerRef.current.scale.set(1, 1, 1);
+
+      if (unit.isSuppressed) {
+        innerRef.current.position.x = Math.sin(t * 15) * 0.03;
+        innerRef.current.rotation.z = Math.sin(t * 12) * 0.04;
       }
     }
 
-    // ── Flash overlay (hit/shoot feedback) ──
+    // ── Flash overlay ──
     if (spriteRef.current) {
       const mat = spriteRef.current.material as THREE.MeshBasicMaterial;
       if (flashIntensity.current > 0) {
@@ -346,7 +370,6 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
     }
   });
 
-  // Show dead units fading for a bit
   if (!unit.isAlive && deathTimer.current >= 2) return null;
 
   const hpPercent = unit.hp / unit.maxHp;
@@ -375,7 +398,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
           </mesh>
         </Billboard>
 
-        {/* Muzzle flash light (during shooting) */}
+        {/* Muzzle flash light */}
         {animState.current === 'shooting' && (
           <pointLight
             position={[targetDir.current.x * 0.4, 0.6, targetDir.current.y * 0.4]}
@@ -399,6 +422,22 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
                   <meshBasicMaterial color="#44ff88" transparent opacity={0.7} />
                 </mesh>
               </Billboard>
+            ))}
+          </>
+        )}
+
+        {/* Walking dust particles */}
+        {animState.current === 'walking' && (
+          <>
+            {[0, 1].map(i => (
+              <mesh key={i} position={[
+                (Math.random() - 0.5) * 0.3,
+                0.05,
+                (Math.random() - 0.5) * 0.3
+              ]}>
+                <sphereGeometry args={[0.06, 4, 4]} />
+                <meshBasicMaterial color="#8a7a60" transparent opacity={0.3} />
+              </mesh>
             ))}
           </>
         )}
@@ -478,7 +517,7 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents }: {
   );
 }
 
-export function GameUnits({ units, selectedUnitId, onUnitClick, combatEvents }: GameUnitsProps) {
+export function GameUnits({ units, selectedUnitId, onUnitClick, combatEvents, movePath, movingUnitId, grid, onMoveComplete }: GameUnitsProps) {
   return (
     <group>
       {units.map(unit => (
@@ -488,6 +527,10 @@ export function GameUnits({ units, selectedUnitId, onUnitClick, combatEvents }: 
           isSelected={unit.id === selectedUnitId}
           onClick={() => onUnitClick(unit.id)}
           combatEvents={combatEvents}
+          movePath={unit.id === movingUnitId ? movePath : null}
+          isMoving={unit.id === movingUnitId && movePath !== null}
+          grid={grid}
+          onMoveComplete={unit.id === movingUnitId ? onMoveComplete : undefined}
         />
       ))}
     </group>

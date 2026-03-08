@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { startAmbientAudio, stopAmbientAudio } from '@/game/ambientAudio';
 import { GameState, Unit, TEAM_COLORS, Team } from '@/game/types';
 import { Play, ChevronDown, ChevronUp, Swords, Heart, Shield, Crosshair, Target, Zap } from 'lucide-react';
 import { CryptoBettingPanel } from './CryptoBettingPanel';

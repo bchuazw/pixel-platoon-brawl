@@ -357,7 +357,7 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
           <div className="glass-panel rounded-xl p-4 min-w-[130px]">
             <div className="text-[9px] tracking-[0.3em] text-muted-foreground/50 mb-2 font-display text-center">SCOREBOARD</div>
             <div className="space-y-1.5">
-              {(['blue', 'red', 'green', 'yellow'] as const)
+              {([...(['blue', 'red', 'green', 'yellow'] as const)])
                 .sort((a, b) => {
                   const aAlive = state.units.filter(u => u.team === a && u.isAlive).length;
                   const bAlive = state.units.filter(u => u.team === b && u.isAlive).length;

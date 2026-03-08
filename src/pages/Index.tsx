@@ -84,7 +84,7 @@ const Index = () => {
 
   return (
     <div className="w-screen h-screen overflow-hidden relative">
-      <GameBoard
+      <GameBoard2D
         state={state}
         onTileClick={handleTileClick}
         onUnitClick={handleUnitClick}

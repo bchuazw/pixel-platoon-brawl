@@ -211,55 +211,173 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         type = 'water'; elevation = -0.15;
       }
 
-      let prop: PropType = null;
-      let isBlocked = false;
-      let coverValue: 0 | 1 | 2 = 0;
-
-      if (type === 'water') {
-        isBlocked = true;
-      } else if (type !== 'dirt' && type !== 'sand') {
-        const propRoll = rand();
-        if (propRoll < 0.025 && distFromCenter > 4) {
-          prop = 'tree'; isBlocked = true; coverValue = 2;
-        } else if (propRoll < 0.05) {
-          prop = 'rock'; isBlocked = true; coverValue = 2;
-        } else if (propRoll < 0.07) {
-          prop = 'bush'; coverValue = 1;
-        } else if (propRoll < 0.085) {
-          prop = 'crate'; isBlocked = true; coverValue = 2;
-        } else if (propRoll < 0.10) {
-          prop = 'barrel'; isBlocked = true; coverValue = 1;
-        } else if (propRoll < 0.115 && distFromCenter > 6) {
-          prop = 'sandbag'; coverValue = 2;
-        } else if (propRoll < 0.13 && distFromCenter > 7) {
-          prop = 'ruins'; isBlocked = true; coverValue = 2; elevation += 0.3;
-        }
-      }
-
-      grid[x][z] = { x, z, elevation, type, prop, isBlocked, coverValue, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null };
+      grid[x][z] = { x, z, elevation, type, prop: null, isBlocked: false, coverValue: 0, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null };
     }
   }
 
-  // Strategic cover clusters scattered around the map
+  // Helper to set prop on tile safely
+  const setTileProp = (x: number, z: number, prop: PropType, blocked: boolean, cover: 0 | 1 | 2) => {
+    if (x < 0 || x >= GRID_SIZE || z < 0 || z >= GRID_SIZE) return;
+    const t = grid[x][z];
+    if (t.type === 'water' || t.prop) return;
+    t.prop = prop; t.isBlocked = blocked; t.coverValue = cover;
+  };
+
+  // ═══ TRENCH LINES ═══
+  // Generate 3-6 trench lines across the map
+  const trenchCount = 3 + Math.floor(rand() * 4);
+  for (let i = 0; i < trenchCount; i++) {
+    const horizontal = rand() > 0.5;
+    const startX = 4 + Math.floor(rand() * (GRID_SIZE - 8));
+    const startZ = 4 + Math.floor(rand() * (GRID_SIZE - 8));
+    const length = 4 + Math.floor(rand() * 6);
+
+    for (let s = 0; s < length; s++) {
+      const tx = horizontal ? startX + s : startX + Math.floor(rand() * 2 - 0.5);
+      const tz = horizontal ? startZ + Math.floor(rand() * 2 - 0.5) : startZ + s;
+      if (tx >= 0 && tx < GRID_SIZE && tz >= 0 && tz < GRID_SIZE && grid[tx][tz].type !== 'water') {
+        grid[tx][tz].type = 'trench';
+        grid[tx][tz].elevation = Math.max(-0.2, grid[tx][tz].elevation - 0.4);
+        grid[tx][tz].coverValue = Math.max(grid[tx][tz].coverValue, 1) as 0 | 1 | 2;
+      }
+    }
+    // Sandbags at trench ends
+    if (horizontal) {
+      setTileProp(startX - 1, startZ, 'sandbag', false, 2);
+      setTileProp(startX + length, startZ, 'sandbag', false, 2);
+    } else {
+      setTileProp(startX, startZ - 1, 'sandbag', false, 2);
+      setTileProp(startX, startZ + length, 'sandbag', false, 2);
+    }
+  }
+
+  // ═══ FORTIFIED POSITIONS ═══
+  // 4-7 fortified outposts with sandbags, HESCO, barrels
+  const fortCount = 4 + Math.floor(rand() * 4);
+  for (let i = 0; i < fortCount; i++) {
+    const fx = 5 + Math.floor(rand() * (GRID_SIZE - 10));
+    const fz = 5 + Math.floor(rand() * (GRID_SIZE - 10));
+    const fortType = rand();
+
+    if (fortType < 0.3) {
+      // L-shaped sandbag wall
+      setTileProp(fx, fz, 'sandbag', false, 2);
+      setTileProp(fx + 1, fz, 'sandbag', false, 2);
+      setTileProp(fx, fz + 1, 'sandbag', false, 2);
+      setTileProp(fx + 1, fz + 1, 'crate', true, 2);
+    } else if (fortType < 0.55) {
+      // HESCO bastion pair with barrel
+      setTileProp(fx, fz, 'hesco', true, 2);
+      setTileProp(fx + 1, fz, 'hesco', true, 2);
+      setTileProp(fx, fz + 1, 'barrel', true, 1);
+    } else if (fortType < 0.75) {
+      // Foxhole with surrounding sandbags
+      setTileProp(fx, fz, 'foxhole', false, 1);
+      setTileProp(fx + 1, fz, 'sandbag', false, 2);
+      setTileProp(fx - 1, fz, 'sandbag', false, 2);
+      setTileProp(fx, fz - 1, 'sandbag', false, 2);
+    } else {
+      // Jersey barrier checkpoint
+      setTileProp(fx, fz, 'jersey_barrier', true, 2);
+      setTileProp(fx + 1, fz, 'jersey_barrier', true, 2);
+      if (rand() > 0.5) setTileProp(fx + 2, fz, 'wire', false, 1);
+    }
+  }
+
+  // ═══ VEHICLE WRECKS ═══
+  const vehicleCount = 2 + Math.floor(rand() * 3);
+  for (let i = 0; i < vehicleCount; i++) {
+    const vx = 4 + Math.floor(rand() * (GRID_SIZE - 8));
+    const vz = 4 + Math.floor(rand() * (GRID_SIZE - 8));
+    if (grid[vx][vz].type !== 'water' && !grid[vx][vz].prop) {
+      setTileProp(vx, vz, 'burnt_vehicle', true, 2);
+      // Debris around vehicle
+      if (rand() > 0.4) setTileProp(vx + 1, vz, 'rock', true, 2);
+      if (rand() > 0.6) setTileProp(vx, vz + 1, 'barrel', true, 1);
+    }
+  }
+
+  // ═══ WIRE BARRIERS ═══
+  const wireCount = 5 + Math.floor(rand() * 5);
+  for (let i = 0; i < wireCount; i++) {
+    const wx = 3 + Math.floor(rand() * (GRID_SIZE - 6));
+    const wz = 3 + Math.floor(rand() * (GRID_SIZE - 6));
+    const wLen = 2 + Math.floor(rand() * 3);
+    const wHoriz = rand() > 0.5;
+    for (let s = 0; s < wLen; s++) {
+      const cx = wHoriz ? wx + s : wx;
+      const cz = wHoriz ? wz : wz + s;
+      setTileProp(cx, cz, 'wire', false, 1);
+    }
+  }
+
+  // ═══ TANK TRAPS ═══
+  const trapCount = 3 + Math.floor(rand() * 3);
+  for (let i = 0; i < trapCount; i++) {
+    const tx = 5 + Math.floor(rand() * (GRID_SIZE - 10));
+    const tz = 5 + Math.floor(rand() * (GRID_SIZE - 10));
+    setTileProp(tx, tz, 'tank_trap', true, 1);
+    if (rand() > 0.5) setTileProp(tx + 1, tz, 'tank_trap', true, 1);
+  }
+
+  // ═══ SCATTERED NATURAL/MILITARY COVER ═══
+  for (let x = 0; x < GRID_SIZE; x++) {
+    for (let z = 0; z < GRID_SIZE; z++) {
+      const t = grid[x][z];
+      if (t.prop || t.type === 'water' || t.type === 'trench') continue;
+      const distFromCenter = Math.sqrt((x - center) ** 2 + (z - center) ** 2);
+      const propRoll = rand();
+
+      if (t.type === 'dirt' || t.type === 'sand') {
+        // Paths get occasional roadside cover
+        if (propRoll < 0.04) setTileProp(x, z, 'jersey_barrier', true, 2);
+        else if (propRoll < 0.06) setTileProp(x, z, 'barrel', true, 1);
+      } else {
+        if (propRoll < 0.018 && distFromCenter > 4) {
+          setTileProp(x, z, 'tree', true, 2);
+        } else if (propRoll < 0.035) {
+          setTileProp(x, z, 'rock', true, 2);
+        } else if (propRoll < 0.05) {
+          setTileProp(x, z, 'bush', false, 1);
+        } else if (propRoll < 0.06) {
+          setTileProp(x, z, 'crate', true, 2);
+        } else if (propRoll < 0.07) {
+          setTileProp(x, z, 'barrel', true, 1);
+        } else if (propRoll < 0.08 && distFromCenter > 6) {
+          setTileProp(x, z, 'sandbag', false, 2);
+        } else if (propRoll < 0.088 && distFromCenter > 7) {
+          grid[x][z].elevation += 0.3;
+          setTileProp(x, z, 'ruins', true, 2);
+        }
+      }
+    }
+  }
+
+  // ═══ STRATEGIC COVER CLUSTERS ═══
+  // Ensure good cover is spread around for tactical gameplay
   const coverPositions: Position[] = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 40; i++) {
     const cx = 3 + Math.floor(rand() * (GRID_SIZE - 6));
     const cz = 3 + Math.floor(rand() * (GRID_SIZE - 6));
     coverPositions.push({ x: cx, z: cz });
-    // Add a neighbor for cluster feel
-    if (rand() > 0.4) coverPositions.push({ x: Math.min(GRID_SIZE - 1, cx + 1), z: cz });
-    if (rand() > 0.5) coverPositions.push({ x: cx, z: Math.min(GRID_SIZE - 1, cz + 1) });
+    if (rand() > 0.3) coverPositions.push({ x: Math.min(GRID_SIZE - 1, cx + 1), z: cz });
+    if (rand() > 0.4) coverPositions.push({ x: cx, z: Math.min(GRID_SIZE - 1, cz + 1) });
+    if (rand() > 0.7) coverPositions.push({ x: Math.min(GRID_SIZE - 1, cx + 1), z: Math.min(GRID_SIZE - 1, cz + 1) });
   }
-  const coverProps: PropType[] = ['sandbag', 'crate', 'barrel'];
+  const clusterProps: PropType[] = ['sandbag', 'crate', 'barrel', 'jersey_barrier', 'hesco', 'foxhole'];
   for (const pos of coverPositions) {
-    if (pos.x < GRID_SIZE && pos.z < GRID_SIZE && grid[pos.x][pos.z].type !== 'water' && !grid[pos.x][pos.z].prop) {
-      grid[pos.x][pos.z].prop = coverProps[Math.floor(rand() * coverProps.length)];
-      grid[pos.x][pos.z].isBlocked = true;
-      grid[pos.x][pos.z].coverValue = 2;
+    if (pos.x < GRID_SIZE && pos.z < GRID_SIZE) {
+      const t = grid[pos.x][pos.z];
+      if (t.type !== 'water' && !t.prop) {
+        const p = clusterProps[Math.floor(rand() * clusterProps.length)];
+        const blocked = p !== 'sandbag' && p !== 'foxhole';
+        const cv: 0 | 1 | 2 = (p === 'barrel' || p === 'foxhole') ? 1 : 2;
+        setTileProp(pos.x, pos.z, p, blocked, cv);
+      }
     }
   }
 
-  // Clear spawn areas (radius 3 around each spawn point)
+  // ═══ CLEAR SPAWN AREAS ═══
   for (const spawn of spawnPoints) {
     for (let dx = -3; dx <= 3; dx++) {
       for (let dz = -3; dz <= 3; dz++) {
@@ -269,9 +387,19 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         }
       }
     }
+    // Place starting cover near spawns (2 sandbag walls per spawn)
+    const offsets = [
+      { dx: -3, dz: 0 }, { dx: 3, dz: 0 }, { dx: 0, dz: -3 }, { dx: 0, dz: 3 },
+    ];
+    for (const off of offsets.slice(0, 2)) {
+      const sx = spawn.x + off.dx, sz = spawn.z + off.dz;
+      if (sx >= 0 && sx < GRID_SIZE && sz >= 0 && sz < GRID_SIZE) {
+        setTileProp(sx, sz, 'sandbag', false, 2);
+      }
+    }
   }
 
-  // Spawn loot (more for bigger map)
+  // ═══ SPAWN LOOT ═══
   const lootCount = 25 + Math.floor(rand() * 12);
   let placed = 0;
   let attempts = 0;
@@ -280,7 +408,6 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
     const lx = Math.floor(rand() * GRID_SIZE);
     const lz = Math.floor(rand() * GRID_SIZE);
     const tile = grid[lx][lz];
-    // Don't place loot near spawn points
     const nearSpawn = spawnPoints.some(s => Math.abs(s.x - lx) <= 3 && Math.abs(s.z - lz) <= 3);
     if (!tile.isBlocked && tile.type !== 'water' && !tile.loot && !nearSpawn) {
       grid[lx][lz].loot = generateLootItem(rand);

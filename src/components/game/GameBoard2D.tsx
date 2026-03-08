@@ -51,6 +51,21 @@ interface UnitAnim {
   floatOpacity: number;
   scale: number;
   deathProgress: number; // 0 = alive, 1 = fully dead
+  walkCycle: number; // 0-2π, drives leg alternation + bob
+  isMoving: boolean;
+  prevX: number;
+  prevZ: number;
+}
+
+// ── Dust particle ──
+interface DustParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
 }
 
 // ── Floating damage number ──
@@ -74,6 +89,7 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
 
   // Animation state
   const unitAnims = useRef<Record<string, UnitAnim>>({});
+  const dustParticles = useRef<DustParticle[]>([]);
   const floatingTexts = useRef<FloatingText[]>([]);
   const lastEventCount = useRef(0);
   const animFrameId = useRef(0);
@@ -97,6 +113,8 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
           x: unit.position.x, z: unit.position.z,
           flash: 0, floatText: null, floatY: 0, floatOpacity: 0,
           scale: 1, deathProgress: unit.isAlive ? 0 : 1,
+          walkCycle: 0, isMoving: false,
+          prevX: unit.position.x, prevZ: unit.position.z,
         };
       }
     }
@@ -363,14 +381,59 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
         ctx.setLineDash([]);
       }
 
+      // ── Draw dust particles ──
+      dustParticles.current = dustParticles.current.filter(p => p.life < p.maxLife);
+      for (const p of dustParticles.current) {
+        p.life += dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 15 * dt; // gravity
+        const alpha = Math.max(0, 1 - p.life / p.maxLife);
+        ctx.fillStyle = `rgba(160,140,110,${alpha * 0.6})`;
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+      }
+
       // ── Draw units ──
       for (const unit of state.units) {
         const anim = unitAnims.current[unit.id];
         if (!anim) continue;
 
         // Smooth position interpolation
-        anim.x += (unit.position.x - anim.x) * 0.12;
-        anim.z += (unit.position.z - anim.z) * 0.12;
+        const dx = unit.position.x - anim.x;
+        const dz = unit.position.z - anim.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const wasMoving = anim.isMoving;
+        anim.isMoving = dist > 0.05;
+
+        anim.x += dx * 0.12;
+        anim.z += dz * 0.12;
+
+        // Walk cycle — advance while moving
+        if (anim.isMoving) {
+          anim.walkCycle += dt * 14; // speed of leg pump
+          // Spawn dust every ~0.25 of walk cycle
+          if (Math.floor(anim.walkCycle * 2) !== Math.floor((anim.walkCycle - dt * 14) * 2)) {
+            const footX = anim.x * TILE_SIZE + TILE_SIZE / 2;
+            const footZ = anim.z * TILE_SIZE + TILE_SIZE / 2 + TILE_SIZE * 0.38 * 0.7;
+            for (let i = 0; i < 3; i++) {
+              dustParticles.current.push({
+                x: footX + (Math.random() - 0.5) * 6,
+                y: footZ + (Math.random() - 0.5) * 2,
+                vx: (Math.random() - 0.5) * 15,
+                vy: -(Math.random() * 12 + 3),
+                life: 0,
+                maxLife: 0.3 + Math.random() * 0.3,
+                size: 1.5 + Math.random() * 1.5,
+              });
+            }
+          }
+        } else {
+          // Smoothly decay walk cycle to nearest rest position
+          anim.walkCycle *= 0.85;
+        }
+
+        anim.prevX = anim.x;
+        anim.prevZ = anim.z;
 
         // Flash decay
         if (anim.flash > 0) anim.flash = Math.max(0, anim.flash - dt * 4);
@@ -388,8 +451,19 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
         const isSelected = unit.id === state.selectedUnitId;
         const size = TILE_SIZE * 0.38;
 
+        // Walk bob offset
+        const bobY = anim.isMoving ? Math.sin(anim.walkCycle * 2) * 2 : 0;
+        const tiltX = anim.isMoving ? Math.sin(anim.walkCycle) * 0.06 : 0;
+        // Leg offsets — alternate legs
+        const legPhase = anim.walkCycle;
+        const leftLegOffset = anim.isMoving ? Math.sin(legPhase) * size * 0.35 : 0;
+        const rightLegOffset = anim.isMoving ? Math.sin(legPhase + Math.PI) * size * 0.35 : 0;
+        // Arm swing
+        const armSwing = anim.isMoving ? Math.sin(legPhase + Math.PI) * size * 0.2 : 0;
+
         ctx.save();
-        ctx.translate(px, pz);
+        ctx.translate(px, pz + bobY);
+        ctx.rotate(tiltX);
 
         // Death fade
         if (!unit.isAlive) {
@@ -401,16 +475,29 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
         if (isSelected) {
           const glowPulse = 0.4 + Math.sin(timestamp * 0.005) * 0.2;
           ctx.beginPath();
-          ctx.arc(0, 0, size + 5, 0, Math.PI * 2);
+          ctx.arc(0, -bobY, size + 5, 0, Math.PI * 2);
           ctx.fillStyle = teamColor + Math.floor(glowPulse * 255).toString(16).padStart(2, '0');
           ctx.fill();
         }
 
-        // Unit shadow
+        // Unit shadow (squashes with bob)
+        const shadowSquash = 1 - Math.abs(bobY) * 0.04;
         ctx.beginPath();
-        ctx.ellipse(0, size * 0.6, size * 0.7, size * 0.25, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, size * 0.6 - bobY, size * 0.7, size * 0.25 * shadowSquash, 0, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.fill();
+
+        // ── Legs (drawn behind body) ──
+        ctx.fillStyle = '#3a3a3a';
+        // Left leg
+        ctx.fillRect(-size * 0.35, size * 0.35 + leftLegOffset * 0.5, size * 0.28, size * 0.4);
+        // Right leg
+        ctx.fillRect(size * 0.08, size * 0.35 + rightLegOffset * 0.5, size * 0.28, size * 0.4);
+
+        // Boots — pixel detail
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-size * 0.38, size * 0.7 + leftLegOffset * 0.5, size * 0.34, size * 0.12);
+        ctx.fillRect(size * 0.05, size * 0.7 + rightLegOffset * 0.5, size * 0.34, size * 0.12);
 
         // Body — pixel art soldier shape
         // Torso
@@ -425,9 +512,12 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
         ctx.fillStyle = teamColor;
         ctx.fillRect(-size * 0.35, -size * 1.2, size * 0.7, size * 0.25);
 
-        // Weapon (right side)
+        // Weapon (right side, swings with arm)
+        ctx.save();
+        ctx.translate(size * 0.4, -size * 0.1 + armSwing);
         ctx.fillStyle = '#555';
-        ctx.fillRect(size * 0.35, -size * 0.5, size * 0.15, size * 0.8);
+        ctx.fillRect(-size * 0.07, -size * 0.4, size * 0.15, size * 0.8);
+        ctx.restore();
 
         // Class indicator
         if (unit.unitClass === 'medic') {
@@ -435,11 +525,6 @@ export function GameBoard2D({ state, onTileClick, onUnitClick, onTileHover, onMo
           ctx.fillRect(-size * 0.12, -size * 0.4, size * 0.24, size * 0.08);
           ctx.fillRect(-size * 0.04, -size * 0.5, size * 0.08, size * 0.28);
         }
-
-        // Legs
-        ctx.fillStyle = '#3a3a3a';
-        ctx.fillRect(-size * 0.35, size * 0.35, size * 0.28, size * 0.4);
-        ctx.fillRect(size * 0.08, size * 0.35, size * 0.28, size * 0.4);
 
         // HP bar above unit
         const barW = size * 1.8;

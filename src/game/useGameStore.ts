@@ -15,6 +15,8 @@ export function useGameStore() {
   const [state, setState] = useState<GameState>(createInitialState);
   const [sponsorPoints, setSponsorPoints] = useState(5);
   const [inspectedUnitId, setInspectedUnitId] = useState<string | null>(null);
+  const [betTeam, setBetTeam] = useState<Team | null>(null);
+  const [betAmount, setBetAmount] = useState(0);
   const autoPlayRef = useRef(false);
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

@@ -97,6 +97,7 @@ function GameSoldierPreview({ teamColor, isMedic, customization, hasBeard }: { t
   const torsoMat = useMemo(() => getMat(armorColor, 0.15, 0.55), [armorColor]);
   const darkMat = useMemo(() => getMat(darkArmor, 0.1, 0.7), [darkArmor]);
   const skinMat = useMemo(() => getMat('#c8a882', 0, 0.85), []);
+  const bootMat = useMemo(() => getMat('#1e1a14', 0.1, 0.7), []);
   const beardMat = useMemo(() => getMat('#5a3a1a', 0, 0.9), []);
   const gearMat = useMemo(() => getMat('#2e2e28', 0.15, 0.6), []);
   const helmetMat = useMemo(() => getMat(armorColor, 0.25, 0.45), [armorColor]);

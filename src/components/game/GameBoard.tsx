@@ -193,15 +193,46 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
       >
         <CameraController angleIndex={angleIndex} />
         <KillCamController killCam={state.killCam} />
-        <color attach="background" args={['#0c1a12']} />
-        <Stars radius={80} depth={40} count={800} factor={2} saturation={0.1} fade speed={0.5} />
+        <color attach="background" args={['#1a2840']} />
+        <Stars radius={80} depth={50} count={1500} factor={3} saturation={0.3} fade speed={0.4} />
+
+        {/* Sky gradient dome */}
+        <mesh scale={[-1, 1, 1]}>
+          <sphereGeometry args={[90, 32, 16]} />
+          <meshBasicMaterial side={THREE.BackSide}>
+            <color attach="color" args={['#1a2840']} />
+          </meshBasicMaterial>
+        </mesh>
+
+        {/* Ground plane extending beyond the map */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[GRID_SIZE / 2 - 0.5, -0.15, GRID_SIZE / 2 - 0.5]}>
+          <planeGeometry args={[120, 120]} />
+          <meshStandardMaterial color="#1a2a18" roughness={1} metalness={0} />
+        </mesh>
+
+        {/* Distant mountain silhouettes */}
+        {[0, 1, 2, 3, 4, 5].map(i => {
+          const angle = (i / 6) * Math.PI * 2;
+          const dist = 35 + Math.sin(i * 2.7) * 8;
+          const height = 6 + Math.sin(i * 1.3) * 4;
+          return (
+            <mesh key={i} position={[
+              GRID_SIZE / 2 + Math.cos(angle) * dist,
+              height * 0.4,
+              GRID_SIZE / 2 + Math.sin(angle) * dist
+            ]}>
+              <coneGeometry args={[8 + i * 1.5, height, 5]} />
+              <meshStandardMaterial color="#0d1a10" roughness={1} />
+            </mesh>
+          );
+        })}
 
         <ambientLight intensity={0.55} color="#99aabb" />
         <directionalLight position={[15, 25, 15]} intensity={0.9} castShadow color="#ffe0b0"
           shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
         <directionalLight position={[-10, 15, -10]} intensity={0.2} color="#7799dd" />
         <hemisphereLight intensity={0.45} color="#778899" groundColor="#2a3a22" />
-        <fog attach="fog" args={['#1a2a1e', 30, 70]} />
+        <fog attach="fog" args={['#1a2840', 35, 80]} />
 
         <DustParticles />
 

@@ -1,13 +1,13 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS,
+  GameState, Position, CombatEvent, AbilityId, AP_MOVE_COST, AP_ATTACK_COST, WEAPONS, Team,
 } from './types';
 import {
   createInitialState, getMovableTiles, getAttackableTiles, getAbilityTargetTiles,
-  performAttack, getNextTeam, getAliveTeams, runAiTurn, isInZone,
+  performAttack, getNextTeam, getAliveTeams, runAiTurn, runAiUnitStep, isInZone,
   checkOverwatch, getAttackPreview, getManhattanDistance, pickupLoot,
 } from './gameState';
-import { startBgMusic, stopBgMusic, playPickup, playHeal, playPickup as playGift } from './sounds';
+import { startBgMusic, stopBgMusic, playPickup, playHeal, playMove } from './sounds';
 import { SponsorAction } from '@/components/game/CharacterPanel';
 
 export function useGameStore() {
@@ -17,6 +17,10 @@ export function useGameStore() {
   const autoPlayRef = useRef(false);
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Track which unit is currently acting in the auto-play sequence
+  const unitQueueRef = useRef<string[]>([]);
+  const currentTeamRef = useRef<Team>('blue');
+
   // Earn sponsor points over time
   useEffect(() => {
     if (!state.autoPlay || state.phase === 'game_over' || state.phase === 'pre_game') return;
@@ -25,19 +29,6 @@ export function useGameStore() {
     }, 8000);
     return () => clearInterval(interval);
   }, [state.autoPlay, state.phase]);
-
-  const addEvents = useCallback((events: CombatEvent[]) => {
-    setState(prev => ({
-      ...prev,
-      combatEvents: [...prev.combatEvents, ...events],
-    }));
-    setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        combatEvents: prev.combatEvents.filter(e => Date.now() - e.timestamp < 2500),
-      }));
-    }, 3000);
-  }, []);
 
   const sponsorUnit = useCallback((unitId: string, action: SponsorAction) => {
     setSponsorPoints(prev => {
@@ -58,7 +49,6 @@ export function useGameStore() {
 
         switch (action) {
           case 'reveal_enemies': {
-            // Find nearest enemy and create a marker event
             const enemies = units.filter(u => u.isAlive && u.team !== unit.team);
             if (enemies.length > 0) {
               let nearest = enemies[0];
@@ -67,7 +57,6 @@ export function useGameStore() {
                 const d = getManhattanDistance(unit.position, e.position);
                 if (d < nearestDist) { nearest = e; nearestDist = d; }
               }
-              // Temporarily boost vision for 3 turns by increasing visionRange
               unit.visionRange += 5;
               log.push(`🎁 SPONSOR: ${unit.name} receives ENEMY INTEL! Nearest: ${nearest.name} (${nearestDist} tiles away)`);
               events.push({
@@ -79,7 +68,6 @@ export function useGameStore() {
             break;
           }
           case 'reveal_loot': {
-            // Find nearest loot
             let nearestLoot: Position | null = null;
             let nearestDist = Infinity;
             for (let x = 0; x < gs.grid.length; x++) {
@@ -157,38 +145,77 @@ export function useGameStore() {
     setInspectedUnitId(unitId);
   }, []);
 
-  const runFullTurn = useCallback(() => {
+  // ═══════════════════════════════════════════════
+  // Per-unit auto-play: one unit acts per tick
+  // ═══════════════════════════════════════════════
+  const runSingleUnitStep = useCallback(() => {
     setState(prev => {
       if (prev.phase === 'game_over' || prev.phase === 'pre_game') return prev;
-
       const aliveTeams = getAliveTeams(prev.units);
       if (aliveTeams.length <= 1) return prev;
 
-      let newState = {
-        ...prev,
-        units: prev.units.map(u => ({ ...u, weapon: { ...u.weapon } })),
-        grid: prev.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null }))),
-      };
+      // If no units queued, prepare the current team's units
+      if (unitQueueRef.current.length === 0) {
+        const team = prev.currentTeam;
+        currentTeamRef.current = team;
 
-      // Reset current team AP
-      newState.units = newState.units.map(u => {
-        if (u.team === newState.currentTeam) {
-          const newCooldowns: Record<string, number> = {};
-          for (const [k, v] of Object.entries(u.cooldowns)) {
-            if (v > 0) newCooldowns[k] = v - 1;
+        // Reset AP and cooldowns for this team
+        const units = prev.units.map(u => {
+          if (u.team === team && u.isAlive) {
+            const newCooldowns: Record<string, number> = {};
+            for (const [k, v] of Object.entries(u.cooldowns)) {
+              if (v > 0) newCooldowns[k] = v - 1;
+            }
+            return { ...u, ap: u.maxAp, isSuppressed: false, isOnOverwatch: false, cooldowns: newCooldowns, weapon: { ...u.weapon } };
           }
-          return { ...u, ap: u.maxAp, isSuppressed: false, isOnOverwatch: false, cooldowns: newCooldowns };
-        }
-        return u;
-      });
+          return { ...u, weapon: { ...u.weapon } };
+        });
 
-      const aiResult = runAiTurn(newState);
-      newState = aiResult.state;
-      const allEvents = [...aiResult.events];
+        // Queue: soldier first, then medic
+        const teamUnits = units.filter(u => u.team === team && u.isAlive);
+        const sorted = [...teamUnits].sort((a, b) => {
+          if (a.unitClass === 'soldier' && b.unitClass === 'medic') return -1;
+          if (a.unitClass === 'medic' && b.unitClass === 'soldier') return 1;
+          return 0;
+        });
 
+        unitQueueRef.current = sorted.map(u => u.id);
+
+        const log = [...prev.log];
+        log.push(`» ${team.toUpperCase()} TEAM's turn`);
+
+        return {
+          ...prev,
+          units,
+          grid: prev.grid.map(row => row.map(t => ({ ...t, loot: t.loot ? { ...t.loot } : null }))),
+          log,
+          selectedUnitId: sorted[0]?.id || null, // highlight who's acting
+        };
+      }
+
+      // Pop next unit from queue
+      const nextUnitId = unitQueueRef.current.shift()!;
+      const unit = prev.units.find(u => u.id === nextUnitId);
+
+      if (!unit || !unit.isAlive) {
+        // Skip dead units, try next tick
+        return { ...prev, selectedUnitId: unitQueueRef.current[0] || null };
+      }
+
+      // Run this single unit's AI
+      const result = runAiUnitStep(nextUnitId, prev);
+      let newState = result.state;
+      const allEvents = [...result.events];
+
+      // Highlight the next unit that will act
+      const nextInQueue = unitQueueRef.current[0] || null;
+      newState = { ...newState, selectedUnitId: nextInQueue };
+
+      // Check for game over
       const alive = getAliveTeams(newState.units);
       if (alive.length <= 1) {
         stopBgMusic();
+        unitQueueRef.current = [];
         return {
           ...newState,
           log: [...newState.log, `🏆 ${alive[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
@@ -199,110 +226,123 @@ export function useGameStore() {
         };
       }
 
-      const nextTeam = getNextTeam(newState.currentTeam, newState.units);
-      if (!nextTeam) return newState;
+      // If queue is empty, advance to next team
+      if (unitQueueRef.current.length === 0) {
+        const nextTeam = getNextTeam(newState.currentTeam, newState.units);
+        if (!nextTeam) return newState;
 
-      const teamOrder = ['blue', 'red', 'green', 'yellow'] as const;
-      const firstAliveTeam = teamOrder.find(t => newState.units.some(u => u.team === t && u.isAlive));
-      const isNewRound = nextTeam === firstAliveTeam;
+        const teamOrder = ['blue', 'red', 'green', 'yellow'] as const;
+        const firstAliveTeam = teamOrder.find(t => newState.units.some(u => u.team === t && u.isAlive));
+        const isNewRound = nextTeam === firstAliveTeam;
 
-      let { turn, shrinkLevel, zoneTimer } = newState;
-      const log = [...newState.log];
+        let { turn, shrinkLevel, zoneTimer } = newState;
+        const log = [...newState.log];
 
-      if (isNewRound) {
-        turn++;
-        zoneTimer--;
-        if (zoneTimer <= 0 && shrinkLevel < 4) {
-          shrinkLevel++;
-          zoneTimer = 4;
+        if (isNewRound) {
+          turn++;
+          zoneTimer--;
+          if (zoneTimer <= 0 && shrinkLevel < 4) {
+            shrinkLevel++;
+            zoneTimer = 4;
+            log.push(`═══════════════════════════`);
+            log.push(`⚠ DANGER ZONE LEVEL ${shrinkLevel}! The ring closes in!`);
+
+            newState.units = newState.units.map(u => {
+              if (u.isAlive && !isInZone(u.position.x, u.position.z, shrinkLevel)) {
+                const dmg = 15 * shrinkLevel;
+                const newHp = Math.max(0, u.hp - dmg);
+                log.push(`☠ ${u.name} takes ${dmg} zone damage!`);
+                allEvents.push({
+                  id: `evt-${Date.now()}-${u.id}`, type: 'damage',
+                  attackerPos: u.position, targetPos: u.position, value: dmg,
+                  message: `☠ Zone damage!`, timestamp: Date.now(),
+                });
+                return { ...u, hp: newHp, isAlive: newHp > 0 };
+              }
+              return u;
+            });
+          }
+
+          let grid = newState.grid;
+          if (turn % 2 === 0) {
+            grid = grid.map(row => row.map(t => ({ ...t, hasSmoke: false })));
+          }
+          newState.grid = grid;
+
           log.push(`═══════════════════════════`);
-          log.push(`⚠ DANGER ZONE LEVEL ${shrinkLevel}! The ring closes in!`);
-
-          newState.units = newState.units.map(u => {
-            if (u.isAlive && !isInZone(u.position.x, u.position.z, shrinkLevel)) {
-              const dmg = 15 * shrinkLevel;
-              const newHp = Math.max(0, u.hp - dmg);
-              log.push(`☠ ${u.name} takes ${dmg} zone damage!`);
-              allEvents.push({
-                id: `evt-${Date.now()}-${u.id}`, type: 'damage',
-                attackerPos: u.position, targetPos: u.position, value: dmg,
-                message: `☠ Zone damage!`, timestamp: Date.now(),
-              });
-              return { ...u, hp: newHp, isAlive: newHp > 0 };
-            }
-            return u;
-          });
+          log.push(`» ROUND ${turn}`);
+          log.push(`» ${newState.units.filter(u => u.isAlive).length} combatants remaining`);
         }
 
-        let grid = newState.grid;
-        if (turn % 2 === 0) {
-          grid = grid.map(row => row.map(t => ({ ...t, hasSmoke: false })));
+        const alive2 = getAliveTeams(newState.units);
+        if (alive2.length <= 1) {
+          stopBgMusic();
+          return {
+            ...newState,
+            log: [...log, `🏆 ${alive2[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
+            phase: 'game_over' as const, selectedUnitId: null,
+            movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+            combatEvents: [...prev.combatEvents, ...allEvents], activeAbility: null,
+            turn, shrinkLevel, zoneTimer, autoPlay: false,
+          };
         }
-        newState.grid = grid;
 
-        log.push(`═══════════════════════════`);
-        log.push(`» TURN ${turn} — ${nextTeam.toUpperCase()} TEAM'S MOVE`);
-        log.push(`» ${newState.units.filter(u => u.isAlive).length} combatants remaining`);
-      }
-
-      const alive2 = getAliveTeams(newState.units);
-      if (alive2.length <= 1) {
-        stopBgMusic();
         return {
           ...newState,
-          log: [...log, `🏆 ${alive2[0]?.toUpperCase() || 'NO'} TEAM WINS THE BATTLE ROYALE!`],
-          phase: 'game_over' as const, selectedUnitId: null,
+          currentTeam: nextTeam,
+          turn, shrinkLevel, zoneTimer,
+          phase: 'select' as const,
+          selectedUnitId: null,
           movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
-          combatEvents: [...prev.combatEvents, ...allEvents], activeAbility: null,
-          turn, shrinkLevel, zoneTimer, autoPlay: false,
+          activeAbility: null,
+          log,
+          combatEvents: [...prev.combatEvents, ...allEvents],
+          attackPreview: null, hoveredTile: null,
         };
       }
 
       return {
         ...newState,
-        currentTeam: nextTeam,
-        turn, shrinkLevel, zoneTimer,
-        phase: 'select' as const,
-        selectedUnitId: null,
-        movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
-        activeAbility: null,
-        log,
         combatEvents: [...prev.combatEvents, ...allEvents],
-        attackPreview: null, hoveredTile: null,
       };
     });
   }, []);
 
-  // Auto-play loop
+  // Auto-play loop - ticks per unit with delay
   useEffect(() => {
     autoPlayRef.current = state.autoPlay;
     if (state.autoPlay && state.phase !== 'game_over' && state.phase !== 'pre_game') {
+      // Shorter delay if just switching teams (no queue), longer for unit actions
+      const hasQueue = unitQueueRef.current.length > 0;
+      const delay = hasQueue ? 1400 : 600; // 1.4s per unit action, 0.6s for team switch
       autoPlayTimerRef.current = setTimeout(() => {
         if (autoPlayRef.current) {
-          runFullTurn();
+          runSingleUnitStep();
         }
-      }, 1200);
+      }, delay);
     }
     return () => {
       if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
     };
-  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, runFullTurn]);
+  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, state.units, state.selectedUnitId, runSingleUnitStep]);
 
   const startAutoPlay = useCallback(() => {
     startBgMusic();
+    unitQueueRef.current = [];
     setState(prev => ({
       ...prev,
       phase: 'select',
       autoPlay: true,
       log: [...prev.log,
         '» AUTO-BATTLE ENGAGED! All teams controlled by AI.',
-        '» Fog of War: AI units have limited vision!',
+        '» Units act one at a time — Soldier first, then Medic.',
         '» 🎁 You are now a SPONSOR — click any unit to send gifts!',
       ],
     }));
   }, []);
 
   const stopAutoPlay = useCallback(() => {
+    unitQueueRef.current = [];
     setState(prev => ({ ...prev, autoPlay: false }));
   }, []);
 
@@ -667,6 +707,7 @@ export function useGameStore() {
 
   const restart = useCallback(() => {
     stopBgMusic();
+    unitQueueRef.current = [];
     setSponsorPoints(5);
     setInspectedUnitId(null);
     setState(createInitialState());

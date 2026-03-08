@@ -676,6 +676,7 @@ export function createInitialState(): GameState {
     movePath: null,
     movingUnitId: null,
     killCam: null,
+    airdrops: [],
   };
 }
 

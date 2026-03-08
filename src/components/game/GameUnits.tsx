@@ -398,7 +398,8 @@ function PixelCharacter({ unit, isSelected, onClick, combatEvents, movePath, isM
     if (frameTimer.current >= 1 / fps) {
       frameTimer.current = 0;
       // For death animation, don't loop - stay on last frame
-      if (animState.current === 'dying') {
+      const currentAnim = animState.current as string;
+      if (currentAnim === 'dying') {
         currentFrame.current = Math.min(currentFrame.current + 1, SPRITE_COLS - 1);
       } else {
         currentFrame.current = (currentFrame.current + 1) % SPRITE_COLS;

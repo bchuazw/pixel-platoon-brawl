@@ -397,6 +397,8 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
   const isPreGame = state.phase === 'pre_game';
   const isGameOver = state.phase === 'game_over';
   const aliveUnits = state.units.filter(u => u.isAlive);
+  const [showRoster, setShowRoster] = useState(false);
+  const [showFeed, setShowFeed] = useState(false);
 
   const aliveByTeam = useMemo(() => {
     const counts: Record<Team, number> = { blue: 0, red: 0, green: 0, yellow: 0 };
@@ -476,17 +478,42 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
         </div>
       </div>
 
+      {/* ── Mobile toggle buttons ── */}
+      {!isPreGame && (
+        <>
+          <button
+            onClick={() => setShowRoster(v => !v)}
+            className={`pointer-events-auto sm:hidden absolute left-2 top-14 z-30 w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+              showRoster ? 'bg-primary/20 border border-primary/30' : 'bg-card/80 border border-border/20'
+            }`}
+          >
+            <Users className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => setShowFeed(v => !v)}
+            className={`pointer-events-auto sm:hidden absolute right-2 top-14 z-30 w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+              showFeed ? 'bg-primary/20 border border-primary/30' : 'bg-card/80 border border-border/20'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </>
+      )}
+
       {/* ── Sidebars ── */}
-      {!isPreGame && <TeamRoster state={state} onUnitInspect={onUnitInspect} />}
-      {!isPreGame && <CombatFeed log={state.log} />}
+      {!isPreGame && <TeamRoster state={state} onUnitInspect={onUnitInspect} visible={showRoster} />}
+      {!isPreGame && <CombatFeed log={state.log} visible={showFeed} />}
 
       {/* ── Tactical Minimap ── */}
       {!isPreGame && !isGameOver && (
         <TacticalMinimap state={state} inspectedUnitId={inspectedUnitId ?? null} />
       )}
 
+      {/* ── Sponsor HUD Panel (WIP) ── */}
+      {!isPreGame && !isGameOver && state.autoPlay && <SponsorHUDPanel />}
+
       {/* ── Kill Feed ── */}
-      <div className="absolute top-14 sm:top-16 right-[200px] sm:right-[280px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[200px] sm:max-w-[280px]">
+      <div className="absolute top-14 sm:top-16 right-[200px] sm:right-[280px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[200px] sm:max-w-[280px] hidden sm:flex">
         {state.combatEvents.filter(e => e.type === 'kill' && Date.now() - e.timestamp < 3500).map(e => (
           <div key={e.id} className="kill-notification rounded-md px-3 sm:px-4 py-1.5 flex items-center gap-2"
             style={{ background: 'rgba(8,12,18,0.9)', borderLeft: '3px solid hsl(0,75%,55%)' }}>

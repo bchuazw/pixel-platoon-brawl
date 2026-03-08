@@ -449,32 +449,45 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         </button>
       </div>
 
-      {/* Kill Cam Overlay */}
+      {/* Kill Cam Overlay — Cinematic */}
       {state.killCam && (
-        <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
-          {/* Letterbox bars */}
-          <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black to-transparent" />
-          {/* Vignette */}
+        <div className="absolute inset-0 z-30 pointer-events-none">
+          {/* Letterbox bars — wider for cinematic ratio */}
+          <div className="absolute top-0 left-0 right-0 h-[12%] bg-black transition-all duration-700" />
+          <div className="absolute bottom-0 left-0 right-0 h-[12%] bg-black transition-all duration-700" />
+          {/* Deep vignette */}
           <div className="absolute inset-0" style={{
-            background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 100%)',
+            background: 'radial-gradient(ellipse at center, transparent 20%, rgba(0,0,0,0.5) 60%, rgba(0,0,0,0.85) 100%)',
           }} />
-          {/* Kill info */}
-          <div className="animate-fade-in flex flex-col items-center gap-3">
-            <div className="text-[10px] tracking-[0.4em] text-red-400/80 font-mono uppercase">
-              Eliminated
-            </div>
-            <div className="text-4xl font-black text-red-500 tracking-wider"
-              style={{ fontFamily: "'Share Tech Mono', monospace", textShadow: '0 0 40px rgba(255,50,50,0.6), 0 0 80px rgba(255,0,0,0.3)' }}>
-              ☠ {state.killCam.victimName}
-            </div>
-            <div className="text-[9px] tracking-[0.25em] text-muted-foreground/70 font-mono">
-              by {state.killCam.killerName}
+          {/* Red accent edge flare */}
+          <div className="absolute inset-0 opacity-30" style={{
+            background: 'radial-gradient(ellipse at center, transparent 50%, rgba(180,30,0,0.3) 100%)',
+          }} />
+          {/* Kill info — bottom-left Gears-style */}
+          <div className="absolute bottom-[14%] left-8 animate-fade-in flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-12 bg-destructive rounded-full" />
+              <div>
+                <div className="text-[9px] tracking-[0.5em] text-destructive/80 font-mono uppercase mb-1">
+                  ELIMINATED
+                </div>
+                <div className="text-3xl font-black text-foreground tracking-wide"
+                  style={{ textShadow: '0 0 30px rgba(255,50,50,0.4), 0 2px 8px rgba(0,0,0,0.8)' }}>
+                  {state.killCam.victimName}
+                </div>
+                <div className="text-[10px] tracking-[0.2em] text-muted-foreground/80 font-mono mt-0.5">
+                  ▸ {state.killCam.killerName}
+                </div>
+              </div>
             </div>
           </div>
-          {/* Film grain */}
-          <div className="absolute inset-0 opacity-[0.06]" style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)',
+          {/* Scanline / film grain */}
+          <div className="absolute inset-0 opacity-[0.04]" style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.03) 1px, rgba(255,255,255,0.03) 2px)',
+          }} />
+          {/* Chromatic aberration hint — top-right corner flash */}
+          <div className="absolute top-[12%] right-0 w-32 h-32 opacity-20" style={{
+            background: 'radial-gradient(circle, rgba(255,100,50,0.5) 0%, transparent 70%)',
           }} />
         </div>
       )}

@@ -355,16 +355,13 @@ export function useGameStore() {
           log.push(`» ${newState.units.filter(u => u.isAlive).length} combatants remaining`);
 
           // Trigger supply airdrops every 7-10 rounds (randomized)
-          if (!newState._nextAirdropRound) {
-            newState._nextAirdropRound = 7 + Math.floor(Math.random() * 4);
-          }
-          if (turn >= newState._nextAirdropRound) {
+          if (turn >= newState.nextAirdropRound) {
             const newDrops = generateAirdrops(newState.grid);
             if (newDrops.length > 0) {
               newState.airdrops = [...(newState.airdrops || []), ...newDrops];
               log.push(`✈️ INCOMING SUPPLY DROP! ${newDrops.length} crate${newDrops.length > 1 ? 's' : ''} inbound!`);
             }
-            newState._nextAirdropRound = turn + 7 + Math.floor(Math.random() * 4);
+            newState.nextAirdropRound = turn + 7 + Math.floor(Math.random() * 4);
           }
         }
 

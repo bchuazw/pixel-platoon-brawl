@@ -813,20 +813,10 @@ function Soldier3D({ unit, isSelected, onClick, combatEvents, movePath, isMoving
 
       {/* ── Overwatch range ── */}
       {unit.isOnOverwatch && (
-        <>
-          <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[unit.attackRange, 32]} />
-            <meshBasicMaterial color="#44aaff" transparent opacity={0.05} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh position={[0, 0.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[unit.attackRange - 0.1, unit.attackRange + 0.1, 32]} />
-            <meshBasicMaterial color="#44aaff" transparent opacity={0.2} side={THREE.DoubleSide} />
-          </mesh>
-          <mesh position={[0, 0.022, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[unit.attackRange * 0.5 - 0.04, unit.attackRange * 0.5 + 0.04, 32]} />
-            <meshBasicMaterial color="#44aaff" transparent opacity={0.08} side={THREE.DoubleSide} />
-          </mesh>
-        </>
+        <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[unit.attackRange - 0.1, unit.attackRange + 0.1, 24]} />
+          <meshBasicMaterial color="#44aaff" transparent opacity={0.15} side={THREE.DoubleSide} />
+        </mesh>
       )}
     </group>
   );

@@ -167,7 +167,7 @@ function CombatFeed({ log, visible }: { log: string[]; visible: boolean }) {
   };
 
   return (
-    <div className={`pointer-events-auto absolute right-0 top-[210px] sm:top-[220px] bottom-8 w-48 sm:w-64 flex flex-col overflow-hidden transition-transform duration-300 ${
+    <div className={`pointer-events-auto absolute right-0 top-[180px] sm:top-[190px] bottom-8 w-44 sm:w-56 flex flex-col overflow-hidden transition-transform duration-300 ${
       visible ? 'translate-x-0' : 'translate-x-full sm:translate-x-0'
     }`}
       style={{
@@ -525,7 +525,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {!isPreGame && !isGameOver && state.autoPlay && <SponsorHUDPanel />}
 
       {/* ── Kill Feed ── */}
-      <div className="absolute top-14 sm:top-16 right-[200px] sm:right-[280px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[200px] sm:max-w-[280px] hidden sm:flex">
+      <div className="absolute top-14 sm:top-16 right-[190px] sm:right-[240px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[180px] sm:max-w-[250px] hidden sm:flex">
         {state.combatEvents.filter(e => e.type === 'kill' && Date.now() - e.timestamp < 3500).map(e => (
           <div key={e.id} className="kill-notification rounded-md px-3 sm:px-4 py-1.5 flex items-center gap-2"
             style={{ background: 'rgba(8,12,18,0.9)', borderLeft: '3px solid hsl(0,75%,55%)' }}>

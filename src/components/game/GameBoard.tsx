@@ -31,7 +31,6 @@ function WASDControls({ orbitRef }: { orbitRef: React.RefObject<any> }) {
     const speed = 0.15;
     const target = orbitRef.current.target;
     const camera = orbitRef.current.object;
-    // Get forward/right vectors projected on xz plane
     const forward = new THREE.Vector3();
     camera.getWorldDirection(forward);
     forward.y = 0;
@@ -61,7 +60,6 @@ interface GameBoardProps {
 
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
 
-// FFT-style isometric camera — high angle, moderate distance
 const CAM_DISTANCE = 22;
 const CAM_HEIGHT = 18;
 
@@ -98,7 +96,7 @@ function CameraController({ angleIndex, orbitRef }: { angleIndex: number; orbitR
   return null;
 }
 
-// ── Kill Cam — optimized: no per-frame allocations, capped delta ──
+// ── Kill Cam ──
 function KillCamController({ killCam }: { killCam: KillCamData | null }) {
   const { camera } = useThree();
   const savedPos = useRef(new THREE.Vector3());
@@ -108,7 +106,7 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
   const targetLook = useRef(new THREE.Vector3());
   const targetCamPos = useRef(new THREE.Vector3());
   const startLook = useRef(new THREE.Vector3());
-  const lerpTemp = useRef(new THREE.Vector3()); // reusable vector
+  const lerpTemp = useRef(new THREE.Vector3());
 
   useEffect(() => {
     if (killCam && !isActive.current) {
@@ -137,7 +135,6 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
 
   useFrame((_, rawDelta) => {
     if (!isActive.current) return;
-    // Cap delta to prevent frame-skip jank
     const delta = Math.min(rawDelta, 0.05);
     const speed = phase.current === 'zoom_in' ? 0.8 : phase.current === 'hold' ? 0 : 1.5;
     progress.current = Math.min(1, progress.current + delta * speed);
@@ -177,6 +174,7 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
     </group>
   ) : null;
 }
+
 function LoadingFallback() {
   return (
     <mesh position={[10, 0, 10]}>
@@ -215,15 +213,12 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         <KillCamController killCam={state.killCam} />
         <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} cameraAngleIndex={angleIndex} />
 
-        {/* ── Sky — warm FFT-style gradient ── */}
         <color attach="background" args={['#1a2844']} />
         <mesh scale={[-1, 1, 1]}>
           <sphereGeometry args={[90, 24, 12]} />
           <meshBasicMaterial side={THREE.BackSide} color="#1e3050" />
         </mesh>
 
-        {/* ── Lighting — warm, bright, FFT-style ── */}
-        {/* Strong warm key light from above-left (like FFT's golden sunlight) */}
         <ambientLight intensity={0.5} color="#8899cc" />
         <directionalLight
           position={[20, 30, 15]}
@@ -240,16 +235,11 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           shadow-camera-bottom={-22}
           shadow-bias={-0.0003}
         />
-        {/* Cool fill from opposite side */}
         <directionalLight position={[-15, 18, -12]} intensity={0.4} color="#6688cc" />
-        {/* Warm rim light */}
         <directionalLight position={[-8, 12, 22]} intensity={0.3} color="#dd9944" />
-        {/* Hemisphere for soft ambient */}
         <hemisphereLight intensity={0.4} color="#88aadd" groundColor="#2a4a1e" />
-        {/* Soft fog — less aggressive than before */}
         <fog attach="fog" args={['#1a2844', 50, 100]} />
 
-        {/* Post-processing */}
         <EffectComposer multisampling={0}>
           <Bloom intensity={0.25} luminanceThreshold={0.6} luminanceSmoothing={0.9} mipmapBlur />
           <Vignette offset={0.15} darkness={0.45} blendFunction={BlendFunction.NORMAL} />
@@ -317,21 +307,23 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         />
       </Canvas>
 
-      {/* Camera controls */}
-      <div className="absolute bottom-36 right-4 z-20 pointer-events-auto flex flex-col gap-1.5">
+      {/* Camera controls — positioned top-right, to the LEFT of the minimap */}
+      <div className="absolute top-12 sm:top-14 right-[134px] sm:right-[140px] z-20 pointer-events-auto flex flex-col gap-1">
         <button
           onClick={() => setAutoFollow(prev => !prev)}
-          className={`bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-secondary transition-colors ${autoFollow ? 'text-primary' : 'text-muted-foreground'}`}
+          className={`bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-2 py-1.5 flex items-center gap-1.5 hover:bg-secondary transition-colors ${autoFollow ? 'text-primary' : 'text-muted-foreground'}`}
+          title={autoFollow ? 'Camera tracking on' : 'Camera tracking off'}
         >
-          {autoFollow ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-          <span className="text-[8px] tracking-wider font-display">{autoFollow ? 'TRACKING ON' : 'TRACKING OFF'}</span>
+          {autoFollow ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
+          <span className="text-[9px] tracking-wider font-display hidden lg:inline">{autoFollow ? 'TRACK' : 'FREE'}</span>
         </button>
         <button
           onClick={rotateCamera}
-          className="bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 flex items-center gap-2 text-foreground hover:bg-secondary transition-colors"
+          className="bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-2 py-1.5 flex items-center gap-1.5 text-foreground hover:bg-secondary transition-colors"
+          title={`Rotate camera (${ANGLE_LABELS[angleIndex]})`}
         >
-          <RotateCw className="w-4 h-4 text-primary" />
-          <span className="text-[8px] tracking-wider font-display">ROTATE ({ANGLE_LABELS[angleIndex]})</span>
+          <RotateCw className="w-3.5 h-3.5 text-primary" />
+          <span className="text-[9px] tracking-wider font-display hidden lg:inline">{ANGLE_LABELS[angleIndex]}</span>
         </button>
       </div>
 

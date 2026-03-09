@@ -82,16 +82,13 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
 }) {
   const surfaceRef = useRef<THREE.InstancedMesh>(null);
   const sideRef = useRef<THREE.InstancedMesh>(null);
+  const highlightRef = useRef<THREE.InstancedMesh>(null);
   const count = GRID_SIZE * GRID_SIZE;
-
-  // Store tile positions for raycasting
-  const tilePositions = useRef<Position[]>([]);
 
   // Build instance matrices and colors
   useEffect(() => {
     if (!surfaceRef.current) return;
-    const positions: Position[] = [];
-    let sideCount = 0;
+    let highlightCount = 0;
 
     for (let x = 0; x < GRID_SIZE; x++) {
       for (let z = 0; z < GRID_SIZE; z++) {
@@ -104,21 +101,6 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
 
         const key = `${x},${z}`;
         const isOutOfZone = !isInZone(x, z, shrinkLevel) && shrinkLevel > 0;
-        const isMovable = movableSet.has(key);
-        const isOnPath = pathSet.has(key);
-        const isWeaponRange = weaponRangeSet.has(key) && !isMovable && !attackableSet.has(key);
-        const isAttackable = attackableSet.has(key);
-        const isAbilityTarget = abilitySet.has(key);
-
-        let emissive = '#000000';
-        let emI = 0;
-        if (tile.type === 'water') { emissive = '#1177aa'; emI = 0.12; }
-        if (isOutOfZone) { emissive = '#cc2222'; emI = 0.25; }
-        if (isMovable) { emissive = '#2299ff'; emI = 0.3; }
-        if (isOnPath) { emissive = '#44ddff'; emI = 0.45; }
-        if (isWeaponRange) { emissive = '#ff8800'; emI = 0.18; }
-        if (isAttackable) { emissive = '#ff3333'; emI = 0.4; }
-        if (isAbilityTarget) { emissive = '#ffaa00'; emI = 0.35; }
 
         const qElev = quantizeElevation(tile.elevation);
         const tileY = qElev * 0.6;
@@ -129,28 +111,28 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
 
         const topColor = isOutOfZone ? '#4a1818' : tile.scorchMark ? darkenColor(baseColor, 0.4) : baseColor;
 
-        // Surface tile
         _dummy.position.set(x, tileY + surfaceH / 2, z);
         _dummy.scale.set(TILE_SIZE, surfaceH, TILE_SIZE);
         _dummy.updateMatrix();
         surfaceRef.current!.setMatrixAt(i, _dummy.matrix);
-
-        // Color
         _color.set(topColor);
         surfaceRef.current!.setColorAt(i, _color);
 
-        positions.push({ x, z });
+        // Check for highlights
+        const isMovable = movableSet.has(key);
+        const isOnPath = pathSet.has(key);
+        const isWeaponRange = weaponRangeSet.has(key) && !isMovable && !attackableSet.has(key);
+        const isAttackable = attackableSet.has(key);
+        const isAbilityTarget = abilitySet.has(key);
 
-        // Side/elevation mesh
-        if (tileY > 0.02 && !isWater) {
-          sideCount++;
+        if (isMovable || isOnPath || isWeaponRange || isAttackable || isAbilityTarget || (isOutOfZone && tile.type === 'water')) {
+          highlightCount++;
         }
       }
     }
 
     surfaceRef.current!.instanceMatrix.needsUpdate = true;
     if (surfaceRef.current!.instanceColor) surfaceRef.current!.instanceColor.needsUpdate = true;
-    tilePositions.current = positions;
 
     // Build side instances
     if (sideRef.current) {
@@ -177,9 +159,56 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
       sideRef.current!.instanceMatrix.needsUpdate = true;
       if (sideRef.current!.instanceColor) sideRef.current!.instanceColor.needsUpdate = true;
     }
+
+    // Build highlight overlay instances
+    if (highlightRef.current && highlightCount > 0) {
+      let hi = 0;
+      for (let x = 0; x < GRID_SIZE; x++) {
+        for (let z = 0; z < GRID_SIZE; z++) {
+          const key = `${x},${z}`;
+          const isMovable = movableSet.has(key);
+          const isOnPath = pathSet.has(key);
+          const isWeaponRange = weaponRangeSet.has(key) && !isMovable && !attackableSet.has(key);
+          const isAttackable = attackableSet.has(key);
+          const isAbilityTarget = abilitySet.has(key);
+          const isOutOfZone = !isInZone(x, z, shrinkLevel) && shrinkLevel > 0;
+
+          let hlColor = '';
+          if (isOutOfZone) hlColor = '#cc2222';
+          if (isMovable) hlColor = '#2299ff';
+          if (isOnPath) hlColor = '#44ddff';
+          if (isWeaponRange) hlColor = '#ff8800';
+          if (isAttackable) hlColor = '#ff3333';
+          if (isAbilityTarget) hlColor = '#ffaa00';
+
+          if (hlColor) {
+            const tile = grid[x][z];
+            const qElev = quantizeElevation(tile.elevation);
+            const tileY = qElev * 0.6;
+            const surfaceH = tile.type === 'water' ? 0.03 : tile.type === 'trench' ? 0.04 : tile.type === 'crater' ? 0.04 : SURFACE_H;
+
+            _dummy.position.set(x, tileY + surfaceH + 0.005, z);
+            _dummy.scale.set(TILE_SIZE * 0.95, 0.01, TILE_SIZE * 0.95);
+            _dummy.updateMatrix();
+            highlightRef.current!.setMatrixAt(hi, _dummy.matrix);
+            _color.set(hlColor);
+            highlightRef.current!.setColorAt(hi, _color);
+            hi++;
+          }
+        }
+      }
+      // Hide unused instances
+      for (let j = hi; j < highlightCount; j++) {
+        _dummy.position.set(0, -100, 0);
+        _dummy.scale.set(0, 0, 0);
+        _dummy.updateMatrix();
+        highlightRef.current!.setMatrixAt(j, _dummy.matrix);
+      }
+      highlightRef.current!.instanceMatrix.needsUpdate = true;
+      if (highlightRef.current!.instanceColor) highlightRef.current!.instanceColor.needsUpdate = true;
+    }
   }, [grid, movableSet, attackableSet, abilitySet, pathSet, weaponRangeSet, shrinkLevel]);
 
-  // Count sides for instanced mesh
   const sideCount = useMemo(() => {
     let c = 0;
     for (let x = 0; x < GRID_SIZE; x++) {
@@ -192,6 +221,23 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
     }
     return c;
   }, [grid]);
+
+  const highlightCount = useMemo(() => {
+    let c = 0;
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const key = `${x},${z}`;
+        const isMovable = movableSet.has(key);
+        const isOnPath = pathSet.has(key);
+        const isWeaponRange = weaponRangeSet.has(key) && !isMovable && !attackableSet.has(key);
+        const isAttackable = attackableSet.has(key);
+        const isAbilityTarget = abilitySet.has(key);
+        const isOutOfZone = !isInZone(x, z, shrinkLevel) && shrinkLevel > 0;
+        if (isMovable || isOnPath || isWeaponRange || isAttackable || isAbilityTarget || isOutOfZone) c++;
+      }
+    }
+    return Math.max(1, c);
+  }, [movableSet, attackableSet, abilitySet, pathSet, weaponRangeSet, shrinkLevel]);
 
   const handleClick = (e: any) => {
     e.stopPropagation();
@@ -229,20 +275,21 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
         onPointerOut={handlePointerOut}
       >
         <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial roughness={0.85} vertexColors />
+        <meshStandardMaterial roughness={0.85} />
       </instancedMesh>
 
       {sideCount > 0 && (
-        <instancedMesh
-          ref={sideRef}
-          args={[undefined, undefined, sideCount]}
-          receiveShadow
-          castShadow
-        >
+        <instancedMesh ref={sideRef} args={[undefined, undefined, sideCount]} receiveShadow castShadow>
           <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial roughness={0.95} vertexColors />
+          <meshStandardMaterial roughness={0.95} />
         </instancedMesh>
       )}
+
+      {/* Highlight overlay for movable/attackable/path tiles */}
+      <instancedMesh ref={highlightRef} args={[undefined, undefined, highlightCount]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial transparent opacity={0.35} />
+      </instancedMesh>
     </>
   );
 }

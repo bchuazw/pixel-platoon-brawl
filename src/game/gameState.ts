@@ -493,7 +493,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
   }
 
   // ═══ SPAWN LOOT ═══
-  const lootCount = 18 + Math.floor(rand() * 8);
+  const lootCount = 26 + Math.floor(rand() * 12);
   let placed = 0;
   let attempts = 0;
   while (placed < lootCount && attempts < 500) {

@@ -11,18 +11,17 @@ import { ScreenShake } from './ScreenShake';
 import { AutoFollowCamera } from './AutoFollowCamera';
 import { AirdropVFX } from './AirdropVFX';
 import { GameState, Position, GRID_SIZE, KillCamData, AirdropData } from '@/game/types';
-import { RotateCw, Video, VideoOff } from 'lucide-react';
+import { useQualityStore, QualityLevel } from '@/game/useQualityStore';
+import { RotateCw, Video, VideoOff, Settings } from 'lucide-react';
 import * as THREE from 'three';
 
-// Reusable vectors for WASD — avoid per-frame allocations
+// Reusable vectors for WASD
 const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 
-// ── WASD Camera Panning — disabled during autoPlay ──
 function WASDControls({ orbitRef, disabled }: { orbitRef: React.RefObject<any>; disabled: boolean }) {
   const keys = useRef<Set<string>>(new Set());
-
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => keys.current.add(e.key.toLowerCase());
     const onUp = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
@@ -30,17 +29,14 @@ function WASDControls({ orbitRef, disabled }: { orbitRef: React.RefObject<any>; 
     window.addEventListener('keyup', onUp);
     return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
   }, []);
-
   useFrame(() => {
     if (!orbitRef.current || disabled) return;
     const speed = 0.15;
     const target = orbitRef.current.target;
     const camera = orbitRef.current.object;
     camera.getWorldDirection(_forward);
-    _forward.y = 0;
-    _forward.normalize();
+    _forward.y = 0; _forward.normalize();
     _right.crossVectors(_forward, _up).normalize();
-
     let moved = false;
     if (keys.current.has('w') || keys.current.has('arrowup')) { target.addScaledVector(_forward, speed); camera.position.addScaledVector(_forward, speed); moved = true; }
     if (keys.current.has('s') || keys.current.has('arrowdown')) { target.addScaledVector(_forward, -speed); camera.position.addScaledVector(_forward, -speed); moved = true; }
@@ -48,7 +44,6 @@ function WASDControls({ orbitRef, disabled }: { orbitRef: React.RefObject<any>; 
     if (keys.current.has('d') || keys.current.has('arrowright')) { target.addScaledVector(_right, speed); camera.position.addScaledVector(_right, speed); moved = true; }
     if (moved) orbitRef.current.update();
   });
-
   return null;
 }
 
@@ -63,46 +58,37 @@ interface GameBoardProps {
 }
 
 const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
-
 const CAM_DISTANCE = 22;
 const CAM_HEIGHT = 18;
 
 function getCameraPosition(angleIndex: number): [number, number, number] {
   const angle = (Math.PI / 4) + (angleIndex * Math.PI / 2);
-  const x = CENTER.x + Math.cos(angle) * CAM_DISTANCE;
-  const z = CENTER.z + Math.sin(angle) * CAM_DISTANCE;
-  return [x, CAM_HEIGHT, z];
+  return [CENTER.x + Math.cos(angle) * CAM_DISTANCE, CAM_HEIGHT, CENTER.z + Math.sin(angle) * CAM_DISTANCE];
 }
 
 const ANGLE_LABELS = ['SW', 'SE', 'NE', 'NW'];
 
-// CameraController only handles manual rotation transitions — NOT during autoPlay
 function CameraController({ angleIndex, orbitRef, disabled }: { angleIndex: number; orbitRef: React.RefObject<any>; disabled: boolean }) {
   const { camera } = useThree();
   const progress = useRef(1);
   const startPos = useRef(new THREE.Vector3());
   const targetPos = useRef(new THREE.Vector3());
-
   useEffect(() => {
     const [x, y, z] = getCameraPosition(angleIndex);
     startPos.current.copy(camera.position);
     targetPos.current.set(x, y, z);
     progress.current = 0;
   }, [angleIndex, camera]);
-
   useFrame(() => {
-    // Skip if autoPlay is controlling the camera, or transition is done
     if (disabled || progress.current >= 1) return;
     progress.current = Math.min(1, progress.current + 0.03);
     const t = 1 - Math.pow(1 - progress.current, 3);
     camera.position.lerpVectors(startPos.current, targetPos.current, t);
     if (orbitRef.current) orbitRef.current.update();
   });
-
   return null;
 }
 
-// ── Kill Cam ──
 function KillCamController({ killCam }: { killCam: KillCamData | null }) {
   const { camera } = useThree();
   const savedPos = useRef(new THREE.Vector3());
@@ -120,19 +106,13 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
       isActive.current = true;
       phase.current = 'zoom_in';
       progress.current = 0;
-
       const dx = killCam.targetPos.x - killCam.attackerPos.x;
       const dz = killCam.targetPos.z - killCam.attackerPos.z;
       const len = Math.sqrt(dx * dx + dz * dz) || 1;
-      const perpX = -dz / len;
-      const perpZ = dx / len;
-
+      const perpX = -dz / len, perpZ = dx / len;
       startLook.current.set(killCam.attackerPos.x + dx * 0.3, 1.5, killCam.attackerPos.z + dz * 0.3);
       targetLook.current.set(killCam.targetPos.x, 0.8, killCam.targetPos.z);
-      targetCamPos.current.set(
-        killCam.targetPos.x + perpX * 2.5 + dx / len * -1.5, 2.5,
-        killCam.targetPos.z + perpZ * 2.5 + dz / len * -1.5
-      );
+      targetCamPos.current.set(killCam.targetPos.x + perpX * 2.5 + dx / len * -1.5, 2.5, killCam.targetPos.z + perpZ * 2.5 + dz / len * -1.5);
     } else if (!killCam && isActive.current) {
       phase.current = 'zoom_out';
       progress.current = 0;
@@ -145,39 +125,27 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
     const speed = phase.current === 'zoom_in' ? 0.8 : phase.current === 'hold' ? 0 : 1.5;
     progress.current = Math.min(1, progress.current + delta * speed);
     const t = 1 - Math.pow(1 - progress.current, 3);
-
     if (phase.current === 'zoom_in') {
       camera.position.lerpVectors(savedPos.current, targetCamPos.current, t);
       lerpTemp.current.lerpVectors(startLook.current, targetLook.current, t);
       camera.lookAt(lerpTemp.current);
-      if (camera instanceof THREE.PerspectiveCamera) {
-        camera.fov = THREE.MathUtils.lerp(40, 30, t);
-        camera.updateProjectionMatrix();
-      }
+      if (camera instanceof THREE.PerspectiveCamera) { camera.fov = THREE.MathUtils.lerp(40, 30, t); camera.updateProjectionMatrix(); }
       if (progress.current >= 1) { phase.current = 'hold'; progress.current = 0; }
     } else if (phase.current === 'hold') {
       camera.lookAt(targetLook.current);
     } else if (phase.current === 'zoom_out') {
       camera.position.lerpVectors(targetCamPos.current, savedPos.current, t);
-      if (camera instanceof THREE.PerspectiveCamera) {
-        camera.fov = THREE.MathUtils.lerp(30, 40, t);
-        camera.updateProjectionMatrix();
-      }
+      if (camera instanceof THREE.PerspectiveCamera) { camera.fov = THREE.MathUtils.lerp(30, 40, t); camera.updateProjectionMatrix(); }
       if (progress.current >= 1) {
         isActive.current = false;
         camera.position.copy(savedPos.current);
-        if (camera instanceof THREE.PerspectiveCamera) {
-          camera.fov = 40;
-          camera.updateProjectionMatrix();
-        }
+        if (camera instanceof THREE.PerspectiveCamera) { camera.fov = 40; camera.updateProjectionMatrix(); }
       }
     }
   });
 
   return killCam ? (
-    <group>
-      <pointLight position={[killCam.targetPos.x, 4, killCam.targetPos.z]} intensity={2} color="#ff6633" distance={10} />
-    </group>
+    <pointLight position={[killCam.targetPos.x, 4, killCam.targetPos.z]} intensity={2} color="#ff6633" distance={10} />
   ) : null;
 }
 
@@ -190,15 +158,48 @@ function LoadingFallback() {
   );
 }
 
+// ── Quality Settings UI ──
+function QualityToggle() {
+  const { level, setLevel } = useQualityStore();
+  const [open, setOpen] = useState(false);
+  const levels: QualityLevel[] = ['low', 'medium', 'high'];
+  const labels: Record<QualityLevel, string> = { low: 'LOW', medium: 'MED', high: 'HIGH' };
+  const colors: Record<QualityLevel, string> = { low: 'text-green-400', medium: 'text-yellow-400', high: 'text-red-400' };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="bg-card/90 backdrop-blur-sm border border-border/50 rounded-lg px-2 py-1.5 flex items-center gap-1.5 text-foreground hover:bg-secondary transition-colors"
+        title="Graphics quality"
+      >
+        <Settings className="w-3.5 h-3.5 text-primary" />
+        <span className={`text-[9px] tracking-wider font-display hidden lg:inline ${colors[level]}`}>{labels[level]}</span>
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 mt-1 bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg overflow-hidden z-50">
+          {levels.map(l => (
+            <button
+              key={l}
+              onClick={() => { setLevel(l); setOpen(false); }}
+              className={`block w-full px-3 py-1.5 text-[10px] tracking-wider font-display text-left hover:bg-secondary transition-colors ${l === level ? colors[l] + ' font-bold' : 'text-muted-foreground'}`}
+            >
+              {labels[l]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMoveComplete, onAirdropLanded, inspectedUnitId }: GameBoardProps) {
   const [angleIndex, setAngleIndex] = useState(0);
   const [autoFollow, setAutoFollow] = useState(true);
   const orbitRef = useRef<any>(null);
+  const { settings } = useQualityStore();
 
-  const rotateCamera = useCallback(() => {
-    setAngleIndex(prev => (prev + 1) % 4);
-  }, []);
-
+  const rotateCamera = useCallback(() => setAngleIndex(prev => (prev + 1) % 4), []);
   const initialCamPos = getCameraPosition(0);
   const isAutoPlaying = state.autoPlay && autoFollow;
 
@@ -206,36 +207,35 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
     <div className="relative w-full h-full">
       <Canvas
         camera={{ position: initialCamPos, fov: 40, near: 0.1, far: 200 }}
-        shadows
+        shadows={settings.shadows}
         gl={{
-          antialias: true,
+          antialias: settings.antialias,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.3,
           powerPreference: 'high-performance',
         }}
-        dpr={[1, 1.5]}
+        dpr={settings.dpr}
       >
-        {/* CameraController only for manual rotation, disabled during autoFollow */}
         <CameraController angleIndex={angleIndex} orbitRef={orbitRef} disabled={isAutoPlaying} />
-        {/* WASD disabled during autoFollow to prevent conflicts */}
         <WASDControls orbitRef={orbitRef} disabled={isAutoPlaying} />
         <KillCamController killCam={state.killCam} />
         <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={isAutoPlaying} orbitRef={orbitRef} cameraAngleIndex={angleIndex} />
 
         <color attach="background" args={['#1a2844']} />
         <mesh scale={[-1, 1, 1]}>
-          <sphereGeometry args={[90, 24, 12]} />
+          <sphereGeometry args={[90, 16, 8]} />
           <meshBasicMaterial side={THREE.BackSide} color="#1e3050" />
         </mesh>
 
-        <ambientLight intensity={0.5} color="#8899cc" />
+        {/* Lighting — quality dependent */}
+        <ambientLight intensity={settings.lightCount === 'minimal' ? 0.7 : 0.5} color="#8899cc" />
         <directionalLight
           position={[20, 30, 15]}
           intensity={1.8}
-          castShadow
+          castShadow={settings.shadows}
           color="#ffe0a0"
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
+          shadow-mapSize-width={settings.shadowMapSize}
+          shadow-mapSize-height={settings.shadowMapSize}
           shadow-camera-near={0.5}
           shadow-camera-far={80}
           shadow-camera-left={-22}
@@ -244,15 +244,24 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           shadow-camera-bottom={-22}
           shadow-bias={-0.0003}
         />
-        <directionalLight position={[-15, 18, -12]} intensity={0.4} color="#6688cc" />
-        <directionalLight position={[-8, 12, 22]} intensity={0.3} color="#dd9944" />
-        <hemisphereLight intensity={0.4} color="#88aadd" groundColor="#2a4a1e" />
-        <fog attach="fog" args={['#1a2844', 50, 100]} />
+        {settings.lightCount !== 'minimal' && (
+          <directionalLight position={[-15, 18, -12]} intensity={0.4} color="#6688cc" />
+        )}
+        {settings.lightCount === 'full' && (
+          <>
+            <directionalLight position={[-8, 12, 22]} intensity={0.3} color="#dd9944" />
+            <hemisphereLight intensity={0.4} color="#88aadd" groundColor="#2a4a1e" />
+          </>
+        )}
+        <fog attach="fog" args={['#1a2844', settings.lightCount === 'minimal' ? 30 : 50, settings.lightCount === 'minimal' ? 70 : 100]} />
 
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.25} luminanceThreshold={0.6} luminanceSmoothing={0.9} mipmapBlur />
-          <Vignette offset={0.15} darkness={0.45} blendFunction={BlendFunction.NORMAL} />
-        </EffectComposer>
+        {/* Post-processing — only on high */}
+        {settings.postProcessing && (
+          <EffectComposer multisampling={0}>
+            <Bloom intensity={0.25} luminanceThreshold={0.6} luminanceSmoothing={0.9} mipmapBlur />
+            <Vignette offset={0.15} darkness={0.45} blendFunction={BlendFunction.NORMAL} />
+          </EffectComposer>
+        )}
 
         <ScreenShake events={state.combatEvents} />
 
@@ -316,7 +325,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         />
       </Canvas>
 
-      {/* Camera controls — positioned top-right, to the LEFT of the minimap */}
+      {/* Camera controls */}
       <div className="absolute top-12 sm:top-14 right-[134px] sm:right-[140px] z-20 pointer-events-auto flex flex-col gap-1">
         <button
           onClick={() => setAutoFollow(prev => !prev)}
@@ -334,6 +343,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           <RotateCw className="w-3.5 h-3.5 text-primary" />
           <span className="text-[9px] tracking-wider font-display hidden lg:inline">{ANGLE_LABELS[angleIndex]}</span>
         </button>
+        <QualityToggle />
       </div>
 
       {/* Kill Cam Overlay */}

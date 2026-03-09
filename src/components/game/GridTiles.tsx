@@ -218,7 +218,7 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
       for (let z = 0; z < GRID_SIZE; z++) {
         const tile = grid[x][z];
         const qElev = quantizeElevation(tile.elevation);
-        const tileY = qElev * 0.6;
+        const tileY = qElev * 0.5;
         if (tileY > 0.02 && tile.type !== 'water') c++;
       }
     }

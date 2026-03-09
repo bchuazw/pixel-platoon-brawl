@@ -738,7 +738,6 @@ _fogDummy.rotation.set(-Math.PI / 2, 0, 0);
 
 function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Position; visionRange: number; isAlive: boolean }[] }) {
   const fogRef = useRef<THREE.InstancedMesh>(null);
-  const matRef = useRef<THREE.MeshBasicMaterial>(null);
 
   // Stable key: only recompute when unit positions/visionRange actually change
   const unitKey = useMemo(() => {
@@ -749,7 +748,9 @@ function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Posi
       .join('|');
   }, [units]);
 
-  const fogData = useMemo(() => {
+  // Target opacity per tile (0 = visible, 0.22 = edge, 0.4 = fogged)
+  const targetOpacity = useMemo(() => {
+    const targets = new Float32Array(GRID_SIZE * GRID_SIZE);
     const visible = new Set<string>();
     const edgeTiles = new Set<string>();
     for (const u of units) {
@@ -770,27 +771,35 @@ function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Posi
         }
       }
     }
-    // Remove edges that are already visible
     for (const key of visible) edgeTiles.delete(key);
 
-    const fogged: { x: number; z: number; opacity: number }[] = [];
     for (let x = 0; x < GRID_SIZE; x++) {
       for (let z = 0; z < GRID_SIZE; z++) {
+        const i = x * GRID_SIZE + z;
         const key = `${x},${z}`;
-        if (visible.has(key)) continue;
-        const isEdge = edgeTiles.has(key);
-        fogged.push({ x, z, opacity: isEdge ? 0.22 : 0.4 });
+        if (visible.has(key)) {
+          targets[i] = 0;
+        } else if (edgeTiles.has(key)) {
+          targets[i] = 0.22;
+        } else {
+          targets[i] = 0.4;
+        }
       }
     }
-    return fogged;
+    return targets;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unitKey]);
 
+  // Current animated opacity per tile
+  const currentOpacity = useRef(new Float32Array(GRID_SIZE * GRID_SIZE).fill(0.4));
+  const isAnimating = useRef(true);
+
+  // Set up instance positions once
   useEffect(() => {
     if (!fogRef.current) return;
-    for (let i = 0; i < FOG_MAX; i++) {
-      if (i < fogData.length) {
-        const { x, z } = fogData[i];
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const i = x * GRID_SIZE + z;
         const tile = grid[x]?.[z];
         const qElev = quantizeElevation(tile?.elevation || 0);
         const tileY = qElev * 0.5;
@@ -799,25 +808,78 @@ function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Posi
         _fogDummy.scale.set(1, 1, 1);
         _fogDummy.updateMatrix();
         fogRef.current.setMatrixAt(i, _fogDummy.matrix);
-        // Edge tiles get lighter color
-        _color.set(fogData[i].opacity > 0.3 ? '#000000' : '#111122');
-        fogRef.current.setColorAt(i, _color);
-      } else {
-        _fogDummy.position.set(0, -100, 0);
-        _fogDummy.scale.set(0, 0, 0);
-        _fogDummy.updateMatrix();
-        fogRef.current.setMatrixAt(i, _fogDummy.matrix);
       }
     }
     fogRef.current.instanceMatrix.needsUpdate = true;
+  }, [grid]);
+
+  // Trigger animation whenever targets change
+  useEffect(() => {
+    isAnimating.current = true;
+  }, [targetOpacity]);
+
+  // Animate opacity per tile each frame
+  useFrame(() => {
+    if (!fogRef.current || !isAnimating.current) return;
+    const cur = currentOpacity.current;
+    const speed = 0.04; // lerp speed per frame (~60fps → ~0.7s transition)
+    let stillAnimating = false;
+
+    for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+      const target = targetOpacity[i];
+      const diff = target - cur[i];
+      if (Math.abs(diff) < 0.005) {
+        cur[i] = target;
+      } else {
+        cur[i] += diff * speed;
+        stillAnimating = true;
+      }
+
+      // Update scale: fully visible tiles (opacity near 0) get hidden
+      if (cur[i] < 0.01) {
+        _fogDummy.scale.set(0, 0, 0);
+        _fogDummy.position.set(0, -100, 0);
+      } else {
+        // Re-read position from existing matrix (keep the tile in place)
+        const x = Math.floor(i / GRID_SIZE);
+        const z = i % GRID_SIZE;
+        const tile = grid[x]?.[z];
+        const qElev = quantizeElevation(tile?.elevation || 0);
+        const tileY = qElev * 0.5;
+        const surfaceH = tile?.type === 'water' ? 0.03 : tile?.type === 'trench' ? 0.04 : tile?.type === 'crater' ? 0.04 : SURFACE_H;
+        _fogDummy.position.set(x, tileY + surfaceH + 0.02, z);
+        _fogDummy.scale.set(1, 1, 1);
+      }
+      _fogDummy.updateMatrix();
+      fogRef.current.setMatrixAt(i, _fogDummy.matrix);
+
+      // Color encodes opacity for visual variation
+      const brightness = cur[i] > 0.3 ? 0 : 0.07;
+      _color.setRGB(brightness, brightness, brightness + 0.01);
+      fogRef.current.setColorAt(i, _color);
+    }
+
+    fogRef.current.instanceMatrix.needsUpdate = true;
     if (fogRef.current.instanceColor) fogRef.current.instanceColor.needsUpdate = true;
-  }, [fogData, grid]);
+
+    // Update material opacity to max of all current values for correct blending
+    const mat = fogRef.current.material as THREE.MeshBasicMaterial;
+    if (mat) {
+      // Use max opacity across all tiles for the shared material
+      let maxOp = 0;
+      for (let i = 0; i < cur.length; i++) {
+        if (cur[i] > maxOp) maxOp = cur[i];
+      }
+      mat.opacity = maxOp;
+    }
+
+    if (!stillAnimating) isAnimating.current = false;
+  });
 
   return (
-    <instancedMesh ref={fogRef} args={[undefined, undefined, FOG_MAX]} renderOrder={10}>
+    <instancedMesh ref={fogRef} args={[undefined, undefined, GRID_SIZE * GRID_SIZE]} renderOrder={10}>
       <planeGeometry args={[TILE_SIZE, TILE_SIZE]} />
       <meshBasicMaterial
-        ref={matRef}
         color="#000000"
         transparent
         opacity={0.4}

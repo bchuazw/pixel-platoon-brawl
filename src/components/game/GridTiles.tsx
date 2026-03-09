@@ -1,8 +1,9 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
 import { TileData, Position, GRID_SIZE } from '@/game/types';
 import { isInZone } from '@/game/gameState';
+import { useQualityStore } from '@/game/useQualityStore';
 import * as THREE from 'three';
 
 interface GridTilesProps {
@@ -33,7 +34,6 @@ const TERRAIN: Record<string, { base: string; dark: string; light: string; side:
   mud:           { base: '#6a5a3a', dark: '#544828', light: '#7a6a4a', side: '#3e3220' },
 };
 
-// ── Deterministic hash for per-tile variation ──
 function tileHash(x: number, z: number, seed: number): number {
   const n = Math.sin(x * 127.1 + z * 311.7 + seed * 43758.5453) * 43758.5453;
   return n - Math.floor(n);
@@ -47,22 +47,9 @@ export function getTileY(elevation: number): number {
   return quantizeElevation(elevation) * 0.6;
 }
 
-// Seamless tiles — no gap
 const TILE_SIZE = 1.0;
-// Thin ground surface — not a block
 const SURFACE_H = 0.08;
 
-// ── Material cache ──
-const matCache = new Map<string, THREE.MeshStandardMaterial>();
-function cachedMat(color: string, roughness: number, metalness: number, emissive = '#000000', emissiveIntensity = 0): THREE.MeshStandardMaterial {
-  const key = `${color}-${roughness}-${metalness}-${emissive}-${emissiveIntensity}`;
-  if (!matCache.has(key)) {
-    matCache.set(key, new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity }));
-  }
-  return matCache.get(key)!;
-}
-
-// ── Color blending helper ──
 function lerpColor(hex1: string, hex2: string, t: number): string {
   const c1 = new THREE.Color(hex1);
   const c2 = new THREE.Color(hex2);
@@ -76,218 +63,191 @@ function darkenColor(hex: string, amount: number): string {
   return '#' + c.getHexString();
 }
 
-// ── Tile Component ──
-function Tile({ tile, isMovable, isAttackable, isAbilityTarget, isOutOfZone, isOnPath, hasSmoke, isWeaponRange, onClick, onHover }: {
-  tile: TileData; isMovable: boolean; isAttackable: boolean; isAbilityTarget: boolean;
-  isOutOfZone: boolean; isOnPath: boolean; hasSmoke: boolean; isWeaponRange: boolean; onClick: () => void; onHover: (hover: boolean) => void;
+// ══════════════════════════════════════════════════════════════
+// ── INSTANCED TILE GRID — one draw call for all tile surfaces
+// ══════════════════════════════════════════════════════════════
+const _dummy = new THREE.Object3D();
+const _color = new THREE.Color();
+
+function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSet, weaponRangeSet, shrinkLevel, onTileClick, onTileHover }: {
+  grid: TileData[][];
+  movableSet: Set<string>;
+  attackableSet: Set<string>;
+  abilitySet: Set<string>;
+  pathSet: Set<string>;
+  weaponRangeSet: Set<string>;
+  shrinkLevel: number;
+  onTileClick: (pos: Position) => void;
+  onTileHover: (pos: Position | null) => void;
 }) {
-  const topRef = useRef<THREE.Mesh>(null);
-  const t = TERRAIN[tile.type] || TERRAIN.grass;
+  const surfaceRef = useRef<THREE.InstancedMesh>(null);
+  const sideRef = useRef<THREE.InstancedMesh>(null);
+  const count = GRID_SIZE * GRID_SIZE;
 
-  // Subtle per-tile color variation using hash (no harsh checkerboard)
-  const h1 = tileHash(tile.x, tile.z, 1);
-  const h2 = tileHash(tile.x, tile.z, 2);
-  const colorBlend = h1 * 0.4; // 0-0.4 range of variation
-  const baseColor = lerpColor(t.base, h1 > 0.5 ? t.light : t.dark, colorBlend);
+  // Store tile positions for raycasting
+  const tilePositions = useRef<Position[]>([]);
 
-  let emissive = '#000000';
-  let emI = 0;
-  if (tile.type === 'water') { emissive = '#1177aa'; emI = 0.12; }
-  if (isOutOfZone) { emissive = '#cc2222'; emI = 0.25; }
-  if (isMovable) { emissive = '#2299ff'; emI = 0.3; }
-  if (isOnPath) { emissive = '#44ddff'; emI = 0.45; }
-  if (isWeaponRange && !isMovable && !isAttackable) { emissive = '#ff8800'; emI = 0.18; }
-  if (isAttackable) { emissive = '#ff3333'; emI = 0.4; }
-  if (isAbilityTarget) { emissive = '#ffaa00'; emI = 0.35; }
+  // Build instance matrices and colors
+  useEffect(() => {
+    if (!surfaceRef.current) return;
+    const positions: Position[] = [];
+    let sideCount = 0;
 
-  const qElev = quantizeElevation(tile.elevation);
-  const tileY = qElev * 0.6;
-  const isWater = tile.type === 'water';
-  const isTrench = tile.type === 'trench';
-  const isCrater = tile.type === 'crater';
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const i = x * GRID_SIZE + z;
+        const tile = grid[x][z];
+        const t = TERRAIN[tile.type] || TERRAIN.grass;
+        const h1 = tileHash(x, z, 1);
+        const colorBlend = h1 * 0.4;
+        const baseColor = lerpColor(t.base, h1 > 0.5 ? t.light : t.dark, colorBlend);
 
-  const surfaceH = isWater ? 0.03 : isTrench ? 0.04 : isCrater ? 0.04 : SURFACE_H;
-  const sideH = tileY;
+        const key = `${x},${z}`;
+        const isOutOfZone = !isInZone(x, z, shrinkLevel) && shrinkLevel > 0;
+        const isMovable = movableSet.has(key);
+        const isOnPath = pathSet.has(key);
+        const isWeaponRange = weaponRangeSet.has(key) && !isMovable && !attackableSet.has(key);
+        const isAttackable = attackableSet.has(key);
+        const isAbilityTarget = abilitySet.has(key);
 
-  const topColor = isOutOfZone ? '#4a1818' : tile.scorchMark ? darkenColor(baseColor, 0.4) : baseColor;
-  const sideColor = tile.scorchMark ? darkenColor(t.side, 0.3) : t.side;
-  const roughness = tile.type === 'stone' ? 0.65 : tile.type === 'sand' ? 0.92 : 0.85;
+        let emissive = '#000000';
+        let emI = 0;
+        if (tile.type === 'water') { emissive = '#1177aa'; emI = 0.12; }
+        if (isOutOfZone) { emissive = '#cc2222'; emI = 0.25; }
+        if (isMovable) { emissive = '#2299ff'; emI = 0.3; }
+        if (isOnPath) { emissive = '#44ddff'; emI = 0.45; }
+        if (isWeaponRange) { emissive = '#ff8800'; emI = 0.18; }
+        if (isAttackable) { emissive = '#ff3333'; emI = 0.4; }
+        if (isAbilityTarget) { emissive = '#ffaa00'; emI = 0.35; }
+
+        const qElev = quantizeElevation(tile.elevation);
+        const tileY = qElev * 0.6;
+        const isWater = tile.type === 'water';
+        const isTrench = tile.type === 'trench';
+        const isCrater = tile.type === 'crater';
+        const surfaceH = isWater ? 0.03 : isTrench ? 0.04 : isCrater ? 0.04 : SURFACE_H;
+
+        const topColor = isOutOfZone ? '#4a1818' : tile.scorchMark ? darkenColor(baseColor, 0.4) : baseColor;
+
+        // Surface tile
+        _dummy.position.set(x, tileY + surfaceH / 2, z);
+        _dummy.scale.set(TILE_SIZE, surfaceH, TILE_SIZE);
+        _dummy.updateMatrix();
+        surfaceRef.current!.setMatrixAt(i, _dummy.matrix);
+
+        // Color
+        _color.set(topColor);
+        surfaceRef.current!.setColorAt(i, _color);
+
+        positions.push({ x, z });
+
+        // Side/elevation mesh
+        if (tileY > 0.02 && !isWater) {
+          sideCount++;
+        }
+      }
+    }
+
+    surfaceRef.current!.instanceMatrix.needsUpdate = true;
+    if (surfaceRef.current!.instanceColor) surfaceRef.current!.instanceColor.needsUpdate = true;
+    tilePositions.current = positions;
+
+    // Build side instances
+    if (sideRef.current) {
+      let si = 0;
+      for (let x = 0; x < GRID_SIZE; x++) {
+        for (let z = 0; z < GRID_SIZE; z++) {
+          const tile = grid[x][z];
+          const t = TERRAIN[tile.type] || TERRAIN.grass;
+          const qElev = quantizeElevation(tile.elevation);
+          const tileY = qElev * 0.6;
+          const isWater = tile.type === 'water';
+          if (tileY > 0.02 && !isWater) {
+            _dummy.position.set(x, tileY / 2, z);
+            _dummy.scale.set(TILE_SIZE, tileY, TILE_SIZE);
+            _dummy.updateMatrix();
+            sideRef.current!.setMatrixAt(si, _dummy.matrix);
+            const sideColor = tile.scorchMark ? darkenColor(t.side, 0.3) : t.side;
+            _color.set(sideColor);
+            sideRef.current!.setColorAt(si, _color);
+            si++;
+          }
+        }
+      }
+      sideRef.current!.instanceMatrix.needsUpdate = true;
+      if (sideRef.current!.instanceColor) sideRef.current!.instanceColor.needsUpdate = true;
+    }
+  }, [grid, movableSet, attackableSet, abilitySet, pathSet, weaponRangeSet, shrinkLevel]);
+
+  // Count sides for instanced mesh
+  const sideCount = useMemo(() => {
+    let c = 0;
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const tile = grid[x][z];
+        const qElev = quantizeElevation(tile.elevation);
+        const tileY = qElev * 0.6;
+        if (tileY > 0.02 && tile.type !== 'water') c++;
+      }
+    }
+    return c;
+  }, [grid]);
+
+  const handleClick = (e: any) => {
+    e.stopPropagation();
+    const instanceId = e.instanceId;
+    if (instanceId !== undefined && instanceId < count) {
+      const x = Math.floor(instanceId / GRID_SIZE);
+      const z = instanceId % GRID_SIZE;
+      onTileClick({ x, z });
+    }
+  };
+
+  const handlePointerMove = (e: any) => {
+    e.stopPropagation();
+    const instanceId = e.instanceId;
+    if (instanceId !== undefined && instanceId < count) {
+      const x = Math.floor(instanceId / GRID_SIZE);
+      const z = instanceId % GRID_SIZE;
+      onTileHover({ x, z });
+    }
+  };
+
+  const handlePointerOut = () => {
+    onTileHover(null);
+  };
 
   return (
-    <group>
-      {/* ── Ground surface — thin, seamless ── */}
-      <mesh
-        ref={topRef}
-        position={[tile.x, tileY + surfaceH / 2, tile.z]}
-        receiveShadow castShadow
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
-        onPointerOver={(e) => { e.stopPropagation(); onHover(true); if (topRef.current) (topRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = emI + 0.12; }}
-        onPointerOut={() => { onHover(false); if (topRef.current) (topRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = emI; }}
+    <>
+      <instancedMesh
+        ref={surfaceRef}
+        args={[undefined, undefined, count]}
+        receiveShadow
+        castShadow
+        onClick={handleClick}
+        onPointerMove={handlePointerMove}
+        onPointerOut={handlePointerOut}
       >
-        <boxGeometry args={[TILE_SIZE, surfaceH, TILE_SIZE]} />
-        <meshStandardMaterial
-          color={topColor} emissive={emissive} emissiveIntensity={emI}
-          roughness={roughness} metalness={tile.type === 'stone' ? 0.06 : 0.0}
-        />
-      </mesh>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial roughness={0.85} vertexColors />
+      </instancedMesh>
 
-      {/* ── Cliff/elevation side ── */}
-      {sideH > 0.02 && !isWater && (
-        <mesh position={[tile.x, sideH / 2, tile.z]} castShadow receiveShadow>
-          <boxGeometry args={[TILE_SIZE, sideH, TILE_SIZE]} />
-          <meshStandardMaterial color={sideColor} roughness={0.95} metalness={0.0} />
-        </mesh>
+      {sideCount > 0 && (
+        <instancedMesh
+          ref={sideRef}
+          args={[undefined, undefined, sideCount]}
+          receiveShadow
+          castShadow
+        >
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial roughness={0.95} vertexColors />
+        </instancedMesh>
       )}
-
-      {/* ── Surface detail overlays ── */}
-      <TileSurfaceDetail tile={tile} tileY={tileY} surfaceH={surfaceH} isOutOfZone={isOutOfZone} />
-
-      {/* ── Scorch mark ── */}
-      {tile.scorchMark && (
-        <mesh position={[tile.x, tileY + surfaceH + 0.002, tile.z]} rotation={[-Math.PI / 2, h1 * Math.PI, 0]}>
-          <circleGeometry args={[0.38, 10]} />
-          <meshBasicMaterial color="#0e0a06" transparent opacity={0.45} />
-        </mesh>
-      )}
-
-      {/* ── Crater ring ── */}
-      {isCrater && (
-        <mesh position={[tile.x, tileY + surfaceH + 0.001, tile.z]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.22, 0.44, 10]} />
-          <meshBasicMaterial color="#1e1810" transparent opacity={0.4} />
-        </mesh>
-      )}
-
-      {/* ── Water ── */}
-      {isWater && <WaterSurface x={tile.x} z={tile.z} y={tileY + surfaceH + 0.01} />}
-
-      {/* ── Smoke ── */}
-      {hasSmoke && <SmokeEffect x={tile.x} z={tile.z} y={tileY + 0.5} />}
-    </group>
+    </>
   );
 }
 
-// ── Organic surface details: grass tufts, pebbles, dirt patches, wildflowers, puddles, moss, leaves ──
-function TileSurfaceDetail({ tile, tileY, surfaceH, isOutOfZone, grid }: { tile: TileData; tileY: number; surfaceH: number; isOutOfZone: boolean; grid?: TileData[][] }) {
-  if (tile.scorchMark || isOutOfZone || tile.type === 'water') return null;
-  const y = tileY + surfaceH + 0.001;
-  const h = tileHash(tile.x, tile.z, 3);
-  const h2 = tileHash(tile.x, tile.z, 4);
-  const h3 = tileHash(tile.x, tile.z, 5);
-  const h4 = tileHash(tile.x, tile.z, 6);
-
-  if (tile.type === 'grass') {
-    // Check if a tree is nearby for fallen leaves
-    const hasNearbyTree = grid && [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,1]].some(([dx,dz]) => {
-      const nx = tile.x + dx, nz = tile.z + dz;
-      return nx >= 0 && nx < GRID_SIZE && nz >= 0 && nz < GRID_SIZE && grid[nx]?.[nz]?.prop === 'tree';
-    });
-
-    return (
-      <group>
-        {/* Grass blades */}
-        {h < 0.35 && Array.from({ length: 2 + Math.floor(h2 * 4) }, (_, i) => {
-          const angle = tileHash(tile.x + i, tile.z, 10 + i) * Math.PI * 2;
-          const dist = tileHash(tile.x, tile.z + i, 20 + i) * 0.35;
-          const ox = Math.cos(angle) * dist;
-          const oz = Math.sin(angle) * dist;
-          const bladeH = 0.04 + tileHash(tile.x + i, tile.z + i, 30) * 0.06;
-          const shade = tileHash(tile.x + i, tile.z, 40 + i);
-          const green = shade > 0.5 ? '#5aaa38' : '#4a8a2e';
-          return (
-            <mesh key={`g${i}`} position={[tile.x + ox, y + bladeH / 2, tile.z + oz]} rotation={[0, angle, 0]}>
-              <boxGeometry args={[0.015, bladeH, 0.005]} />
-              <meshBasicMaterial color={green} transparent opacity={0.7} />
-            </mesh>
-          );
-        })}
-        {/* Wildflowers — occasional small color spots */}
-        {h4 < 0.12 && (
-          <mesh position={[tile.x + (h2 - 0.5) * 0.4, y + 0.025, tile.z + (h3 - 0.5) * 0.4]}>
-            <sphereGeometry args={[0.018, 4, 3]} />
-            <meshBasicMaterial color={h4 < 0.04 ? '#ee5588' : h4 < 0.08 ? '#eebb33' : '#aa77ee'} />
-          </mesh>
-        )}
-        {h4 > 0.85 && (
-          <mesh position={[tile.x + (h - 0.5) * 0.3, y + 0.02, tile.z + (h2 - 0.5) * 0.3]}>
-            <sphereGeometry args={[0.015, 4, 3]} />
-            <meshBasicMaterial color="#ffffff" />
-          </mesh>
-        )}
-        {/* Fallen leaves near trees */}
-        {hasNearbyTree && h3 < 0.6 && [0,1,2].map(i => {
-          const lx = (tileHash(tile.x, tile.z, 80+i) - 0.5) * 0.5;
-          const lz = (tileHash(tile.x, tile.z, 90+i) - 0.5) * 0.5;
-          const lRot = tileHash(tile.x+i, tile.z, 100) * Math.PI * 2;
-          const leafColor = tileHash(tile.x, tile.z+i, 110) > 0.5 ? '#8a5a20' : '#6a7a28';
-          return (
-            <mesh key={`lf${i}`} position={[tile.x + lx, y + 0.002, tile.z + lz]} rotation={[-Math.PI/2, lRot, 0]}>
-              <circleGeometry args={[0.025, 5]} />
-              <meshBasicMaterial color={leafColor} transparent opacity={0.6} side={THREE.DoubleSide} />
-            </mesh>
-          );
-        })}
-      </group>
-    );
-  }
-
-  if (tile.type === 'dirt' || tile.type === 'sand') {
-    return (
-      <group>
-        {/* Pebbles */}
-        {h < 0.4 && [0, 1, 2].map(i => {
-          const ox = (tileHash(tile.x, tile.z, 50 + i) - 0.5) * 0.6;
-          const oz = (tileHash(tile.x, tile.z, 60 + i) - 0.5) * 0.6;
-          const size = 0.02 + tileHash(tile.x, tile.z, 70 + i) * 0.03;
-          return (
-            <mesh key={`p${i}`} position={[tile.x + ox, y + size * 0.3, tile.z + oz]}>
-              <sphereGeometry args={[size, 4, 3]} />
-              <meshStandardMaterial color={tile.type === 'sand' ? '#b8a058' : '#8a7858'} roughness={1} />
-            </mesh>
-          );
-        })}
-        {/* Puddles on dirt tiles — small reflective patches */}
-        {tile.type === 'dirt' && h4 < 0.1 && (
-          <mesh position={[tile.x + (h2-0.5)*0.2, y + 0.002, tile.z + (h3-0.5)*0.2]} rotation={[-Math.PI/2, 0, 0]}>
-            <circleGeometry args={[0.12 + h * 0.1, 8]} />
-            <meshStandardMaterial color="#4a6a88" metalness={0.8} roughness={0.1} transparent opacity={0.5} />
-          </mesh>
-        )}
-      </group>
-    );
-  }
-
-  if (tile.type === 'stone') {
-    return (
-      <group>
-        {/* Cracks */}
-        {h < 0.35 && (
-          <mesh position={[tile.x + (h2 - 0.5) * 0.3, y + 0.001, tile.z + (h3 - 0.5) * 0.3]} rotation={[-Math.PI / 2, h * 3, 0]}>
-            <planeGeometry args={[0.3, 0.008]} />
-            <meshBasicMaterial color="#4a4a50" transparent opacity={0.3} />
-          </mesh>
-        )}
-        {/* Moss patches on stone */}
-        {h4 < 0.15 && (
-          <mesh position={[tile.x + (h-0.5)*0.3, y + 0.003, tile.z + (h2-0.5)*0.3]} rotation={[-Math.PI/2, h3 * Math.PI, 0]}>
-            <circleGeometry args={[0.08 + h * 0.06, 6]} />
-            <meshBasicMaterial color="#3a6a28" transparent opacity={0.35} />
-          </mesh>
-        )}
-        {h4 > 0.82 && (
-          <mesh position={[tile.x + (h3-0.5)*0.25, y + 0.003, tile.z + (h-0.5)*0.25]} rotation={[-Math.PI/2, h2 * Math.PI, 0]}>
-            <circleGeometry args={[0.06 + h2 * 0.05, 5]} />
-            <meshBasicMaterial color="#4a7a30" transparent opacity={0.3} />
-          </mesh>
-        )}
-      </group>
-    );
-  }
-
-  return null;
-}
-
-// ── Water with animated shimmer ──
+// ── Water with animated shimmer (kept as individual for animation) ──
 function WaterSurface({ x, z, y }: { x: number; z: number; y: number }) {
   const ref = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
@@ -316,707 +276,258 @@ function SmokeEffect({ x, z, y }: { x: number; z: number; y: number }) {
   });
   return (
     <group ref={ref} position={[x, y, z]}>
-      <mesh><sphereGeometry args={[0.35, 8, 6]} /><meshBasicMaterial color="#99aabb" transparent opacity={0.2} depthWrite={false} /></mesh>
-      <mesh position={[0.15, 0.1, 0.1]}><sphereGeometry args={[0.25, 6, 5]} /><meshBasicMaterial color="#889aaa" transparent opacity={0.16} depthWrite={false} /></mesh>
-      <mesh position={[-0.1, 0.15, -0.08]}><sphereGeometry args={[0.2, 6, 4]} /><meshBasicMaterial color="#778899" transparent opacity={0.14} depthWrite={false} /></mesh>
+      <mesh><sphereGeometry args={[0.35, 6, 4]} /><meshBasicMaterial color="#99aabb" transparent opacity={0.2} depthWrite={false} /></mesh>
+      <mesh position={[0.15, 0.1, 0.1]}><sphereGeometry args={[0.25, 5, 4]} /><meshBasicMaterial color="#889aaa" transparent opacity={0.16} depthWrite={false} /></mesh>
     </group>
   );
 }
 
 // ══════════════════════════════════════════════════
-// ── Props — Realistically scaled to soldier height (~0.73 units = ~1.8m)
-// 1 tile ≈ 2.5m. Soldier head at ~0.73.
+// ── Props — simplified for performance; quality-dependent detail
 // ══════════════════════════════════════════════════
-function PropObject({ tile }: { tile: TileData }) {
+function PropObject({ tile, detail }: { tile: TileData; detail: 'low' | 'medium' | 'high' }) {
   if (!tile.prop) return null;
   const qElev = quantizeElevation(tile.elevation);
   const baseY = qElev * 0.6 + SURFACE_H;
   const h = tileHash(tile.x, tile.z, 99);
-  // Per-prop variation: random scale and rotation offset
-  const scaleVar = 0.85 + tileHash(tile.x, tile.z, 200) * 0.3; // 0.85-1.15
-  const rotVar = tileHash(tile.x, tile.z, 201) * 0.3 - 0.15; // small tilt
+  const scaleVar = 0.85 + tileHash(tile.x, tile.z, 200) * 0.3;
+  const rotVar = tileHash(tile.x, tile.z, 201) * 0.3 - 0.15;
 
+  // Low detail: simplified single-mesh props
+  if (detail === 'low') {
+    const propColors: Record<string, string> = {
+      tree: '#2e7018', bush: '#3a7a28', rock: '#7a7a82', crate: '#8a6a30',
+      barrel: '#4a6848', sandbag: '#c0a060', ruins: '#7a7a82', wall: '#707078',
+      jersey_barrier: '#a0a0a0', wire: '#7a7a78', foxhole: '#7a6a42',
+      hesco: '#b49a60', tank_trap: '#4a4035', broken_wall: '#8a7a6a',
+      burnt_vehicle: '#222220', wrecked_car: '#3a3a4a', rubble_pile: '#6a6058',
+      lamp_post: '#3a3a3a', bench: '#6a4a20', market_stall: '#7a5a30',
+      palm_tree: '#2a7a18', driftwood: '#9a8a6a', church_wall: '#b0a890',
+      chimney: '#8a4422', boat_wreck: '#5a4a30', fountain: '#9a9a9a', pier_post: '#6a5a30',
+    };
+    const color = propColors[tile.prop] || '#666666';
+    const isTree = tile.prop === 'tree' || tile.prop === 'palm_tree';
+    const height = isTree ? 1.2 : 0.35;
+    return (
+      <mesh position={[tile.x, baseY + height / 2, tile.z]} castShadow>
+        {isTree ? <cylinderGeometry args={[0.15, 0.08, height, 6]} /> : <boxGeometry args={[0.4, height, 0.4]} />}
+        <meshStandardMaterial color={color} roughness={0.9} />
+      </mesh>
+    );
+  }
+
+  // Medium detail: 2-3 meshes per prop
   switch (tile.prop) {
-    // Wooden supply crate — waist height (~0.35)
     case 'crate':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * 0.4 + rotVar * 2, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * 0.4, 0]}>
           <mesh position={[0, 0.175, 0]} castShadow>
             <boxGeometry args={[0.42, 0.35, 0.42]} />
             <meshStandardMaterial color="#8a6a30" roughness={0.9} />
           </mesh>
-          {/* Reinforcement frame */}
-          <mesh position={[0, 0.175, 0.212]}><boxGeometry args={[0.44, 0.37, 0.008]} /><meshStandardMaterial color="#6a5020" roughness={0.85} /></mesh>
-          <mesh position={[0.212, 0.175, 0]}><boxGeometry args={[0.008, 0.37, 0.44]} /><meshStandardMaterial color="#6a5020" roughness={0.85} /></mesh>
-          {/* Metal corner bands */}
           <mesh position={[0, 0.355, 0]}><boxGeometry args={[0.44, 0.012, 0.44]} /><meshStandardMaterial color="#5a5a55" metalness={0.5} roughness={0.4} /></mesh>
-          <mesh position={[0, 0.0, 0]}><boxGeometry args={[0.44, 0.012, 0.44]} /><meshStandardMaterial color="#5a5a55" metalness={0.5} roughness={0.4} /></mesh>
         </group>
       );
-
-    // Oil drum / barrel — chest height (~0.45)
     case 'barrel':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.2, h * Math.PI, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
+        <group position={[tile.x, baseY, tile.z]}>
           <mesh position={[0, 0.225, 0]} castShadow>
-            <cylinderGeometry args={[0.18, 0.20, 0.45, 10]} />
+            <cylinderGeometry args={[0.18, 0.20, 0.45, 8]} />
             <meshStandardMaterial color="#4a6848" roughness={0.6} metalness={0.3} />
           </mesh>
-          {/* Rim rings */}
-          <mesh position={[0, 0.44, 0]}><cylinderGeometry args={[0.19, 0.19, 0.015, 10]} /><meshStandardMaterial color="#3a4a38" metalness={0.6} roughness={0.3} /></mesh>
-          <mesh position={[0, 0.01, 0]}><cylinderGeometry args={[0.21, 0.21, 0.015, 10]} /><meshStandardMaterial color="#3a4a38" metalness={0.6} roughness={0.3} /></mesh>
-          <mesh position={[0, 0.22, 0]}><cylinderGeometry args={[0.195, 0.195, 0.012, 10]} /><meshStandardMaterial color="#3a4a38" metalness={0.5} roughness={0.35} /></mesh>
         </group>
       );
-
-    // Sandbag wall — waist-high cover (~0.4) with variations
-    case 'sandbag': {
-      const sbColor1 = h > 0.5 ? '#c0a060' : '#b89858';
-      const sbColor2 = h > 0.3 ? '#c8a868' : '#baa058';
-      const sbColor3 = h > 0.7 ? '#b09050' : '#a88848';
-      const variant = Math.floor(h * 5); // 0-4 variants
+    case 'sandbag':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
-          {variant === 0 && (
-            <>
-              {/* Standard L-shape */}
-              <mesh position={[-0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
-              <mesh position={[0.15, 0.08, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
-              <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.20]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
-            </>
-          )}
-          {variant === 1 && (
-            <>
-              {/* Staggered pile */}
-              <mesh position={[-0.12, 0.07, -0.08]} castShadow rotation={[0, 0.2, 0]}><boxGeometry args={[0.3, 0.12, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
-              <mesh position={[0.1, 0.07, 0.06]} castShadow rotation={[0, -0.15, 0]}><boxGeometry args={[0.26, 0.12, 0.2]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
-              <mesh position={[0, 0.19, -0.02]} castShadow rotation={[0, 0.1, 0]}><boxGeometry args={[0.24, 0.12, 0.18]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
-            </>
-          )}
-          {variant === 2 && (
-            <>
-              {/* Single tall stack */}
-              <mesh position={[0, 0.07, 0]} castShadow><boxGeometry args={[0.32, 0.12, 0.24]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
-              <mesh position={[0.02, 0.19, -0.01]} castShadow><boxGeometry args={[0.3, 0.12, 0.22]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
-              <mesh position={[-0.01, 0.31, 0.01]} castShadow><boxGeometry args={[0.26, 0.12, 0.2]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
-            </>
-          )}
-          {variant === 3 && (
-            <>
-              {/* Corner / V-shape */}
-              <mesh position={[-0.15, 0.08, -0.1]} castShadow rotation={[0, 0.3, 0]}><boxGeometry args={[0.28, 0.14, 0.18]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
-              <mesh position={[0.05, 0.08, 0.12]} castShadow rotation={[0, -0.4, 0]}><boxGeometry args={[0.28, 0.14, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
-              <mesh position={[-0.05, 0.22, 0]} castShadow><boxGeometry args={[0.22, 0.12, 0.16]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
-            </>
-          )}
-          {variant >= 4 && (
-            <>
-              {/* Scattered with one toppled */}
-              <mesh position={[-0.18, 0.07, 0]} castShadow><boxGeometry args={[0.24, 0.12, 0.2]} /><meshStandardMaterial color={sbColor1} roughness={1} /></mesh>
-              <mesh position={[0.12, 0.07, 0.05]} castShadow><boxGeometry args={[0.26, 0.12, 0.18]} /><meshStandardMaterial color={sbColor2} roughness={1} /></mesh>
-              {/* Toppled bag */}
-              <mesh position={[0.2, 0.04, -0.14]} castShadow rotation={[0, 0.8, 0.4]}><boxGeometry args={[0.24, 0.1, 0.16]} /><meshStandardMaterial color={sbColor3} roughness={1} /></mesh>
-            </>
-          )}
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+          <mesh position={[0, 0.08, 0]} castShadow><boxGeometry args={[0.55, 0.14, 0.22]} /><meshStandardMaterial color="#c0a060" roughness={1} /></mesh>
+          <mesh position={[0, 0.22, 0]} castShadow><boxGeometry args={[0.28, 0.14, 0.20]} /><meshStandardMaterial color="#b89858" roughness={1} /></mesh>
         </group>
       );
-    }
-
-    // Natural boulder — knee to waist height
     case 'rock':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.5, h * Math.PI, rotVar * 0.3]} scale={[scaleVar, 0.8 + tileHash(tile.x, tile.z, 202) * 0.4, scaleVar]}>
-          <mesh position={[0, 0.15, 0]} castShadow>
-            <dodecahedronGeometry args={[0.25 + h * 0.1, 1]} />
-            <meshStandardMaterial color="#7a7a82" roughness={0.95} />
+        <mesh position={[tile.x, baseY + 0.15, tile.z]} castShadow>
+          <dodecahedronGeometry args={[0.25, 1]} />
+          <meshStandardMaterial color="#7a7a82" roughness={0.95} />
+        </mesh>
+      );
+    case 'bush':
+      return (
+        <mesh position={[tile.x, baseY + 0.15, tile.z]} castShadow>
+          <sphereGeometry args={[0.28, 6, 5]} />
+          <meshStandardMaterial color="#3a7a28" roughness={0.95} />
+        </mesh>
+      );
+    case 'tree':
+      return (
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]} scale={[scaleVar, 0.85 + tileHash(tile.x, tile.z, 203) * 0.35, scaleVar]}>
+          <mesh position={[0, 0.35, 0]} castShadow>
+            <cylinderGeometry args={[0.05, 0.09, 0.7, 5]} />
+            <meshStandardMaterial color="#5a3818" roughness={0.95} />
           </mesh>
-          {/* Small companion rock */}
-          {h > 0.4 && (
-            <mesh position={[0.22, 0.06, 0.12]} castShadow>
-              <dodecahedronGeometry args={[0.1, 0]} />
-              <meshStandardMaterial color="#8a8a90" roughness={0.95} />
-            </mesh>
+          <mesh position={[0, 0.85, 0]} castShadow>
+            <sphereGeometry args={[0.42, 6, 5]} />
+            <meshStandardMaterial color="#2e7018" roughness={0.9} />
+          </mesh>
+          {detail === 'high' && (
+            <>
+              <mesh position={[0.08, 1.15, 0.05]} castShadow>
+                <sphereGeometry args={[0.32, 6, 5]} />
+                <meshStandardMaterial color="#389222" roughness={0.9} />
+              </mesh>
+              <mesh position={[-0.05, 1.38, -0.03]}>
+                <sphereGeometry args={[0.22, 5, 4]} />
+                <meshStandardMaterial color="#42a830" roughness={0.9} />
+              </mesh>
+            </>
           )}
         </group>
       );
-
-    // Bush — knee height, wide spread
-    case 'bush': {
-      const bushColor = h > 0.5 ? '#3a7a28' : '#2e7020';
-      return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]} scale={[scaleVar * (0.9 + h * 0.3), scaleVar, scaleVar * (0.9 + h * 0.3)]}>
-          <mesh position={[0, 0.15, 0]} castShadow>
-            <sphereGeometry args={[0.28, 8, 6]} />
-            <meshStandardMaterial color={bushColor} roughness={0.95} />
-          </mesh>
-          <mesh position={[0.12, 0.10, 0.1]}>
-            <sphereGeometry args={[0.2, 7, 5]} />
-            <meshStandardMaterial color="#2e6e20" roughness={0.95} />
-          </mesh>
-          <mesh position={[-0.08, 0.08, -0.06]}>
-            <sphereGeometry args={[0.16, 6, 5]} />
-            <meshStandardMaterial color="#348a22" roughness={0.95} />
-          </mesh>
-        </group>
-      );
-    }
-
-    // Tree — 2-3x soldier height (1.5-2.2 total)
-    case 'tree': {
-      const trunkColor = h > 0.5 ? '#5a3818' : '#4a2e14';
-      const leafColor1 = h > 0.6 ? '#2e7018' : '#1e6010';
-      const leafColor2 = h > 0.4 ? '#389222' : '#2a7a18';
-      return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.15, h * Math.PI * 2, rotVar * 0.1]} scale={[scaleVar, 0.85 + tileHash(tile.x, tile.z, 203) * 0.35, scaleVar]}>
-          {/* Trunk */}
-          <mesh position={[0, 0.35, 0]} castShadow>
-            <cylinderGeometry args={[0.05, 0.09, 0.7, 7]} />
-            <meshStandardMaterial color={trunkColor} roughness={0.95} />
-          </mesh>
-          {/* Lower canopy — dense, wide */}
-          <mesh position={[0, 0.85, 0]} castShadow>
-            <sphereGeometry args={[0.42, 8, 6]} />
-            <meshStandardMaterial color={leafColor1} roughness={0.9} />
-          </mesh>
-          {/* Upper canopy */}
-          <mesh position={[0.08, 1.15, 0.05]} castShadow>
-            <sphereGeometry args={[0.32, 7, 6]} />
-            <meshStandardMaterial color={leafColor2} roughness={0.9} />
-          </mesh>
-          {/* Top cluster */}
-          <mesh position={[-0.05, 1.38, -0.03]}>
-            <sphereGeometry args={[0.22, 6, 5]} />
-            <meshStandardMaterial color="#42a830" roughness={0.9} />
-          </mesh>
-          {/* Roots */}
-          <mesh position={[0.06, 0.02, 0.06]} rotation={[0.3, 0, 0.4]}>
-            <cylinderGeometry args={[0.03, 0.015, 0.15, 4]} />
-            <meshStandardMaterial color={trunkColor} roughness={0.95} />
-          </mesh>
-        </group>
-      );
-    }
-
-    // Ruined wall / building fragment — shoulder height with rubble
     case 'ruins':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
-          {/* Foundation slab */}
-          <mesh position={[0, 0.04, 0]} castShadow>
-            <boxGeometry args={[0.7, 0.08, 0.6]} />
-            <meshStandardMaterial color="#6e6e76" roughness={0.92} />
-          </mesh>
-          {/* Standing wall piece */}
-          <mesh position={[-0.22, 0.32, -0.15]} castShadow>
-            <boxGeometry args={[0.1, 0.56, 0.28]} />
-            <meshStandardMaterial color="#7a7a82" roughness={0.9} />
-          </mesh>
-          {/* Broken column */}
-          <mesh position={[0.18, 0.18, 0.12]} castShadow>
-            <boxGeometry args={[0.1, 0.28, 0.1]} />
-            <meshStandardMaterial color="#828288" roughness={0.9} />
-          </mesh>
-          {/* Rubble */}
-          <mesh position={[0.12, 0.04, -0.18]} rotation={[0.2, 0.5, 0.1]}>
-            <boxGeometry args={[0.14, 0.06, 0.10]} />
-            <meshStandardMaterial color="#6a6a70" roughness={0.95} />
-          </mesh>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 2, 0]}>
+          <mesh position={[0, 0.04, 0]} castShadow><boxGeometry args={[0.7, 0.08, 0.6]} /><meshStandardMaterial color="#6e6e76" roughness={0.92} /></mesh>
+          <mesh position={[-0.22, 0.32, -0.15]} castShadow><boxGeometry args={[0.1, 0.56, 0.28]} /><meshStandardMaterial color="#7a7a82" roughness={0.9} /></mesh>
         </group>
       );
-
-    // Jersey barrier — proper concrete highway barrier (~0.45 tall)
-    case 'jersey_barrier': {
-      const jbColor = h > 0.5 ? '#a0a0a0' : '#909898';
+    case 'jersey_barrier':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar * 0.5 : Math.PI / 2 + rotVar * 0.5, 0]}>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
           <mesh position={[0, 0.225, 0]} castShadow>
             <boxGeometry args={[0.72, 0.45, 0.28]} />
-            <meshStandardMaterial color={jbColor} roughness={0.85} />
-          </mesh>
-          {/* Sloped base */}
-          <mesh position={[0, 0.04, 0]} castShadow>
-            <boxGeometry args={[0.74, 0.08, 0.36]} />
-            <meshStandardMaterial color="#909090" roughness={0.88} />
+            <meshStandardMaterial color="#a0a0a0" roughness={0.85} />
           </mesh>
         </group>
       );
-    }
-
-    // Burnt vehicle wreck — large cover, ~chest height
     case 'burnt_vehicle':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.15, h * Math.PI, rotVar * 0.1]} scale={[scaleVar * 1.5, scaleVar * 1.5, scaleVar * 1.5]}>
-          {/* Chassis */}
-          <mesh position={[0, 0.12, 0]} castShadow>
-            <boxGeometry args={[0.82, 0.2, 0.44]} />
-            <meshStandardMaterial color="#222220" roughness={0.8} metalness={0.3} />
-          </mesh>
-          {/* Cabin */}
-          <mesh position={[-0.08, 0.3, 0]} castShadow>
-            <boxGeometry args={[0.38, 0.22, 0.38]} />
-            <meshStandardMaterial color="#1a1a18" roughness={0.75} metalness={0.35} />
-          </mesh>
-          {/* Wheels (flat) */}
-          <mesh position={[0.28, 0.06, 0.24]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.08, 0.08, 0.04, 8]} />
-            <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
-          </mesh>
-          <mesh position={[-0.28, 0.06, 0.24]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.08, 0.08, 0.04, 8]} />
-            <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
-          </mesh>
-          {/* Scorch marks */}
-          <mesh position={[0.15, 0.22, 0.223]} rotation={[0, 0, 0]}>
-            <planeGeometry args={[0.2, 0.15]} />
-            <meshBasicMaterial color="#0a0a08" transparent opacity={0.4} />
-          </mesh>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+          <mesh position={[0, 0.12, 0]} castShadow><boxGeometry args={[0.82, 0.2, 0.44]} /><meshStandardMaterial color="#222220" roughness={0.8} metalness={0.3} /></mesh>
+          <mesh position={[-0.08, 0.3, 0]} castShadow><boxGeometry args={[0.38, 0.22, 0.38]} /><meshStandardMaterial color="#1a1a18" roughness={0.75} metalness={0.35} /></mesh>
         </group>
       );
-
-    // Concertina wire — 3D coils between posts
     case 'wire':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
-          {/* Wooden/metal posts */}
-          <mesh position={[-0.32, 0.14, 0]} castShadow>
-            <cylinderGeometry args={[0.018, 0.018, 0.28, 5]} />
-            <meshStandardMaterial color="#5a4a30" roughness={0.9} />
-          </mesh>
-          <mesh position={[0.32, 0.14, 0]} castShadow>
-            <cylinderGeometry args={[0.018, 0.018, 0.28, 5]} />
-            <meshStandardMaterial color="#5a4a30" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.14, 0]} castShadow>
-            <cylinderGeometry args={[0.012, 0.012, 0.26, 4]} />
-            <meshStandardMaterial color="#5a4a30" roughness={0.9} />
-          </mesh>
-          {/* Horizontal support wire */}
-          <mesh position={[0, 0.24, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.004, 0.004, 0.64, 3]} />
-            <meshStandardMaterial color="#8a8a88" metalness={0.7} roughness={0.3} />
-          </mesh>
-          <mesh position={[0, 0.06, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.004, 0.004, 0.64, 3]} />
-            <meshStandardMaterial color="#7a7a78" metalness={0.7} roughness={0.3} />
-          </mesh>
-          {/* 3D wire coils — multiple offset torus rings */}
-          {[0, 1, 2, 3, 4].map(i => {
-            const cx = -0.24 + i * 0.12;
-            const cy = 0.12 + (i % 2 === 0 ? 0.04 : -0.01);
-            const rAngle = tileHash(tile.x + i, tile.z, 150 + i) * 0.6 - 0.3;
-            return (
-              <group key={`wc${i}`} position={[cx, cy, 0]} rotation={[rAngle, 0.4 * i, Math.PI / 2 + rAngle * 0.5]}>
-                <mesh>
-                  <torusGeometry args={[0.065, 0.006, 5, 8]} />
-                  <meshStandardMaterial color="#7a7a78" metalness={0.6} roughness={0.4} />
-                </mesh>
-              </group>
-            );
-          })}
-          {/* Barb clusters */}
-          {[0, 1, 2].map(i => {
-            const bx = -0.18 + i * 0.18;
-            const by = 0.14 + tileHash(tile.x, tile.z + i, 160) * 0.06;
-            return (
-              <mesh key={`wb${i}`} position={[bx, by, 0.02]}>
-                <octahedronGeometry args={[0.012, 0]} />
-                <meshStandardMaterial color="#999" metalness={0.8} roughness={0.2} />
-              </mesh>
-            );
-          })}
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+          <mesh position={[-0.32, 0.14, 0]} castShadow><cylinderGeometry args={[0.018, 0.018, 0.28, 4]} /><meshStandardMaterial color="#5a4a30" roughness={0.9} /></mesh>
+          <mesh position={[0.32, 0.14, 0]} castShadow><cylinderGeometry args={[0.018, 0.018, 0.28, 4]} /><meshStandardMaterial color="#5a4a30" roughness={0.9} /></mesh>
+          <mesh position={[0, 0.24, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.004, 0.004, 0.64, 3]} /><meshStandardMaterial color="#8a8a88" metalness={0.7} roughness={0.3} /></mesh>
         </group>
       );
-
-    // Foxhole — below ground level
     case 'foxhole':
       return (
         <group position={[tile.x, baseY - 0.06, tile.z]}>
-          {/* Rim of dug-in position */}
-          <mesh position={[0.34, 0.06, 0]} castShadow>
-            <boxGeometry args={[0.12, 0.1, 0.4]} />
-            <meshStandardMaterial color="#7a6a42" roughness={1} />
-          </mesh>
-          <mesh position={[-0.34, 0.06, 0]} castShadow>
-            <boxGeometry args={[0.12, 0.1, 0.4]} />
-            <meshStandardMaterial color="#6a5a38" roughness={1} />
-          </mesh>
-          <mesh position={[0, 0.06, 0.28]} castShadow>
-            <boxGeometry args={[0.56, 0.1, 0.12]} />
-            <meshStandardMaterial color="#726040" roughness={1} />
-          </mesh>
+          <mesh position={[0.34, 0.06, 0]} castShadow><boxGeometry args={[0.12, 0.1, 0.4]} /><meshStandardMaterial color="#7a6a42" roughness={1} /></mesh>
+          <mesh position={[-0.34, 0.06, 0]} castShadow><boxGeometry args={[0.12, 0.1, 0.4]} /><meshStandardMaterial color="#6a5a38" roughness={1} /></mesh>
         </group>
       );
-
-    // HESCO bastion — tall fortification (~0.6, chest-head height)
     case 'hesco':
       return (
-        <group position={[tile.x, baseY, tile.z]}>
-          {/* Wire mesh exterior */}
-          <mesh position={[0, 0.3, 0]} castShadow>
-            <boxGeometry args={[0.52, 0.6, 0.52]} />
-            <meshStandardMaterial color="#b49a60" roughness={0.92} />
-          </mesh>
-          {/* Wire cage top edge */}
-          <mesh position={[0, 0.61, 0]}>
-            <boxGeometry args={[0.54, 0.02, 0.54]} />
-            <meshStandardMaterial color="#7a7a78" metalness={0.4} roughness={0.5} />
-          </mesh>
-        </group>
+        <mesh position={[tile.x, baseY + 0.3, tile.z]} castShadow>
+          <boxGeometry args={[0.52, 0.6, 0.52]} />
+          <meshStandardMaterial color="#b49a60" roughness={0.92} />
+        </mesh>
       );
-
-    // Czech hedgehog / tank trap — waist height, angular
     case 'tank_trap':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * Math.PI / 3, rotVar * 0.2]} scale={[scaleVar, scaleVar, scaleVar]}>
-          <mesh position={[0, 0.2, 0]} rotation={[0, 0, Math.PI / 4]} castShadow>
-            <boxGeometry args={[0.05, 0.48, 0.05]} />
-            <meshStandardMaterial color="#4a4035" metalness={0.5} roughness={0.45} />
-          </mesh>
-          <mesh position={[0, 0.2, 0]} rotation={[Math.PI / 4, 0, 0]}>
-            <boxGeometry args={[0.05, 0.48, 0.05]} />
-            <meshStandardMaterial color="#3e3428" metalness={0.5} roughness={0.45} />
-          </mesh>
-          <mesh position={[0, 0.2, 0]} rotation={[0, Math.PI / 4, Math.PI / 4]}>
-            <boxGeometry args={[0.05, 0.48, 0.05]} />
-            <meshStandardMaterial color="#443a2e" metalness={0.5} roughness={0.45} />
-          </mesh>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 3, 0]}>
+          <mesh position={[0, 0.2, 0]} rotation={[0, 0, Math.PI / 4]} castShadow><boxGeometry args={[0.05, 0.48, 0.05]} /><meshStandardMaterial color="#4a4035" metalness={0.5} roughness={0.45} /></mesh>
+          <mesh position={[0, 0.2, 0]} rotation={[Math.PI / 4, 0, 0]}><boxGeometry args={[0.05, 0.48, 0.05]} /><meshStandardMaterial color="#3e3428" metalness={0.5} roughness={0.45} /></mesh>
         </group>
       );
-
-    // Broken brick/concrete wall — chest-head height cover
-    case 'broken_wall': {
-      const wallColor = h > 0.5 ? '#8a7a6a' : '#7a6a5e';
-      return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? rotVar : Math.PI / 2 + rotVar, 0]} scale={[scaleVar, scaleVar, scaleVar]}>
-          {/* Main wall section */}
-          <mesh position={[0, 0.25, 0]} castShadow>
-            <boxGeometry args={[0.7, 0.5, 0.12]} />
-            <meshStandardMaterial color={wallColor} roughness={0.92} />
-          </mesh>
-          {/* Jagged top — broken edge */}
-          <mesh position={[-0.15, 0.52, 0]} castShadow>
-            <boxGeometry args={[0.25, 0.08, 0.12]} />
-            <meshStandardMaterial color="#7a6a5a" roughness={0.95} />
-          </mesh>
-          <mesh position={[0.22, 0.56, 0]} castShadow>
-            <boxGeometry args={[0.15, 0.12, 0.11]} />
-            <meshStandardMaterial color="#8a7a6a" roughness={0.92} />
-          </mesh>
-          {/* Rubble at base */}
-          <mesh position={[0.3, 0.04, 0.1]} rotation={[0.2, 0.4, 0.1]}>
-            <boxGeometry args={[0.12, 0.06, 0.08]} />
-            <meshStandardMaterial color="#7a7068" roughness={0.95} />
-          </mesh>
-          <mesh position={[-0.25, 0.03, 0.08]}>
-            <boxGeometry args={[0.08, 0.05, 0.06]} />
-            <meshStandardMaterial color="#6a6058" roughness={0.95} />
-          </mesh>
-          {/* Exposed rebar */}
-          <mesh position={[0.28, 0.45, 0]} rotation={[0, 0, 0.2]}>
-            <cylinderGeometry args={[0.008, 0.008, 0.2, 4]} />
-            <meshStandardMaterial color="#5a4a3a" metalness={0.6} roughness={0.4} />
-          </mesh>
-        </group>
-      );
-    }
-
-    // Civilian wrecked car — good cover, realistic proportions
-    case 'wrecked_car': {
-      const carColor = h > 0.7 ? '#4a3a2a' : h > 0.4 ? '#2a3a4a' : '#3a2a3a';
-      return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.1, h * Math.PI * 2, rotVar * 0.15]} scale={[scaleVar * 1.5, scaleVar * 1.5, scaleVar * 1.5]}>
-          {/* Body/chassis */}
-          <mesh position={[0, 0.14, 0]} castShadow>
-            <boxGeometry args={[0.8, 0.22, 0.4]} />
-            <meshStandardMaterial color={carColor} roughness={0.75} metalness={0.35} />
-          </mesh>
-          {/* Roof/cabin */}
-          <mesh position={[0.05, 0.32, 0]} castShadow>
-            <boxGeometry args={[0.4, 0.18, 0.36]} />
-            <meshStandardMaterial color={darkenColor(carColor, 0.2)} roughness={0.7} metalness={0.4} />
-          </mesh>
-          {/* Windshield (broken) */}
-          <mesh position={[0.26, 0.3, 0]} rotation={[0, 0, -0.2]}>
-            <boxGeometry args={[0.005, 0.14, 0.32]} />
-            <meshStandardMaterial color="#445566" metalness={0.3} roughness={0.2} transparent opacity={0.5} />
-          </mesh>
-          {/* Wheels */}
-          {[[-0.28, 0.06, 0.22], [-0.28, 0.06, -0.22], [0.28, 0.06, 0.22], [0.28, 0.06, -0.22]].map((p, i) => (
-            <mesh key={i} position={p as [number, number, number]} rotation={[Math.PI / 2, 0, 0]}>
-              <cylinderGeometry args={[0.07, 0.07, 0.04, 8]} />
-              <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
-            </mesh>
-          ))}
-          {/* Damage dent */}
-          <mesh position={[-0.3, 0.18, 0.15]} rotation={[0, 0.5, 0]}>
-            <boxGeometry args={[0.08, 0.1, 0.08]} />
-            <meshStandardMaterial color="#1a1510" roughness={0.95} />
-          </mesh>
-        </group>
-      );
-    }
-
-    // Scattered rubble/debris — low cover
-    case 'rubble_pile':
-      return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.4, h * Math.PI * 2, rotVar * 0.3]} scale={[scaleVar, scaleVar, scaleVar]}>
-          <mesh position={[0, 0.06, 0]} castShadow>
-            <dodecahedronGeometry args={[0.15, 0]} />
-            <meshStandardMaterial color="#6a6058" roughness={0.95} />
-          </mesh>
-          <mesh position={[0.12, 0.04, 0.08]} rotation={[0.3, 0.5, 0]}>
-            <boxGeometry args={[0.14, 0.06, 0.1]} />
-            <meshStandardMaterial color="#7a7068" roughness={0.95} />
-          </mesh>
-          <mesh position={[-0.1, 0.03, -0.06]} rotation={[0.1, 0.8, 0.2]}>
-            <boxGeometry args={[0.1, 0.05, 0.08]} />
-            <meshStandardMaterial color="#5a5048" roughness={0.95} />
-          </mesh>
-          <mesh position={[0.05, 0.08, -0.12]}>
-            <dodecahedronGeometry args={[0.08, 0]} />
-            <meshStandardMaterial color="#8a7a70" roughness={0.95} />
-          </mesh>
-        </group>
-      );
-
-    // Street lamp post — tall, narrow
-    case 'lamp_post':
-      return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
-          <mesh position={[0, 0.5, 0]} castShadow>
-            <cylinderGeometry args={[0.025, 0.04, 1.0, 6]} />
-            <meshStandardMaterial color="#3a3a3a" metalness={0.6} roughness={0.4} />
-          </mesh>
-          <mesh position={[0.12, 0.95, 0]}>
-            <boxGeometry args={[0.24, 0.06, 0.08]} />
-            <meshStandardMaterial color="#4a4a4a" metalness={0.5} roughness={0.4} />
-          </mesh>
-          <mesh position={[0.22, 0.92, 0]}>
-            <boxGeometry args={[0.08, 0.04, 0.06]} />
-            <meshStandardMaterial color="#aaaa66" emissive="#aaaa44" emissiveIntensity={0.15} roughness={0.3} />
-          </mesh>
-        </group>
-      );
-
-    // Park bench
-    case 'bench':
+    case 'broken_wall':
       return (
         <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
-          <mesh position={[0, 0.15, 0]} castShadow>
-            <boxGeometry args={[0.6, 0.04, 0.22]} />
-            <meshStandardMaterial color="#6a4a20" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.28, -0.1]} castShadow>
-            <boxGeometry args={[0.6, 0.2, 0.04]} />
-            <meshStandardMaterial color="#5a3a18" roughness={0.9} />
-          </mesh>
-          {[[-0.25, 0], [0.25, 0]].map(([ox, oz], i) => (
-            <mesh key={i} position={[ox, 0.075, oz]}>
-              <boxGeometry args={[0.04, 0.15, 0.2]} />
-              <meshStandardMaterial color="#3a3a38" metalness={0.5} roughness={0.5} />
-            </mesh>
-          ))}
+          <mesh position={[0, 0.25, 0]} castShadow><boxGeometry args={[0.7, 0.5, 0.12]} /><meshStandardMaterial color="#8a7a6a" roughness={0.92} /></mesh>
         </group>
       );
-
-    // Market stall — collapsed/ruined
-    case 'market_stall':
+    case 'wrecked_car':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, rotVar * 0.2]}>
-          <mesh position={[0, 0.02, 0]} castShadow>
-            <boxGeometry args={[0.6, 0.04, 0.5]} />
-            <meshStandardMaterial color="#7a5a30" roughness={0.95} />
-          </mesh>
-          <mesh position={[-0.28, 0.22, 0]} castShadow>
-            <cylinderGeometry args={[0.025, 0.025, 0.4, 5]} />
-            <meshStandardMaterial color="#5a4020" roughness={0.9} />
-          </mesh>
-          <mesh position={[0.28, 0.18, 0]} castShadow rotation={[0, 0, 0.15]}>
-            <cylinderGeometry args={[0.025, 0.025, 0.36, 5]} />
-            <meshStandardMaterial color="#5a4020" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.38, 0]} rotation={[0, 0, 0.08]}>
-            <boxGeometry args={[0.7, 0.02, 0.55]} />
-            <meshStandardMaterial color="#aa4422" roughness={0.9} transparent opacity={0.7} />
-          </mesh>
+        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
+          <mesh position={[0, 0.14, 0]} castShadow><boxGeometry args={[0.8, 0.22, 0.4]} /><meshStandardMaterial color="#3a3a4a" roughness={0.75} metalness={0.35} /></mesh>
+          <mesh position={[0.05, 0.32, 0]} castShadow><boxGeometry args={[0.4, 0.18, 0.36]} /><meshStandardMaterial color="#2a2a3a" roughness={0.7} metalness={0.4} /></mesh>
         </group>
       );
-
-    // Palm tree — coastal
+    case 'rubble_pile':
+      return (
+        <mesh position={[tile.x, baseY + 0.06, tile.z]} castShadow>
+          <dodecahedronGeometry args={[0.15, 0]} />
+          <meshStandardMaterial color="#6a6058" roughness={0.95} />
+        </mesh>
+      );
+    case 'lamp_post':
+      return (
+        <group position={[tile.x, baseY, tile.z]}>
+          <mesh position={[0, 0.5, 0]} castShadow><cylinderGeometry args={[0.025, 0.04, 1.0, 5]} /><meshStandardMaterial color="#3a3a3a" metalness={0.6} roughness={0.4} /></mesh>
+        </group>
+      );
     case 'palm_tree':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.15, h * Math.PI * 2, 0]}>
-          <mesh position={[0, 0.45, 0]} castShadow>
-            <cylinderGeometry args={[0.04, 0.06, 0.9, 6]} />
-            <meshStandardMaterial color="#8a6a30" roughness={0.95} />
-          </mesh>
-          {[0, 1.2, 2.4, 3.6, 4.8].map((a, i) => (
-            <mesh key={i} position={[Math.cos(a) * 0.25, 0.88, Math.sin(a) * 0.25]} rotation={[Math.cos(a) * 0.8, 0, Math.sin(a) * 0.8]}>
-              <boxGeometry args={[0.08, 0.5, 0.02]} />
-              <meshStandardMaterial color={i % 2 === 0 ? '#2a7a18' : '#1e6a10'} roughness={0.9} />
-            </mesh>
-          ))}
+        <group position={[tile.x, baseY, tile.z]}>
+          <mesh position={[0, 0.45, 0]} castShadow><cylinderGeometry args={[0.04, 0.06, 0.9, 5]} /><meshStandardMaterial color="#8a6a30" roughness={0.95} /></mesh>
+          <mesh position={[0, 0.88, 0]} castShadow><sphereGeometry args={[0.3, 5, 4]} /><meshStandardMaterial color="#2a7a18" roughness={0.9} /></mesh>
         </group>
       );
-
-    // Driftwood
-    case 'driftwood':
-      return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * Math.PI * 2, rotVar * 0.4]}>
-          <mesh position={[0, 0.04, 0]} rotation={[0, 0, 0.1]} castShadow>
-            <cylinderGeometry args={[0.03, 0.05, 0.5, 5]} />
-            <meshStandardMaterial color="#9a8a6a" roughness={1} />
-          </mesh>
-          <mesh position={[0.18, 0.03, 0.06]} rotation={[0.2, 0.5, 0.3]}>
-            <cylinderGeometry args={[0.02, 0.03, 0.25, 4]} />
-            <meshStandardMaterial color="#8a7a5a" roughness={1} />
-          </mesh>
-        </group>
-      );
-
-    // Church/building wall fragment
     case 'church_wall':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI / 2, 0]}>
-          <mesh position={[0, 0.4, 0]} castShadow>
-            <boxGeometry args={[0.65, 0.8, 0.14]} />
-            <meshStandardMaterial color="#b0a890" roughness={0.92} />
-          </mesh>
-          <mesh position={[0, 0.7, 0]} castShadow>
-            <boxGeometry args={[0.2, 0.25, 0.06]} />
-            <meshBasicMaterial color="#445566" transparent opacity={0.3} />
-          </mesh>
-          <mesh position={[0, 0.85, 0]}>
-            <coneGeometry args={[0.15, 0.15, 4]} />
-            <meshStandardMaterial color="#a09888" roughness={0.95} />
-          </mesh>
-        </group>
+        <mesh position={[tile.x, baseY + 0.4, tile.z]} castShadow>
+          <boxGeometry args={[0.65, 0.8, 0.14]} />
+          <meshStandardMaterial color="#b0a890" roughness={0.92} />
+        </mesh>
       );
-
-    // Chimney remnant
     case 'chimney':
       return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.1, h * Math.PI, 0]}>
-          <mesh position={[0, 0.3, 0]} castShadow>
-            <boxGeometry args={[0.22, 0.6, 0.22]} />
-            <meshStandardMaterial color="#8a4422" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.08, 0]}>
-            <boxGeometry args={[0.35, 0.16, 0.35]} />
-            <meshStandardMaterial color="#7a3a18" roughness={0.92} />
-          </mesh>
-        </group>
+        <mesh position={[tile.x, baseY + 0.3, tile.z]} castShadow>
+          <boxGeometry args={[0.22, 0.6, 0.22]} />
+          <meshStandardMaterial color="#8a4422" roughness={0.9} />
+        </mesh>
       );
-
-    // Boat wreck
-    case 'boat_wreck':
-      return (
-        <group position={[tile.x, baseY, tile.z]} rotation={[rotVar * 0.3, h * Math.PI, 0.15]}>
-          <mesh position={[0, 0.12, 0]} castShadow>
-            <boxGeometry args={[0.7, 0.18, 0.32]} />
-            <meshStandardMaterial color="#5a4a30" roughness={0.95} />
-          </mesh>
-          <mesh position={[0, 0.08, 0.14]} rotation={[0.3, 0, 0]}>
-            <boxGeometry args={[0.68, 0.12, 0.04]} />
-            <meshStandardMaterial color="#4a3a22" roughness={0.95} />
-          </mesh>
-          <mesh position={[0, 0.08, -0.14]} rotation={[-0.3, 0, 0]}>
-            <boxGeometry args={[0.68, 0.12, 0.04]} />
-            <meshStandardMaterial color="#4a3a22" roughness={0.95} />
-          </mesh>
-        </group>
-      );
-
-    // Fountain — ruined town center piece
     case 'fountain':
       return (
         <group position={[tile.x, baseY, tile.z]}>
-          <mesh position={[0, 0.06, 0]} castShadow>
-            <cylinderGeometry args={[0.35, 0.38, 0.12, 10]} />
-            <meshStandardMaterial color="#9a9a9a" roughness={0.85} />
-          </mesh>
-          <mesh position={[0, 0.18, 0]} castShadow>
-            <cylinderGeometry args={[0.06, 0.06, 0.24, 6]} />
-            <meshStandardMaterial color="#8a8a88" roughness={0.85} />
-          </mesh>
-          <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.32, 10]} />
-            <meshStandardMaterial color="#4a7a99" metalness={0.5} roughness={0.2} transparent opacity={0.4} />
-          </mesh>
+          <mesh position={[0, 0.06, 0]} castShadow><cylinderGeometry args={[0.35, 0.38, 0.12, 8]} /><meshStandardMaterial color="#9a9a9a" roughness={0.85} /></mesh>
+          <mesh position={[0, 0.18, 0]} castShadow><cylinderGeometry args={[0.06, 0.06, 0.24, 5]} /><meshStandardMaterial color="#8a8a88" roughness={0.85} /></mesh>
         </group>
       );
-
-    case 'pier_post':
+    default:
+      // bench, market_stall, driftwood, boat_wreck, pier_post — simplified
       return (
-        <group position={[tile.x, baseY - 0.1, tile.z]}>
-          <mesh position={[0, 0.2, 0]} castShadow>
-            <cylinderGeometry args={[0.06, 0.07, 0.5, 6]} />
-            <meshStandardMaterial color="#6a5a30" roughness={0.95} />
-          </mesh>
-          <mesh position={[0, 0.46, 0]}>
-            <boxGeometry args={[0.6, 0.04, 0.3]} />
-            <meshStandardMaterial color="#7a6a40" roughness={0.92} />
-          </mesh>
-        </group>
+        <mesh position={[tile.x, baseY + 0.15, tile.z]} castShadow>
+          <boxGeometry args={[0.4, 0.3, 0.3]} />
+          <meshStandardMaterial color="#6a5a30" roughness={0.9} />
+        </mesh>
       );
-
-    default: return null;
   }
 }
 
-// ── Loot — Treasure Chests ──
+// ── Loot — simplified ──
 function LootObject({ tile }: { tile: TileData }) {
   const ref = useRef<THREE.Group>(null);
   const qElev = quantizeElevation(tile.elevation);
   const baseY = qElev * 0.6 + SURFACE_H + 0.01;
-  const h = tileHash(tile.x, tile.z, 999);
 
   useFrame(({ clock }) => {
     if (!ref.current || !tile.loot) return;
     const t = clock.getElapsedTime();
-    // Gentle hover bob
     ref.current.position.y = baseY + Math.sin(t * 1.8 + tile.x * 0.7 + tile.z * 1.3) * 0.02;
   });
 
   if (!tile.loot) return null;
   const color = tile.loot.type === 'weapon' ? '#ffaa22' : tile.loot.type === 'medkit' ? '#ff3366' :
                 tile.loot.type === 'armor' ? '#3388ff' : tile.loot.type === 'killstreak' ? '#bb44ff' : '#66cc33';
-  const woodColor = h > 0.5 ? '#5a3a1a' : '#4a3018';
-  const metalColor = h > 0.5 ? '#8a7a40' : '#7a6a30';
 
   return (
-    <group ref={ref} position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI * 2, 0]}>
-      {/* Chest body */}
-      <mesh position={[0, 0.08, 0]} castShadow>
-        <boxGeometry args={[0.28, 0.16, 0.2]} />
-        <meshStandardMaterial color={woodColor} roughness={0.85} />
+    <group ref={ref} position={[tile.x, baseY, tile.z]}>
+      <mesh position={[0, 0.1, 0]} castShadow>
+        <boxGeometry args={[0.25, 0.15, 0.18]} />
+        <meshStandardMaterial color="#5a3a1a" roughness={0.85} />
       </mesh>
-      {/* Chest lid (rounded top) */}
-      <mesh position={[0, 0.18, 0]} castShadow>
-        <boxGeometry args={[0.3, 0.06, 0.22]} />
-        <meshStandardMaterial color={woodColor} roughness={0.8} />
-      </mesh>
-      {/* Metal bands */}
-      <mesh position={[0, 0.08, 0.101]}>
-        <boxGeometry args={[0.3, 0.04, 0.005]} />
-        <meshStandardMaterial color={metalColor} metalness={0.6} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, 0.08, -0.101]}>
-        <boxGeometry args={[0.3, 0.04, 0.005]} />
-        <meshStandardMaterial color={metalColor} metalness={0.6} roughness={0.3} />
-      </mesh>
-      {/* Lock / clasp */}
-      <mesh position={[0, 0.14, 0.11]}>
-        <boxGeometry args={[0.04, 0.06, 0.02]} />
-        <meshStandardMaterial color={metalColor} metalness={0.7} roughness={0.25} />
-      </mesh>
-      {/* Colored glow indicator */}
-      <mesh position={[0, 0.22, 0]}>
-        <sphereGeometry args={[0.04, 6, 6]} />
+      <mesh position={[0, 0.2, 0]}>
+        <sphereGeometry args={[0.04, 5, 5]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} transparent opacity={0.8} />
       </mesh>
-      <pointLight color={color} intensity={0.4} distance={1.5} position={[0, 0.25, 0]} />
-      <Billboard position={[0, 0.35, 0]}>
+      <pointLight color={color} intensity={0.3} distance={1.2} position={[0, 0.25, 0]} />
+      <Billboard position={[0, 0.32, 0]}>
         <Text fontSize={0.07} color={color} anchorX="center" anchorY="middle" font={undefined} outlineWidth={0.012} outlineColor="#000000">
           {tile.loot.icon} {tile.loot.name}
         </Text>
@@ -1034,12 +545,10 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
         const qElev = quantizeElevation(tile?.elevation || 0);
         const y = qElev * 0.6 + SURFACE_H + 0.005;
         return (
-          <group key={`path-${i}`} position={[pos.x, y, pos.z]}>
-            <mesh rotation={[-Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[0.1, 8]} />
-              <meshBasicMaterial color="#44ddff" transparent opacity={0.45 - i * 0.03} />
-            </mesh>
-          </group>
+          <mesh key={`path-${i}`} position={[pos.x, y, pos.z]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.1, 6]} />
+            <meshBasicMaterial color="#44ddff" transparent opacity={0.45 - i * 0.03} />
+          </mesh>
         );
       })}
     </group>
@@ -1048,6 +557,7 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
 
 // ── Main GridTiles ──
 export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTiles, shrinkLevel, movePath, onTileClick, onTileHover, weaponRangeTiles }: GridTilesProps) {
+  const { settings } = useQualityStore();
   const lootTiles = useMemo(() => grid.flat().filter(t => t.loot !== null), [grid]);
   const movableSet = useMemo(() => new Set(movableTiles.map(t => `${t.x},${t.z}`)), [movableTiles]);
   const attackableSet = useMemo(() => new Set(attackableTiles.map(t => `${t.x},${t.z}`)), [attackableTiles]);
@@ -1055,34 +565,47 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
   const pathSet = useMemo(() => new Set(movePath ? movePath.map(p => `${p.x},${p.z}`) : []), [movePath]);
   const weaponRangeSet = useMemo(() => new Set(weaponRangeTiles ? weaponRangeTiles.map(t => `${t.x},${t.z}`) : []), [weaponRangeTiles]);
 
+  // Water tiles for overlay
+  const waterTiles = useMemo(() => grid.flat().filter(t => t.type === 'water'), [grid]);
+  // Smoke tiles
+  const smokeTiles = useMemo(() => grid.flat().filter(t => t.hasSmoke), [grid]);
+
   return (
     <group>
-      {/* Base ground — seamless earth beneath map */}
+      {/* Base ground */}
       <mesh position={[GRID_SIZE / 2 - 0.5, -0.25, GRID_SIZE / 2 - 0.5]} receiveShadow>
         <boxGeometry args={[GRID_SIZE + 10, 0.5, GRID_SIZE + 10]} />
         <meshStandardMaterial color="#2a3a1e" roughness={1} />
       </mesh>
 
-      {grid.map((row, x) => row.map((tile, z) => {
-        const key = `${x},${z}`;
-        return (
-          <Tile
-            key={`t-${x}-${z}`} tile={tile}
-            isMovable={movableSet.has(key)}
-            isAttackable={attackableSet.has(key)}
-            isAbilityTarget={abilitySet.has(key)}
-            isOutOfZone={!isInZone(x, z, shrinkLevel) && shrinkLevel > 0}
-            isOnPath={pathSet.has(key)}
-            hasSmoke={tile.hasSmoke}
-            isWeaponRange={weaponRangeSet.has(key)}
-            onClick={() => onTileClick({ x, z })}
-            onHover={(hover) => onTileHover(hover ? { x, z } : null)}
-          />
-        );
-      }))}
+      {/* INSTANCED tile grid — 2 draw calls instead of 1152 */}
+      <InstancedTileGrid
+        grid={grid}
+        movableSet={movableSet}
+        attackableSet={attackableSet}
+        abilitySet={abilitySet}
+        pathSet={pathSet}
+        weaponRangeSet={weaponRangeSet}
+        shrinkLevel={shrinkLevel}
+        onTileClick={onTileClick}
+        onTileHover={onTileHover}
+      />
 
+      {/* Water overlays — only for water tiles */}
+      {waterTiles.map(tile => {
+        const tileY = getTileY(tile.elevation);
+        return <WaterSurface key={`w-${tile.x}-${tile.z}`} x={tile.x} z={tile.z} y={tileY + 0.03 + 0.01} />;
+      })}
+
+      {/* Smoke effects */}
+      {smokeTiles.map(tile => {
+        const tileY = getTileY(tile.elevation);
+        return <SmokeEffect key={`s-${tile.x}-${tile.z}`} x={tile.x} z={tile.z} y={tileY + 0.5} />;
+      })}
+
+      {/* Props — quality dependent */}
       {grid.flat().filter(t => t.prop).map(tile => (
-        <PropObject key={`p-${tile.x}-${tile.z}`} tile={tile} />
+        <PropObject key={`p-${tile.x}-${tile.z}`} tile={tile} detail={settings.propDetail} />
       ))}
 
       {lootTiles.map(tile => (

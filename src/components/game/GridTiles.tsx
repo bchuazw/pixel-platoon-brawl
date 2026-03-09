@@ -16,6 +16,7 @@ interface GridTilesProps {
   onTileClick: (pos: Position) => void;
   onTileHover: (pos: Position | null) => void;
   weaponRangeTiles?: Position[];
+  units?: { position: Position; visionRange: number; isAlive: boolean }[];
 }
 
 // ── Naturalistic terrain palette ──

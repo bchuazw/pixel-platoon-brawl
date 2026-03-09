@@ -101,29 +101,40 @@ function generateLootItem(rand: () => number): LootItem {
 }
 
 // ── BFS Pathfinding ──
-export function findPath(from: Position, to: Position, state: GameState): Position[] {
+// maxSteps limits path length to prevent movement exceeding moveRange
+export function findPath(from: Position, to: Position, state: GameState, maxSteps?: number): Position[] {
   if (from.x === to.x && from.z === to.z) return [to];
 
   const visited = new Set<string>();
   const parent = new Map<string, string>();
+  const depth = new Map<string, number>();
   const queue: Position[] = [from];
-  visited.add(`${from.x},${from.z}`);
+  const fromKey = `${from.x},${from.z}`;
+  visited.add(fromKey);
+  depth.set(fromKey, 0);
 
   while (queue.length > 0) {
     const current = queue.shift()!;
     const key = `${current.x},${current.z}`;
+    const currentDepth = depth.get(key) || 0;
 
     if (current.x === to.x && current.z === to.z) {
-      // Reconstruct path
       const path: Position[] = [];
       let cur = `${to.x},${to.z}`;
-      while (cur !== `${from.x},${from.z}`) {
+      while (cur !== fromKey) {
         const [px, pz] = cur.split(',').map(Number);
         path.unshift({ x: px, z: pz });
         cur = parent.get(cur)!;
       }
+      // Clamp path to maxSteps if specified
+      if (maxSteps && path.length > maxSteps) {
+        return path.slice(0, maxSteps);
+      }
       return path;
     }
+
+    // Don't expand beyond maxSteps
+    if (maxSteps && currentDepth >= maxSteps) continue;
 
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = current.x + dx;
@@ -138,6 +149,7 @@ export function findPath(from: Position, to: Position, state: GameState): Positi
 
       visited.add(nKey);
       parent.set(nKey, key);
+      depth.set(nKey, currentDepth + 1);
       queue.push({ x: nx, z: nz });
     }
   }
@@ -1068,16 +1080,29 @@ export function getManhattanDistance(a: Position, b: Position): number {
 
 export function getMovableTiles(unit: Unit, state: GameState): Position[] {
   if (unit.ap < AP_MOVE_COST || unit.isSuppressed) return [];
+  // Use BFS to find actually reachable tiles within moveRange steps
   const tiles: Position[] = [];
-  for (let x = 0; x < GRID_SIZE; x++) {
-    for (let z = 0; z < GRID_SIZE; z++) {
-      const dist = getManhattanDistance(unit.position, { x, z });
-      const tile = state.grid[x][z];
-      if (dist > 0 && dist <= unit.moveRange && !tile.isBlocked && !tile.prop && tile.type !== 'water') {
-        if (!state.units.some(u => u.isAlive && u.position.x === x && u.position.z === z)) {
-          tiles.push({ x, z });
-        }
-      }
+  const visited = new Set<string>();
+  const queue: { pos: Position; steps: number }[] = [{ pos: unit.position, steps: 0 }];
+  visited.add(`${unit.position.x},${unit.position.z}`);
+
+  while (queue.length > 0) {
+    const { pos, steps } = queue.shift()!;
+    if (steps >= unit.moveRange) continue;
+
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = pos.x + dx;
+      const nz = pos.z + dz;
+      const nKey = `${nx},${nz}`;
+      if (nx < 0 || nx >= GRID_SIZE || nz < 0 || nz >= GRID_SIZE) continue;
+      if (visited.has(nKey)) continue;
+      const tile = state.grid[nx][nz];
+      if (tile.isBlocked || tile.prop || tile.type === 'water') continue;
+      if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz)) continue;
+
+      visited.add(nKey);
+      tiles.push({ x: nx, z: nz });
+      queue.push({ pos: { x: nx, z: nz }, steps: steps + 1 });
     }
   }
   return tiles;
@@ -1489,10 +1514,12 @@ export function runAiUnitStep(
     }
   }
 
-  // Helper to move unit and return path (optionally to an intermediate stop along the path)
+  // Helper to move unit and return path — clamp to moveRange
   const moveToTile = (bestTile: Position) => {
-    const path = findPath(unit.position, bestTile, newState);
-    unit.position = bestTile;
+    const path = findPath(unit.position, bestTile, newState, unit.moveRange);
+    // If path was clamped, move to the last reachable tile instead
+    const actualDest = path.length > 0 ? path[path.length - 1] : bestTile;
+    unit.position = actualDest;
     unit.ap -= AP_MOVE_COST;
     didMove = true;
     newState.movePath = path;

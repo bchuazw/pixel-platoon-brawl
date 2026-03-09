@@ -338,7 +338,7 @@ function SmokeEffect({ x, z, y }: { x: number; z: number; y: number }) {
 function PropObject({ tile, detail }: { tile: TileData; detail: 'low' | 'medium' | 'high' }) {
   if (!tile.prop) return null;
   const qElev = quantizeElevation(tile.elevation);
-  const baseY = qElev * 0.6 + SURFACE_H;
+  const baseY = qElev * 0.5 + SURFACE_H;
   const h = tileHash(tile.x, tile.z, 99);
   const scaleVar = 0.85 + tileHash(tile.x, tile.z, 200) * 0.3;
   const rotVar = tileHash(tile.x, tile.z, 201) * 0.3 - 0.15;

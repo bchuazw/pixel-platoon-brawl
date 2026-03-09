@@ -260,8 +260,8 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
             <Reveal delay={1600}>
               <div className="text-center">
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/20 bg-card/30">
-                  <Settings className="w-3.5 h-3.5 text-muted-foreground/40" />
-                  <span className="text-[12px] text-muted-foreground/40">Click any unit to customize gear</span>
+                  <Settings className="w-4 h-4 text-muted-foreground/60" />
+                  <span className="text-[15px] text-muted-foreground/60 font-medium">Click any unit to customize gear</span>
                 </div>
               </div>
             </Reveal>

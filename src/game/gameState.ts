@@ -537,16 +537,14 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
     }
   }
 
-  // ═══ STRATEGIC COVER CLUSTERS ═══
-  // Ensure good cover is spread around for tactical gameplay
+  // ═══ STRATEGIC COVER CLUSTERS (reduced from 40 to 18) ═══
   const coverPositions: Position[] = [];
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 18; i++) {
     const cx = 3 + Math.floor(rand() * (GRID_SIZE - 6));
     const cz = 3 + Math.floor(rand() * (GRID_SIZE - 6));
     coverPositions.push({ x: cx, z: cz });
-    if (rand() > 0.3) coverPositions.push({ x: Math.min(GRID_SIZE - 1, cx + 1), z: cz });
-    if (rand() > 0.4) coverPositions.push({ x: cx, z: Math.min(GRID_SIZE - 1, cz + 1) });
-    if (rand() > 0.7) coverPositions.push({ x: Math.min(GRID_SIZE - 1, cx + 1), z: Math.min(GRID_SIZE - 1, cz + 1) });
+    if (rand() > 0.4) coverPositions.push({ x: Math.min(GRID_SIZE - 1, cx + 1), z: cz });
+    if (rand() > 0.6) coverPositions.push({ x: cx, z: Math.min(GRID_SIZE - 1, cz + 1) });
   }
   const clusterProps: PropType[] = ['sandbag', 'crate', 'barrel', 'jersey_barrier', 'hesco', 'foxhole'];
   for (const pos of coverPositions) {

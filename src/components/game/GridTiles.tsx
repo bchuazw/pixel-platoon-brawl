@@ -41,11 +41,13 @@ function tileHash(x: number, z: number, seed: number): number {
 }
 
 function quantizeElevation(elev: number): number {
-  return Math.round(elev * 2.5) / 2.5;
+  // Elevation is now integer 0-3, just clamp
+  return Math.round(Math.max(0, Math.min(3, elev)));
 }
 
 export function getTileY(elevation: number): number {
-  return quantizeElevation(elevation) * 0.6;
+  // Each block level = 0.5 units tall
+  return quantizeElevation(elevation) * 0.5;
 }
 
 const TILE_SIZE = 1.0;

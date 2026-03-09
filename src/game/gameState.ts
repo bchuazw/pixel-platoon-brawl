@@ -285,8 +285,8 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         } else if (r < 0.25) {
           type = 'dirt'; elevation = Math.max(0, elevation * 0.5);
         } else {
-          // Keep as grass but with higher elevation for hills
-          elevation = Math.max(0.2, elevation * 1.3);
+          // Forest hills — keep elevated
+          elevation = Math.max(1, elevation);
         }
       } else if (biome === 'swamp') {
         // Swamp: shallow water, mud, tall grass

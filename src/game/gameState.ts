@@ -101,29 +101,40 @@ function generateLootItem(rand: () => number): LootItem {
 }
 
 // ── BFS Pathfinding ──
-export function findPath(from: Position, to: Position, state: GameState): Position[] {
+// maxSteps limits path length to prevent movement exceeding moveRange
+export function findPath(from: Position, to: Position, state: GameState, maxSteps?: number): Position[] {
   if (from.x === to.x && from.z === to.z) return [to];
 
   const visited = new Set<string>();
   const parent = new Map<string, string>();
+  const depth = new Map<string, number>();
   const queue: Position[] = [from];
-  visited.add(`${from.x},${from.z}`);
+  const fromKey = `${from.x},${from.z}`;
+  visited.add(fromKey);
+  depth.set(fromKey, 0);
 
   while (queue.length > 0) {
     const current = queue.shift()!;
     const key = `${current.x},${current.z}`;
+    const currentDepth = depth.get(key) || 0;
 
     if (current.x === to.x && current.z === to.z) {
-      // Reconstruct path
       const path: Position[] = [];
       let cur = `${to.x},${to.z}`;
-      while (cur !== `${from.x},${from.z}`) {
+      while (cur !== fromKey) {
         const [px, pz] = cur.split(',').map(Number);
         path.unshift({ x: px, z: pz });
         cur = parent.get(cur)!;
       }
+      // Clamp path to maxSteps if specified
+      if (maxSteps && path.length > maxSteps) {
+        return path.slice(0, maxSteps);
+      }
       return path;
     }
+
+    // Don't expand beyond maxSteps
+    if (maxSteps && currentDepth >= maxSteps) continue;
 
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = current.x + dx;
@@ -138,6 +149,7 @@ export function findPath(from: Position, to: Position, state: GameState): Positi
 
       visited.add(nKey);
       parent.set(nKey, key);
+      depth.set(nKey, currentDepth + 1);
       queue.push({ x: nx, z: nz });
     }
   }

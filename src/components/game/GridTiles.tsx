@@ -730,6 +730,9 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
 // ── Main GridTiles ──
 // ── Fog of War overlay ──
 const FOG_MAX = GRID_SIZE * GRID_SIZE;
+const _fogDummy = new THREE.Object3D();
+// Pre-set the fog dummy rotation so planes lie flat — never changes
+_fogDummy.rotation.set(-Math.PI / 2, 0, 0);
 
 function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Position; visionRange: number; isAlive: boolean }[] }) {
   const fogRef = useRef<THREE.InstancedMesh>(null);

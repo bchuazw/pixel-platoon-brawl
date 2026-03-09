@@ -257,6 +257,53 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         } else {
           type = 'beach_sand'; elevation = Math.max(0, elevation * 0.1);
         }
+      } else if (biome === 'forest') {
+        // Dense forest: mostly grass with heavy tree cover, dirt trails
+        if (onHorizPath || onVertPath) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.4);
+        } else if (r < 0.15) {
+          type = 'mud'; elevation = Math.max(0, elevation * 0.3);
+        } else if (r < 0.25) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.5);
+        } else {
+          // Keep as grass but with higher elevation for hills
+          elevation = Math.max(0.2, elevation * 1.3);
+        }
+      } else if (biome === 'swamp') {
+        // Swamp: shallow water, mud, tall grass
+        if (r < 0.30) {
+          type = 'shallow_water'; elevation = -0.05;
+        } else if (r < 0.50) {
+          type = 'mud'; elevation = Math.max(0, elevation * 0.15);
+        } else if (r < 0.65) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.2);
+        } else {
+          elevation = Math.max(0, elevation * 0.3);
+        }
+      } else if (biome === 'ridge') {
+        // Rocky ridge: elevated terrain with stone outcrops
+        if (r < 0.35) {
+          type = 'stone'; elevation = elevation + 0.5 + r * 0.8;
+        } else if (r < 0.50) {
+          type = 'dirt'; elevation = elevation + 0.3;
+        } else {
+          elevation = elevation + 0.4;
+        }
+      } else if (biome === 'industrial') {
+        // Ruined industrial zone: cobblestone, craters, concrete
+        if (onHorizPath || onVertPath) {
+          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.15);
+        } else if (r < 0.25) {
+          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.2);
+        } else if (r < 0.40) {
+          type = 'stone'; elevation = Math.max(0, elevation * 0.25);
+        } else if (r < 0.50) {
+          type = 'crater'; elevation = Math.max(-0.2, elevation - 0.3);
+        } else if (r < 0.60) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
+        } else {
+          type = 'mud'; elevation = Math.max(0, elevation * 0.2);
+        }
       } else if (onHorizPath || onVertPath) {
         type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
       } else if ((onDiagPath1 || onDiagPath2) && r < 0.4) {

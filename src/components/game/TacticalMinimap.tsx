@@ -1,19 +1,24 @@
 import { useRef, useEffect, useMemo, useState } from 'react';
 import { GameState, TEAM_COLORS, GRID_SIZE, Team } from '@/game/types';
 import { isInZone } from '@/game/gameState';
-import { ChevronDown, ChevronUp, Map } from 'lucide-react';
+import { Maximize2, Minimize2, Map } from 'lucide-react';
 
 interface TacticalMinimapProps {
   state: GameState;
   inspectedUnitId: string | null;
 }
 
-const MAP_SIZE = 160;
-const CELL = MAP_SIZE / GRID_SIZE;
+const MAP_SMALL = 110;
+const MAP_LARGE = 190;
+const CELL_SMALL = MAP_SMALL / GRID_SIZE;
+const CELL_LARGE = MAP_LARGE / GRID_SIZE;
 
 export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const mapSize = expanded ? MAP_LARGE : MAP_SMALL;
+  const CELL = mapSize / GRID_SIZE;
 
   const lootPositions = useMemo(() => {
     const positions: { x: number; z: number }[] = [];
@@ -27,18 +32,18 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || collapsed) return;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = MAP_SIZE * dpr;
-    canvas.height = MAP_SIZE * dpr;
+    canvas.width = mapSize * dpr;
+    canvas.height = mapSize * dpr;
     ctx.scale(dpr, dpr);
 
     // Background
     ctx.fillStyle = 'rgba(8, 12, 18, 0.92)';
-    ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+    ctx.fillRect(0, 0, mapSize, mapSize);
 
     // Grid terrain
     for (let x = 0; x < GRID_SIZE; x++) {
@@ -65,7 +70,7 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
 
         if (tile.prop && tile.isBlocked) {
           ctx.fillStyle = 'rgba(60, 60, 60, 0.6)';
-          ctx.fillRect(px + 1, pz + 1, CELL - 2, CELL - 2);
+          ctx.fillRect(px + 0.5, pz + 0.5, CELL - 1, CELL - 1);
         }
       }
     }
@@ -94,7 +99,7 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
       const cz = pos.z * CELL + CELL / 2;
       ctx.fillStyle = 'rgba(255, 204, 68, 0.7)';
       ctx.beginPath();
-      ctx.arc(cx, cz, 2, 0, Math.PI * 2);
+      ctx.arc(cx, cz, expanded ? 2.5 : 1.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -104,7 +109,8 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
         const cx = drop.targetPos.x * CELL + CELL / 2;
         const cz = drop.targetPos.z * CELL + CELL / 2;
         ctx.fillStyle = 'rgba(255, 170, 0, 0.8)';
-        ctx.fillRect(cx - 3, cz - 3, 6, 6);
+        const s = expanded ? 4 : 3;
+        ctx.fillRect(cx - s / 2, cz - s / 2, s, s);
       }
     }
 
@@ -117,7 +123,7 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
 
       const isActive = unit.id === state.selectedUnitId;
       const isInspected = unit.id === inspectedUnitId;
-      const radius = unit.unitClass === 'soldier' ? 3.5 : 3;
+      const radius = expanded ? (unit.unitClass === 'soldier' ? 4 : 3.5) : (unit.unitClass === 'soldier' ? 3 : 2.5);
 
       if (isActive || isInspected) {
         ctx.strokeStyle = color;
@@ -132,7 +138,7 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
       ctx.arc(cx, cz, radius, 0, Math.PI * 2);
       ctx.fill();
 
-      if (unit.unitClass === 'medic') {
+      if (unit.unitClass === 'medic' && expanded) {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(cx - 1.2, cz - 0.4, 2.4, 0.8);
         ctx.fillRect(cx - 0.4, cz - 1.2, 0.8, 2.4);
@@ -141,36 +147,34 @@ export function TacticalMinimap({ state, inspectedUnitId }: TacticalMinimapProps
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(0.5, 0.5, MAP_SIZE - 1, MAP_SIZE - 1);
+    ctx.strokeRect(0.5, 0.5, mapSize - 1, mapSize - 1);
 
-  }, [state.units, state.shrinkLevel, state.selectedUnitId, state.grid, lootPositions, state.airdrops, inspectedUnitId, collapsed]);
+  }, [state.units, state.shrinkLevel, state.selectedUnitId, state.grid, lootPositions, state.airdrops, inspectedUnitId, expanded, mapSize, CELL]);
 
   return (
     <div className="pointer-events-auto absolute right-1 sm:right-2 top-12 sm:top-14 z-20 hidden sm:block">
-      <div className="glass-panel rounded-lg overflow-hidden" style={{ width: collapsed ? 'auto' : MAP_SIZE + 12 }}>
+      <div className="glass-panel rounded-lg overflow-hidden" style={{ width: mapSize + 12 }}>
         <button
-          onClick={() => setCollapsed(v => !v)}
+          onClick={() => setExpanded(v => !v)}
           className="w-full px-2 py-1 flex items-center justify-between hover:bg-white/5 transition-colors"
         >
           <div className="flex items-center gap-1.5">
             <Map className="w-3 h-3 text-muted-foreground/50" />
-            <span className="text-[9px] text-muted-foreground/50 tracking-[0.2em] font-display">TACTICAL MAP</span>
+            <span className="text-[9px] text-muted-foreground/50 tracking-[0.2em] font-display">MAP</span>
           </div>
-          {collapsed ? (
-            <ChevronDown className="w-3 h-3 text-muted-foreground/40" />
+          {expanded ? (
+            <Minimize2 className="w-3 h-3 text-muted-foreground/40" />
           ) : (
-            <ChevronUp className="w-3 h-3 text-muted-foreground/40" />
+            <Maximize2 className="w-3 h-3 text-muted-foreground/40" />
           )}
         </button>
-        {!collapsed && (
-          <div className="p-1.5 pt-0">
-            <canvas
-              ref={canvasRef}
-              style={{ width: MAP_SIZE, height: MAP_SIZE }}
-              className="rounded-sm"
-            />
-          </div>
-        )}
+        <div className="p-1.5 pt-0">
+          <canvas
+            ref={canvasRef}
+            style={{ width: mapSize, height: mapSize }}
+            className="rounded-sm"
+          />
+        </div>
       </div>
     </div>
   );

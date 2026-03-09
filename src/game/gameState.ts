@@ -357,6 +357,33 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
           else if (pr < 0.14) setTileProp(bx, bz, 'rock', true, 2);
           else if (pr < 0.16) setTileProp(bx, bz, 'pier_post', true, 1);
           else if (pr < 0.18) setTileProp(bx, bz, 'barrel', true, 1);
+        } else if (biome.type === 'forest') {
+          // Dense trees, bushes, fallen logs
+          if (pr < 0.18) setTileProp(bx, bz, 'tree', true, 2);
+          else if (pr < 0.26) setTileProp(bx, bz, 'bush', false, 1);
+          else if (pr < 0.30) setTileProp(bx, bz, 'rock', true, 2);
+          else if (pr < 0.33) setTileProp(bx, bz, 'driftwood', false, 1);
+        } else if (biome.type === 'swamp') {
+          // Sparse cover, reeds, rotting structures
+          if (pr < 0.06) setTileProp(bx, bz, 'tree', true, 2);
+          else if (pr < 0.10) setTileProp(bx, bz, 'bush', false, 1);
+          else if (pr < 0.13) setTileProp(bx, bz, 'barrel', true, 1);
+          else if (pr < 0.15) setTileProp(bx, bz, 'ruins', true, 2);
+        } else if (biome.type === 'ridge') {
+          // Rock outcrops, boulders, natural cover
+          if (pr < 0.14) setTileProp(bx, bz, 'rock', true, 2);
+          else if (pr < 0.20) setTileProp(bx, bz, 'sandbag', false, 2);
+          else if (pr < 0.24) setTileProp(bx, bz, 'bush', false, 1);
+          else if (pr < 0.27) setTileProp(bx, bz, 'tank_trap', true, 1);
+        } else if (biome.type === 'industrial') {
+          // Heavy cover: barriers, wrecks, crates
+          if (pr < 0.08) setTileProp(bx, bz, 'wrecked_car', true, 2);
+          else if (pr < 0.14) setTileProp(bx, bz, 'jersey_barrier', true, 2);
+          else if (pr < 0.20) setTileProp(bx, bz, 'crate', true, 2);
+          else if (pr < 0.24) setTileProp(bx, bz, 'barrel', true, 1);
+          else if (pr < 0.28) setTileProp(bx, bz, 'broken_wall', true, 2);
+          else if (pr < 0.31) setTileProp(bx, bz, 'hesco', true, 2);
+          else if (pr < 0.33) setTileProp(bx, bz, 'rubble_pile', false, 1);
         }
       }
     }

@@ -1514,10 +1514,12 @@ export function runAiUnitStep(
     }
   }
 
-  // Helper to move unit and return path (optionally to an intermediate stop along the path)
+  // Helper to move unit and return path — clamp to moveRange
   const moveToTile = (bestTile: Position) => {
-    const path = findPath(unit.position, bestTile, newState);
-    unit.position = bestTile;
+    const path = findPath(unit.position, bestTile, newState, unit.moveRange);
+    // If path was clamped, move to the last reachable tile instead
+    const actualDest = path.length > 0 ? path[path.length - 1] : bestTile;
+    unit.position = actualDest;
     unit.ap -= AP_MOVE_COST;
     didMove = true;
     newState.movePath = path;

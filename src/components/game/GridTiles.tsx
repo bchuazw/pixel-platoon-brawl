@@ -106,7 +106,7 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
         const isOutOfZone = !isInZone(x, z, shrinkLevel) && shrinkLevel > 0;
 
         const qElev = quantizeElevation(tile.elevation);
-        const tileY = qElev * 0.6;
+        const tileY = qElev * 0.5;
         const isWater = tile.type === 'water';
         const isTrench = tile.type === 'trench';
         const isCrater = tile.type === 'crater';

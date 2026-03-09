@@ -187,7 +187,7 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
           if (hlColor) {
             const tile = grid[x][z];
             const qElev = quantizeElevation(tile.elevation);
-            const tileY = qElev * 0.6;
+            const tileY = qElev * 0.5;
             const surfaceH = tile.type === 'water' ? 0.03 : tile.type === 'trench' ? 0.04 : tile.type === 'crater' ? 0.04 : SURFACE_H;
 
             _dummy.position.set(x, tileY + surfaceH + 0.005, z);

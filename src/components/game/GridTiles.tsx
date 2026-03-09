@@ -717,7 +717,7 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
       {path.map((pos, i) => {
         const tile = grid[pos.x]?.[pos.z];
         const qElev = quantizeElevation(tile?.elevation || 0);
-        const y = qElev * 0.6 + SURFACE_H + 0.005;
+        const y = qElev * 0.5 + SURFACE_H + 0.005;
         return (
           <mesh key={`path-${i}`} position={[pos.x, y, pos.z]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[0.1, 6]} />

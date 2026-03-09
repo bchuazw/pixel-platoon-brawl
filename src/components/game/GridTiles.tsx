@@ -791,6 +791,7 @@ function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Posi
         const tileY = qElev * 0.6;
         const surfaceH = tile?.type === 'water' ? 0.03 : tile?.type === 'trench' ? 0.04 : tile?.type === 'crater' ? 0.04 : SURFACE_H;
         _dummy.position.set(x, tileY + surfaceH + 0.02, z);
+        _dummy.rotation.set(-Math.PI / 2, 0, 0);
         _dummy.scale.set(1, 1, 1);
         _dummy.updateMatrix();
         fogRef.current.setMatrixAt(i, _dummy.matrix);

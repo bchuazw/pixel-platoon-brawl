@@ -525,7 +525,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {!isPreGame && !isGameOver && state.autoPlay && <SponsorHUDPanel />}
 
       {/* ── Kill Feed ── */}
-      <div className="absolute top-14 sm:top-16 right-[200px] sm:right-[280px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[200px] sm:max-w-[280px] hidden sm:flex">
+      <div className="absolute top-14 sm:top-16 right-[190px] sm:right-[240px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[180px] sm:max-w-[250px] hidden sm:flex">
         {state.combatEvents.filter(e => e.type === 'kill' && Date.now() - e.timestamp < 3500).map(e => (
           <div key={e.id} className="kill-notification rounded-md px-3 sm:px-4 py-1.5 flex items-center gap-2"
             style={{ background: 'rgba(8,12,18,0.9)', borderLeft: '3px solid hsl(0,75%,55%)' }}>

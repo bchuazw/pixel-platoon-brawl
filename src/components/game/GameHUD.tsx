@@ -521,8 +521,6 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
         <TacticalMinimap state={state} inspectedUnitId={inspectedUnitId ?? null} />
       )}
 
-      {/* ── Sponsor HUD Panel (WIP) — bottom-left, below roster ── */}
-      {!isPreGame && !isGameOver && state.autoPlay && <SponsorHUDPanel />}
 
       {/* ── Kill Feed ── */}
       <div className="absolute top-14 sm:top-16 right-[190px] sm:right-[240px] z-20 flex flex-col gap-1.5 pointer-events-none max-w-[180px] sm:max-w-[250px] hidden sm:flex">

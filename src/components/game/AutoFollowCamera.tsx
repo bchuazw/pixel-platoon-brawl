@@ -15,9 +15,13 @@ const CENTER = new THREE.Vector3(GRID_SIZE / 2 - 0.5, 0, GRID_SIZE / 2 - 0.5);
 const CAM_DISTANCE = 22;
 const CAM_HEIGHT = 18;
 
-function getAnglePosition(angleIndex: number, target: THREE.Vector3): THREE.Vector3 {
+// Reusable vectors to avoid per-frame allocations
+const _desiredPos = new THREE.Vector3();
+const _unitPos = new THREE.Vector3();
+
+function getAnglePosition(angleIndex: number, target: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
   const angle = (Math.PI / 4) + (angleIndex * Math.PI / 2);
-  return new THREE.Vector3(
+  return out.set(
     target.x + Math.cos(angle) * CAM_DISTANCE,
     CAM_HEIGHT,
     target.z + Math.sin(angle) * CAM_DISTANCE
@@ -30,25 +34,25 @@ export function AutoFollowCamera({ units, selectedUnitId, autoPlay, orbitRef, ca
 
   useFrame(() => {
     if (!orbitRef.current) return;
+    // Only act when autoPlay is on — do NOT interfere with manual camera otherwise
+    if (!autoPlay) return;
 
-    if (!autoPlay || !selectedUnitId) {
+    if (!selectedUnitId) {
       targetLook.current.lerp(CENTER, 0.03);
     } else {
       const unit = units.find(u => u.id === selectedUnitId);
       if (unit && unit.isAlive) {
-        const unitPos = new THREE.Vector3(unit.position.x, 0, unit.position.z);
-        targetLook.current.lerp(unitPos, 0.06);
+        _unitPos.set(unit.position.x, 0, unit.position.z);
+        targetLook.current.lerp(_unitPos, 0.06);
       }
     }
 
     const controls = orbitRef.current;
     controls.target.lerp(targetLook.current, 0.05);
 
-    // Lock camera angle — maintain consistent azimuthal position relative to target
-    if (autoPlay) {
-      const desiredPos = getAnglePosition(cameraAngleIndex, controls.target);
-      camera.position.lerp(desiredPos, 0.04);
-    }
+    // Smoothly maintain camera angle relative to target
+    getAnglePosition(cameraAngleIndex, controls.target, _desiredPos);
+    camera.position.lerp(_desiredPos, 0.04);
 
     controls.update();
   });

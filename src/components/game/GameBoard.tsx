@@ -14,8 +14,13 @@ import { GameState, Position, GRID_SIZE, KillCamData, AirdropData } from '@/game
 import { RotateCw, Video, VideoOff } from 'lucide-react';
 import * as THREE from 'three';
 
-// ── WASD Camera Panning ──
-function WASDControls({ orbitRef }: { orbitRef: React.RefObject<any> }) {
+// Reusable vectors for WASD — avoid per-frame allocations
+const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+
+// ── WASD Camera Panning — disabled during autoPlay ──
+function WASDControls({ orbitRef, disabled }: { orbitRef: React.RefObject<any>; disabled: boolean }) {
   const keys = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -27,21 +32,20 @@ function WASDControls({ orbitRef }: { orbitRef: React.RefObject<any> }) {
   }, []);
 
   useFrame(() => {
-    if (!orbitRef.current) return;
+    if (!orbitRef.current || disabled) return;
     const speed = 0.15;
     const target = orbitRef.current.target;
     const camera = orbitRef.current.object;
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+    camera.getWorldDirection(_forward);
+    _forward.y = 0;
+    _forward.normalize();
+    _right.crossVectors(_forward, _up).normalize();
 
     let moved = false;
-    if (keys.current.has('w') || keys.current.has('arrowup')) { target.addScaledVector(forward, speed); camera.position.addScaledVector(forward, speed); moved = true; }
-    if (keys.current.has('s') || keys.current.has('arrowdown')) { target.addScaledVector(forward, -speed); camera.position.addScaledVector(forward, -speed); moved = true; }
-    if (keys.current.has('a') || keys.current.has('arrowleft')) { target.addScaledVector(right, -speed); camera.position.addScaledVector(right, -speed); moved = true; }
-    if (keys.current.has('d') || keys.current.has('arrowright')) { target.addScaledVector(right, speed); camera.position.addScaledVector(right, speed); moved = true; }
+    if (keys.current.has('w') || keys.current.has('arrowup')) { target.addScaledVector(_forward, speed); camera.position.addScaledVector(_forward, speed); moved = true; }
+    if (keys.current.has('s') || keys.current.has('arrowdown')) { target.addScaledVector(_forward, -speed); camera.position.addScaledVector(_forward, -speed); moved = true; }
+    if (keys.current.has('a') || keys.current.has('arrowleft')) { target.addScaledVector(_right, -speed); camera.position.addScaledVector(_right, -speed); moved = true; }
+    if (keys.current.has('d') || keys.current.has('arrowright')) { target.addScaledVector(_right, speed); camera.position.addScaledVector(_right, speed); moved = true; }
     if (moved) orbitRef.current.update();
   });
 
@@ -72,7 +76,8 @@ function getCameraPosition(angleIndex: number): [number, number, number] {
 
 const ANGLE_LABELS = ['SW', 'SE', 'NE', 'NW'];
 
-function CameraController({ angleIndex, orbitRef }: { angleIndex: number; orbitRef: React.RefObject<any> }) {
+// CameraController only handles manual rotation transitions — NOT during autoPlay
+function CameraController({ angleIndex, orbitRef, disabled }: { angleIndex: number; orbitRef: React.RefObject<any>; disabled: boolean }) {
   const { camera } = useThree();
   const progress = useRef(1);
   const startPos = useRef(new THREE.Vector3());
@@ -86,7 +91,8 @@ function CameraController({ angleIndex, orbitRef }: { angleIndex: number; orbitR
   }, [angleIndex, camera]);
 
   useFrame(() => {
-    if (progress.current >= 1) return;
+    // Skip if autoPlay is controlling the camera, or transition is done
+    if (disabled || progress.current >= 1) return;
     progress.current = Math.min(1, progress.current + 0.03);
     const t = 1 - Math.pow(1 - progress.current, 3);
     camera.position.lerpVectors(startPos.current, targetPos.current, t);
@@ -194,6 +200,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
   }, []);
 
   const initialCamPos = getCameraPosition(0);
+  const isAutoPlaying = state.autoPlay && autoFollow;
 
   return (
     <div className="relative w-full h-full">
@@ -208,10 +215,12 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
         }}
         dpr={[1, 1.5]}
       >
-        <CameraController angleIndex={angleIndex} orbitRef={orbitRef} />
-        <WASDControls orbitRef={orbitRef} />
+        {/* CameraController only for manual rotation, disabled during autoFollow */}
+        <CameraController angleIndex={angleIndex} orbitRef={orbitRef} disabled={isAutoPlaying} />
+        {/* WASD disabled during autoFollow to prevent conflicts */}
+        <WASDControls orbitRef={orbitRef} disabled={isAutoPlaying} />
         <KillCamController killCam={state.killCam} />
-        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={state.autoPlay && autoFollow} orbitRef={orbitRef} cameraAngleIndex={angleIndex} />
+        <AutoFollowCamera units={state.units} selectedUnitId={state.selectedUnitId} autoPlay={isAutoPlaying} orbitRef={orbitRef} cameraAngleIndex={angleIndex} />
 
         <color attach="background" args={['#1a2844']} />
         <mesh scale={[-1, 1, 1]}>
@@ -293,7 +302,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           ref={orbitRef}
           target={[CENTER.x, 0, CENTER.z]}
           enableRotate={false}
-          enablePan={true}
+          enablePan={!isAutoPlaying}
           enableZoom={true}
           minDistance={10}
           maxDistance={40}

@@ -845,8 +845,8 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
 
   return (
     <group>
-      <mesh position={[GRID_SIZE / 2 - 0.5, -0.25, GRID_SIZE / 2 - 0.5]} receiveShadow>
-        <boxGeometry args={[GRID_SIZE + 10, 0.5, GRID_SIZE + 10]} />
+      <mesh position={[GRID_SIZE / 2 - 0.5, -0.3, GRID_SIZE / 2 - 0.5]} receiveShadow>
+        <boxGeometry args={[GRID_SIZE + 10, 0.6, GRID_SIZE + 10]} />
         <meshStandardMaterial color="#2a3a1e" roughness={1} />
       </mesh>
 

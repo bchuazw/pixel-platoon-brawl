@@ -145,7 +145,7 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
           const tile = grid[x][z];
           const t = TERRAIN[tile.type] || TERRAIN.grass;
           const qElev = quantizeElevation(tile.elevation);
-          const tileY = qElev * 0.6;
+          const tileY = qElev * 0.5;
           const isWater = tile.type === 'water';
           if (tileY > 0.02 && !isWater) {
             _dummy.position.set(x, tileY / 2, z);

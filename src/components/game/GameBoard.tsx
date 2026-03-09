@@ -122,31 +122,27 @@ function KillCamController({ killCam }: { killCam: KillCamData | null }) {
   useFrame((_, rawDelta) => {
     if (!isActive.current) return;
     const delta = Math.min(rawDelta, 0.05);
-    const speed = phase.current === 'zoom_in' ? 0.8 : phase.current === 'hold' ? 0 : 1.5;
+    // Faster transitions to reduce total time camera is animating
+    const speed = phase.current === 'zoom_in' ? 1.5 : phase.current === 'hold' ? 0 : 2.5;
     progress.current = Math.min(1, progress.current + delta * speed);
     const t = 1 - Math.pow(1 - progress.current, 3);
     if (phase.current === 'zoom_in') {
       camera.position.lerpVectors(savedPos.current, targetCamPos.current, t);
       lerpTemp.current.lerpVectors(startLook.current, targetLook.current, t);
       camera.lookAt(lerpTemp.current);
-      if (camera instanceof THREE.PerspectiveCamera) { camera.fov = THREE.MathUtils.lerp(40, 30, t); camera.updateProjectionMatrix(); }
       if (progress.current >= 1) { phase.current = 'hold'; progress.current = 0; }
     } else if (phase.current === 'hold') {
       camera.lookAt(targetLook.current);
     } else if (phase.current === 'zoom_out') {
       camera.position.lerpVectors(targetCamPos.current, savedPos.current, t);
-      if (camera instanceof THREE.PerspectiveCamera) { camera.fov = THREE.MathUtils.lerp(30, 40, t); camera.updateProjectionMatrix(); }
       if (progress.current >= 1) {
         isActive.current = false;
         camera.position.copy(savedPos.current);
-        if (camera instanceof THREE.PerspectiveCamera) { camera.fov = 40; camera.updateProjectionMatrix(); }
       }
     }
   });
 
-  return killCam ? (
-    <pointLight position={[killCam.targetPos.x, 4, killCam.targetPos.z]} intensity={2} color="#ff6633" distance={10} />
-  ) : null;
+  return null;
 }
 
 function LoadingFallback() {

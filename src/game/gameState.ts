@@ -428,7 +428,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
       const tz = horizontal ? startZ + Math.floor(rand() * 2 - 0.5) : startZ + s;
       if (tx >= 0 && tx < GRID_SIZE && tz >= 0 && tz < GRID_SIZE && grid[tx][tz].type !== 'water') {
         grid[tx][tz].type = 'trench';
-        grid[tx][tz].elevation = Math.max(-0.2, grid[tx][tz].elevation - 0.4);
+        grid[tx][tz].elevation = Math.max(0, grid[tx][tz].elevation - 1);
         grid[tx][tz].coverValue = Math.max(grid[tx][tz].coverValue, 1) as 0 | 1 | 2;
       }
     }

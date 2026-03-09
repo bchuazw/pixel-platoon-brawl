@@ -793,7 +793,7 @@ function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Posi
         const { x, z } = fogData[i];
         const tile = grid[x]?.[z];
         const qElev = quantizeElevation(tile?.elevation || 0);
-        const tileY = qElev * 0.6;
+        const tileY = qElev * 0.5;
         const surfaceH = tile?.type === 'water' ? 0.03 : tile?.type === 'trench' ? 0.04 : tile?.type === 'crater' ? 0.04 : SURFACE_H;
         _fogDummy.position.set(x, tileY + surfaceH + 0.02, z);
         _fogDummy.scale.set(1, 1, 1);

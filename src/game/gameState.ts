@@ -1031,9 +1031,10 @@ export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]
 
   if (attacker.isSuppressed) chance -= 30;
 
+  // Height advantage: +15% accuracy when shooting from above (any elevation advantage)
   const aElev = grid[attacker.position.x]?.[attacker.position.z]?.elevation || 0;
   const dElev = grid[defender.position.x]?.[defender.position.z]?.elevation || 0;
-  if (aElev > dElev + 0.3) chance += 15;
+  if (aElev > dElev) chance += 15;
 
   if (attacker.weapon.id === 'shotgun' && dist <= 1) chance += 20;
   if (attacker.weapon.id === 'shotgun' && dist === 2) chance += 10;

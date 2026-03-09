@@ -192,17 +192,24 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
   const center = GRID_SIZE / 2;
 
   // ═══ BIOME ZONES ═══
-  // Place 2-3 biome centers (town, beach) to break up grass monotony
-  const biomes: { cx: number; cz: number; type: 'town' | 'beach'; radius: number }[] = [];
-  const biomeCount = 2 + Math.floor(rand() * 2);
+  // Place 4-6 biome centers to break up grass monotony with diverse terrain
+  type BiomeType = 'town' | 'beach' | 'forest' | 'swamp' | 'ridge' | 'industrial';
+  const biomes: { cx: number; cz: number; type: BiomeType; radius: number }[] = [];
+  const biomeTypes: BiomeType[] = ['town', 'beach', 'forest', 'swamp', 'ridge', 'industrial'];
+  const biomeCount = 4 + Math.floor(rand() * 3); // 4-6 biomes
   for (let i = 0; i < biomeCount; i++) {
-    const bx = 5 + Math.floor(rand() * (GRID_SIZE - 10));
-    const bz = 5 + Math.floor(rand() * (GRID_SIZE - 10));
-    const bType = rand() > 0.5 ? 'town' : 'beach';
-    biomes.push({ cx: bx, cz: bz, type: bType, radius: 4 + Math.floor(rand() * 3) });
+    const bx = 4 + Math.floor(rand() * (GRID_SIZE - 8));
+    const bz = 4 + Math.floor(rand() * (GRID_SIZE - 8));
+    const bType = biomeTypes[Math.floor(rand() * biomeTypes.length)];
+    const radius = 4 + Math.floor(rand() * 4); // 4-7 radius
+    // Don't overlap too much with existing biomes
+    const tooClose = biomes.some(b => Math.sqrt((b.cx - bx) ** 2 + (b.cz - bz) ** 2) < 5);
+    if (!tooClose) {
+      biomes.push({ cx: bx, cz: bz, type: bType, radius });
+    }
   }
 
-  function getBiome(x: number, z: number): 'town' | 'beach' | null {
+  function getBiome(x: number, z: number): BiomeType | null {
     for (const b of biomes) {
       const dist = Math.sqrt((x - b.cx) ** 2 + (z - b.cz) ** 2);
       if (dist <= b.radius) return b.type;
@@ -250,18 +257,71 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         } else {
           type = 'beach_sand'; elevation = Math.max(0, elevation * 0.1);
         }
+      } else if (biome === 'forest') {
+        // Dense forest: mostly grass with heavy tree cover, dirt trails
+        if (onHorizPath || onVertPath) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.4);
+        } else if (r < 0.15) {
+          type = 'mud'; elevation = Math.max(0, elevation * 0.3);
+        } else if (r < 0.25) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.5);
+        } else {
+          // Keep as grass but with higher elevation for hills
+          elevation = Math.max(0.2, elevation * 1.3);
+        }
+      } else if (biome === 'swamp') {
+        // Swamp: shallow water, mud, tall grass
+        if (r < 0.30) {
+          type = 'shallow_water'; elevation = -0.05;
+        } else if (r < 0.50) {
+          type = 'mud'; elevation = Math.max(0, elevation * 0.15);
+        } else if (r < 0.65) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.2);
+        } else {
+          elevation = Math.max(0, elevation * 0.3);
+        }
+      } else if (biome === 'ridge') {
+        // Rocky ridge: elevated terrain with stone outcrops
+        if (r < 0.35) {
+          type = 'stone'; elevation = elevation + 0.5 + r * 0.8;
+        } else if (r < 0.50) {
+          type = 'dirt'; elevation = elevation + 0.3;
+        } else {
+          elevation = elevation + 0.4;
+        }
+      } else if (biome === 'industrial') {
+        // Ruined industrial zone: cobblestone, craters, concrete
+        if (onHorizPath || onVertPath) {
+          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.15);
+        } else if (r < 0.25) {
+          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.2);
+        } else if (r < 0.40) {
+          type = 'stone'; elevation = Math.max(0, elevation * 0.25);
+        } else if (r < 0.50) {
+          type = 'crater'; elevation = Math.max(-0.2, elevation - 0.3);
+        } else if (r < 0.60) {
+          type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
+        } else {
+          type = 'mud'; elevation = Math.max(0, elevation * 0.2);
+        }
       } else if (onHorizPath || onVertPath) {
         type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
       } else if ((onDiagPath1 || onDiagPath2) && r < 0.4) {
         type = 'sand'; elevation = Math.max(0, elevation * 0.4);
       } else if (distFromCenter < 4 && r < 0.3) {
         type = 'stone'; elevation = elevation + 0.1;
-      } else if (elevation < 0.15 && r < 0.08) {
+      } else if (elevation < 0.15 && r < 0.10) {
         type = 'water'; elevation = -0.15;
-      } else if (elevation > 1.2) {
+      } else if (elevation > 1.0) {
         type = 'stone';
-      } else if (r < 0.03 && distFromCenter > 5) {
+      } else if (elevation > 0.7 && r < 0.3) {
+        type = 'dirt'; elevation = elevation + 0.15;
+      } else if (r < 0.06 && distFromCenter > 5) {
         type = 'water'; elevation = -0.15;
+      } else if (r < 0.12 && distFromCenter > 3) {
+        type = 'dirt'; elevation = Math.max(0, elevation * 0.5);
+      } else if (r < 0.16 && distFromCenter > 4) {
+        type = 'mud'; elevation = Math.max(0, elevation * 0.3);
       }
 
       grid[x][z] = { x, z, elevation, type, prop: null, isBlocked: false, coverValue: 0, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null, damaged: false, scorchMark: false };
@@ -303,6 +363,33 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
           else if (pr < 0.14) setTileProp(bx, bz, 'rock', true, 2);
           else if (pr < 0.16) setTileProp(bx, bz, 'pier_post', true, 1);
           else if (pr < 0.18) setTileProp(bx, bz, 'barrel', true, 1);
+        } else if (biome.type === 'forest') {
+          // Dense trees, bushes, fallen logs
+          if (pr < 0.18) setTileProp(bx, bz, 'tree', true, 2);
+          else if (pr < 0.26) setTileProp(bx, bz, 'bush', false, 1);
+          else if (pr < 0.30) setTileProp(bx, bz, 'rock', true, 2);
+          else if (pr < 0.33) setTileProp(bx, bz, 'driftwood', false, 1);
+        } else if (biome.type === 'swamp') {
+          // Sparse cover, reeds, rotting structures
+          if (pr < 0.06) setTileProp(bx, bz, 'tree', true, 2);
+          else if (pr < 0.10) setTileProp(bx, bz, 'bush', false, 1);
+          else if (pr < 0.13) setTileProp(bx, bz, 'barrel', true, 1);
+          else if (pr < 0.15) setTileProp(bx, bz, 'ruins', true, 2);
+        } else if (biome.type === 'ridge') {
+          // Rock outcrops, boulders, natural cover
+          if (pr < 0.14) setTileProp(bx, bz, 'rock', true, 2);
+          else if (pr < 0.20) setTileProp(bx, bz, 'sandbag', false, 2);
+          else if (pr < 0.24) setTileProp(bx, bz, 'bush', false, 1);
+          else if (pr < 0.27) setTileProp(bx, bz, 'tank_trap', true, 1);
+        } else if (biome.type === 'industrial') {
+          // Heavy cover: barriers, wrecks, crates
+          if (pr < 0.08) setTileProp(bx, bz, 'wrecked_car', true, 2);
+          else if (pr < 0.14) setTileProp(bx, bz, 'jersey_barrier', true, 2);
+          else if (pr < 0.20) setTileProp(bx, bz, 'crate', true, 2);
+          else if (pr < 0.24) setTileProp(bx, bz, 'barrel', true, 1);
+          else if (pr < 0.28) setTileProp(bx, bz, 'broken_wall', true, 2);
+          else if (pr < 0.31) setTileProp(bx, bz, 'hesco', true, 2);
+          else if (pr < 0.33) setTileProp(bx, bz, 'rubble_pile', false, 1);
         }
       }
     }
@@ -619,12 +706,14 @@ export function pickupLoot(unit: Unit, tile: TileData): { picked: boolean; messa
       }
     }
     case 'stim_pack': {
-      // Temporary move range boost and small heal
-      unit.moveRange += 2;
+      // Move range boost (capped at 6 to prevent stacking abuse)
+      const MAX_MOVE_RANGE = 6;
+      const moveGain = Math.min(2, MAX_MOVE_RANGE - unit.moveRange);
+      if (moveGain > 0) unit.moveRange += moveGain;
       const healAmt = Math.min(15, unit.maxHp - unit.hp);
       if (healAmt > 0) unit.hp += healAmt;
       tile.loot = null;
-      return { picked: true, message: `💉 ${unit.name} injects Stim Pack! (+2 MOV${healAmt > 0 ? `, +${healAmt} HP` : ''})` };
+      return { picked: true, message: `💉 ${unit.name} injects Stim Pack! (${moveGain > 0 ? `+${moveGain} MOV` : 'MOV maxed'}${healAmt > 0 ? `, +${healAmt} HP` : ''})` };
     }
     case 'killstreak': {
       if (loot.killstreakId && !unit.killstreak) {

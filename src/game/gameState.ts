@@ -537,7 +537,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         } else if (propRoll < 0.050 && distFromCenter > 5) {
           setTileProp(x, z, 'broken_wall', true, 2);
         } else if (propRoll < 0.055 && distFromCenter > 7) {
-          grid[x][z].elevation += 0.3;
+          grid[x][z].elevation = Math.min(3, grid[x][z].elevation + 1);
           setTileProp(x, z, 'ruins', true, 2);
         }
       }

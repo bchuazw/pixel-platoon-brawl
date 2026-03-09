@@ -59,7 +59,9 @@ function getTerrainElevation(x: number, z: number, seed: number, flatZones?: Pos
     }
   }
 
-  return Math.max(0, Math.min(1.8, elev));
+  // Quantize to integer block levels 0-3
+  const raw = Math.max(0, Math.min(3, elev * 2.2));
+  return Math.round(raw);
 }
 
 // ── Loot Generation ──

@@ -10,9 +10,9 @@ interface ScreenShakeProps {
 export function ScreenShake({ events }: ScreenShakeProps) {
   const { camera } = useThree();
   const shakeIntensity = useRef(0);
-  const shakeDecay = useRef(0);
-  const originalPos = useRef(new THREE.Vector3());
   const lastEventCount = useRef(0);
+  // Store the offset so we can remove it next frame
+  const lastOffset = useRef(new THREE.Vector3());
 
   useEffect(() => {
     if (events.length > lastEventCount.current) {
@@ -34,12 +34,20 @@ export function ScreenShake({ events }: ScreenShakeProps) {
   }, [events.length]);
 
   useFrame(() => {
+    // Remove last frame's offset first to prevent cumulative drift
+    camera.position.sub(lastOffset.current);
+
     if (shakeIntensity.current > 0.001) {
       const shake = shakeIntensity.current;
-      camera.position.x += (Math.random() - 0.5) * shake;
-      camera.position.y += (Math.random() - 0.5) * shake * 0.5;
-      camera.position.z += (Math.random() - 0.5) * shake;
-      shakeIntensity.current *= 0.88; // decay
+      lastOffset.current.set(
+        (Math.random() - 0.5) * shake,
+        (Math.random() - 0.5) * shake * 0.5,
+        (Math.random() - 0.5) * shake
+      );
+      camera.position.add(lastOffset.current);
+      shakeIntensity.current *= 0.88;
+    } else {
+      lastOffset.current.set(0, 0, 0);
     }
   });
 

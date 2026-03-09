@@ -322,6 +322,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
           enableDamping
           dampingFactor={0.12}
           screenSpacePanning={false}
+          mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }}
         />
       </Canvas>
 

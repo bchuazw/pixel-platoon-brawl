@@ -619,12 +619,14 @@ export function pickupLoot(unit: Unit, tile: TileData): { picked: boolean; messa
       }
     }
     case 'stim_pack': {
-      // Temporary move range boost and small heal
-      unit.moveRange += 2;
+      // Move range boost (capped at 6 to prevent stacking abuse)
+      const MAX_MOVE_RANGE = 6;
+      const moveGain = Math.min(2, MAX_MOVE_RANGE - unit.moveRange);
+      if (moveGain > 0) unit.moveRange += moveGain;
       const healAmt = Math.min(15, unit.maxHp - unit.hp);
       if (healAmt > 0) unit.hp += healAmt;
       tile.loot = null;
-      return { picked: true, message: `💉 ${unit.name} injects Stim Pack! (+2 MOV${healAmt > 0 ? `, +${healAmt} HP` : ''})` };
+      return { picked: true, message: `💉 ${unit.name} injects Stim Pack! (${moveGain > 0 ? `+${moveGain} MOV` : 'MOV maxed'}${healAmt > 0 ? `, +${healAmt} HP` : ''})` };
     }
     case 'killstreak': {
       if (loot.killstreakId && !unit.killstreak) {

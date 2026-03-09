@@ -5,7 +5,7 @@ import { isInZone } from '@/game/gameState';
 import { playVictoryFanfare } from '@/game/sounds';
 import { PreGameScreen } from './PreGameScreen';
 import { TacticalMinimap } from './TacticalMinimap';
-import { SponsorHUDPanel } from './SponsorHUDPanel';
+
 
 import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
 import portraitSoldierRed from '@/assets/portrait-soldier-red.png';

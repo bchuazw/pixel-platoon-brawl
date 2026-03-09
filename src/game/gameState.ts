@@ -1080,16 +1080,29 @@ export function getManhattanDistance(a: Position, b: Position): number {
 
 export function getMovableTiles(unit: Unit, state: GameState): Position[] {
   if (unit.ap < AP_MOVE_COST || unit.isSuppressed) return [];
+  // Use BFS to find actually reachable tiles within moveRange steps
   const tiles: Position[] = [];
-  for (let x = 0; x < GRID_SIZE; x++) {
-    for (let z = 0; z < GRID_SIZE; z++) {
-      const dist = getManhattanDistance(unit.position, { x, z });
-      const tile = state.grid[x][z];
-      if (dist > 0 && dist <= unit.moveRange && !tile.isBlocked && !tile.prop && tile.type !== 'water') {
-        if (!state.units.some(u => u.isAlive && u.position.x === x && u.position.z === z)) {
-          tiles.push({ x, z });
-        }
-      }
+  const visited = new Set<string>();
+  const queue: { pos: Position; steps: number }[] = [{ pos: unit.position, steps: 0 }];
+  visited.add(`${unit.position.x},${unit.position.z}`);
+
+  while (queue.length > 0) {
+    const { pos, steps } = queue.shift()!;
+    if (steps >= unit.moveRange) continue;
+
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = pos.x + dx;
+      const nz = pos.z + dz;
+      const nKey = `${nx},${nz}`;
+      if (nx < 0 || nx >= GRID_SIZE || nz < 0 || nz >= GRID_SIZE) continue;
+      if (visited.has(nKey)) continue;
+      const tile = state.grid[nx][nz];
+      if (tile.isBlocked || tile.prop || tile.type === 'water') continue;
+      if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz)) continue;
+
+      visited.add(nKey);
+      tiles.push({ x: nx, z: nz });
+      queue.push({ pos: { x: nx, z: nz }, steps: steps + 1 });
     }
   }
   return tiles;

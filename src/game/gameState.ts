@@ -192,17 +192,24 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
   const center = GRID_SIZE / 2;
 
   // ═══ BIOME ZONES ═══
-  // Place 2-3 biome centers (town, beach) to break up grass monotony
-  const biomes: { cx: number; cz: number; type: 'town' | 'beach'; radius: number }[] = [];
-  const biomeCount = 2 + Math.floor(rand() * 2);
+  // Place 4-6 biome centers to break up grass monotony with diverse terrain
+  type BiomeType = 'town' | 'beach' | 'forest' | 'swamp' | 'ridge' | 'industrial';
+  const biomes: { cx: number; cz: number; type: BiomeType; radius: number }[] = [];
+  const biomeTypes: BiomeType[] = ['town', 'beach', 'forest', 'swamp', 'ridge', 'industrial'];
+  const biomeCount = 4 + Math.floor(rand() * 3); // 4-6 biomes
   for (let i = 0; i < biomeCount; i++) {
-    const bx = 5 + Math.floor(rand() * (GRID_SIZE - 10));
-    const bz = 5 + Math.floor(rand() * (GRID_SIZE - 10));
-    const bType = rand() > 0.5 ? 'town' : 'beach';
-    biomes.push({ cx: bx, cz: bz, type: bType, radius: 4 + Math.floor(rand() * 3) });
+    const bx = 4 + Math.floor(rand() * (GRID_SIZE - 8));
+    const bz = 4 + Math.floor(rand() * (GRID_SIZE - 8));
+    const bType = biomeTypes[Math.floor(rand() * biomeTypes.length)];
+    const radius = 4 + Math.floor(rand() * 4); // 4-7 radius
+    // Don't overlap too much with existing biomes
+    const tooClose = biomes.some(b => Math.sqrt((b.cx - bx) ** 2 + (b.cz - bz) ** 2) < 5);
+    if (!tooClose) {
+      biomes.push({ cx: bx, cz: bz, type: bType, radius });
+    }
   }
 
-  function getBiome(x: number, z: number): 'town' | 'beach' | null {
+  function getBiome(x: number, z: number): BiomeType | null {
     for (const b of biomes) {
       const dist = Math.sqrt((x - b.cx) ** 2 + (z - b.cz) ** 2);
       if (dist <= b.radius) return b.type;

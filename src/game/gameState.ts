@@ -300,13 +300,13 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
           elevation = Math.max(0, elevation * 0.3);
         }
       } else if (biome === 'ridge') {
-        // Rocky ridge: elevated terrain with stone outcrops
+        // Rocky ridge: elevated terrain 2-3 blocks high
         if (r < 0.35) {
-          type = 'stone'; elevation = elevation + 0.5 + r * 0.8;
+          type = 'stone'; elevation = 2 + (r < 0.15 ? 1 : 0); // 2-3 blocks
         } else if (r < 0.50) {
-          type = 'dirt'; elevation = elevation + 0.3;
+          type = 'dirt'; elevation = 2;
         } else {
-          elevation = elevation + 0.4;
+          elevation = Math.max(1, elevation);
         }
       } else if (biome === 'industrial') {
         // Ruined industrial zone: cobblestone, craters, concrete

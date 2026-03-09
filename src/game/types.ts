@@ -43,7 +43,7 @@ export const WEAPONS: Record<WeaponId, Weapon> = {
 };
 
 // ── Loot System ──
-export type LootType = 'weapon' | 'medkit' | 'armor' | 'ammo' | 'killstreak';
+export type LootType = 'weapon' | 'medkit' | 'armor' | 'ammo' | 'killstreak' | 'grenade_pack' | 'smoke_canister' | 'bandage' | 'stim_pack';
 export type KillstreakId = 'uav' | 'supply_drop' | 'airstrike' | 'emp';
 
 export interface LootItem {

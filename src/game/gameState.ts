@@ -65,23 +65,31 @@ function getTerrainElevation(x: number, z: number, seed: number, flatZones?: Pos
 // ── Loot Generation ──
 function generateLootItem(rand: () => number): LootItem {
   const roll = rand();
-  if (roll < 0.14) {
+  if (roll < 0.10) {
     return { type: 'weapon', weaponId: 'rifle', value: 0, icon: '🔫', name: 'Assault Rifle' };
-  } else if (roll < 0.24) {
+  } else if (roll < 0.17) {
     return { type: 'weapon', weaponId: 'shotgun', value: 0, icon: '💥', name: 'Shotgun' };
-  } else if (roll < 0.32) {
+  } else if (roll < 0.23) {
     return { type: 'weapon', weaponId: 'sniper_rifle', value: 0, icon: '🎯', name: 'Sniper Rifle' };
-  } else if (roll < 0.37) {
+  } else if (roll < 0.27) {
     return { type: 'weapon', weaponId: 'rocket_launcher', value: 0, icon: '🚀', name: 'Rocket Launcher' };
-  } else if (roll < 0.45) {
+  } else if (roll < 0.33) {
     return { type: 'weapon', weaponId: 'smg', value: 0, icon: '⚡', name: 'SMG' };
-  } else if (roll < 0.58) {
+  } else if (roll < 0.42) {
     return { type: 'medkit', value: 40, icon: '❤️', name: 'Medkit' };
-  } else if (roll < 0.70) {
+  } else if (roll < 0.49) {
+    return { type: 'bandage', value: 20, icon: '🩹', name: 'Bandage' };
+  } else if (roll < 0.56) {
     return { type: 'armor', value: 8, icon: '🛡️', name: 'Armor Vest' };
-  } else if (roll < 0.80) {
+  } else if (roll < 0.63) {
     return { type: 'ammo', value: 0, icon: '📦', name: 'Ammo Crate' };
-  } else if (roll < 0.86) {
+  } else if (roll < 0.71) {
+    return { type: 'grenade_pack', value: 0, icon: '💣', name: 'Grenade Pack' };
+  } else if (roll < 0.78) {
+    return { type: 'smoke_canister', value: 0, icon: '💨', name: 'Smoke Canister' };
+  } else if (roll < 0.84) {
+    return { type: 'stim_pack', value: 0, icon: '💉', name: 'Stim Pack' };
+  } else if (roll < 0.88) {
     return { type: 'killstreak', killstreakId: 'uav', value: 0, icon: '📡', name: 'UAV' };
   } else if (roll < 0.92) {
     return { type: 'killstreak', killstreakId: 'supply_drop', value: 0, icon: '📦', name: 'Supply Drop' };
@@ -485,7 +493,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
   }
 
   // ═══ SPAWN LOOT ═══
-  const lootCount = 18 + Math.floor(rand() * 8);
+  const lootCount = 26 + Math.floor(rand() * 12);
   let placed = 0;
   let attempts = 0;
   while (placed < lootCount && attempts < 500) {
@@ -554,6 +562,15 @@ export function pickupLoot(unit: Unit, tile: TileData): { picked: boolean; messa
       }
       return { picked: false, message: '' };
     }
+    case 'bandage': {
+      const healAmt = Math.min(loot.value, unit.maxHp - unit.hp);
+      if (healAmt > 0) {
+        unit.hp += healAmt;
+        tile.loot = null;
+        return { picked: true, message: `🩹 ${unit.name} uses Bandage (+${healAmt} HP)!` };
+      }
+      return { picked: false, message: '' };
+    }
     case 'armor': {
       unit.armor += loot.value;
       unit.defense += Math.floor(loot.value / 2);
@@ -568,13 +585,53 @@ export function pickupLoot(unit: Unit, tile: TileData): { picked: boolean; messa
       }
       break;
     }
+    case 'grenade_pack': {
+      // Reset grenade cooldown for soldiers, or give temp attack boost for medics
+      const grenadeAbility = unit.abilities.find(a => a.id === 'grenade');
+      if (grenadeAbility && unit.cooldowns['grenade']) {
+        unit.cooldowns['grenade'] = 0;
+        tile.loot = null;
+        return { picked: true, message: `💣 ${unit.name} picks up Grenade Pack! Grenade ready!` };
+      } else if (grenadeAbility) {
+        // Already off cooldown — grant bonus attack
+        unit.attack += 3;
+        tile.loot = null;
+        return { picked: true, message: `💣 ${unit.name} uses Grenade Pack (+3 ATK)!` };
+      } else {
+        // Medics get attack boost
+        unit.attack += 5;
+        tile.loot = null;
+        return { picked: true, message: `💣 ${unit.name} uses Grenade Pack (+5 ATK)!` };
+      }
+    }
+    case 'smoke_canister': {
+      // Reset smoke cooldown for medics, or give defense boost
+      const smokeAbility = unit.abilities.find(a => a.id === 'smoke');
+      if (smokeAbility && unit.cooldowns['smoke']) {
+        unit.cooldowns['smoke'] = 0;
+        tile.loot = null;
+        return { picked: true, message: `💨 ${unit.name} picks up Smoke Canister! Smoke ready!` };
+      } else {
+        // Give defense boost
+        unit.defense += 3;
+        tile.loot = null;
+        return { picked: true, message: `💨 ${unit.name} uses Smoke Canister (+3 DEF)!` };
+      }
+    }
+    case 'stim_pack': {
+      // Temporary move range boost and small heal
+      unit.moveRange += 2;
+      const healAmt = Math.min(15, unit.maxHp - unit.hp);
+      if (healAmt > 0) unit.hp += healAmt;
+      tile.loot = null;
+      return { picked: true, message: `💉 ${unit.name} injects Stim Pack! (+2 MOV${healAmt > 0 ? `, +${healAmt} HP` : ''})` };
+    }
     case 'killstreak': {
       if (loot.killstreakId && !unit.killstreak) {
         unit.killstreak = loot.killstreakId;
         tile.loot = null;
         return { picked: true, message: `🎖️ ${unit.name} picks up ${loot.name}! Ready to activate.` };
       } else if (loot.killstreakId && unit.killstreak) {
-        // Already holding one — swap it
         unit.killstreak = loot.killstreakId;
         tile.loot = null;
         return { picked: true, message: `🎖️ ${unit.name} swaps killstreak for ${loot.name}!` };

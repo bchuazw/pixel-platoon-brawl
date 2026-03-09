@@ -729,58 +729,99 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
 
 // ── Main GridTiles ──
 // ── Fog of War overlay ──
+const FOG_MAX = GRID_SIZE * GRID_SIZE;
+
 function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Position; visionRange: number; isAlive: boolean }[] }) {
   const fogRef = useRef<THREE.InstancedMesh>(null);
+  const matRef = useRef<THREE.MeshBasicMaterial>(null);
 
-  const fogTiles = useMemo(() => {
-    // Compute visible set from all alive units
+  // Stable key: only recompute when unit positions/visionRange actually change
+  const unitKey = useMemo(() => {
+    return units
+      .filter(u => u.isAlive)
+      .map(u => `${u.position.x},${u.position.z},${u.visionRange}`)
+      .sort()
+      .join('|');
+  }, [units]);
+
+  const fogData = useMemo(() => {
     const visible = new Set<string>();
+    const edgeTiles = new Set<string>();
     for (const u of units) {
       if (!u.isAlive) continue;
       const range = u.visionRange;
-      for (let dx = -range; dx <= range; dx++) {
-        for (let dz = -range; dz <= range; dz++) {
-          if (Math.abs(dx) + Math.abs(dz) > range) continue;
+      for (let dx = -range - 1; dx <= range + 1; dx++) {
+        for (let dz = -range - 1; dz <= range + 1; dz++) {
+          const dist = Math.abs(dx) + Math.abs(dz);
           const tx = u.position.x + dx;
           const tz = u.position.z + dz;
-          if (tx >= 0 && tx < GRID_SIZE && tz >= 0 && tz < GRID_SIZE) {
-            visible.add(`${tx},${tz}`);
+          if (tx < 0 || tx >= GRID_SIZE || tz < 0 || tz >= GRID_SIZE) continue;
+          const key = `${tx},${tz}`;
+          if (dist <= range) {
+            visible.add(key);
+          } else if (dist <= range + 1) {
+            edgeTiles.add(key);
           }
         }
       }
     }
-    // Collect non-visible tiles
-    const fogged: { x: number; z: number }[] = [];
+    // Remove edges that are already visible
+    for (const key of visible) edgeTiles.delete(key);
+
+    const fogged: { x: number; z: number; opacity: number }[] = [];
     for (let x = 0; x < GRID_SIZE; x++) {
       for (let z = 0; z < GRID_SIZE; z++) {
-        if (!visible.has(`${x},${z}`)) fogged.push({ x, z });
+        const key = `${x},${z}`;
+        if (visible.has(key)) continue;
+        const isEdge = edgeTiles.has(key);
+        fogged.push({ x, z, opacity: isEdge ? 0.22 : 0.4 });
       }
     }
     return fogged;
-  }, [units]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitKey]);
 
   useEffect(() => {
-    if (!fogRef.current || fogTiles.length === 0) return;
-    for (let i = 0; i < fogTiles.length; i++) {
-      const { x, z } = fogTiles[i];
-      const tile = grid[x]?.[z];
-      const qElev = quantizeElevation(tile?.elevation || 0);
-      const tileY = qElev * 0.6;
-      const surfaceH = tile?.type === 'water' ? 0.03 : tile?.type === 'trench' ? 0.04 : tile?.type === 'crater' ? 0.04 : SURFACE_H;
-      _dummy.position.set(x, tileY + surfaceH + 0.008, z);
-      _dummy.scale.set(TILE_SIZE, 0.01, TILE_SIZE);
-      _dummy.updateMatrix();
-      fogRef.current.setMatrixAt(i, _dummy.matrix);
+    if (!fogRef.current) return;
+    for (let i = 0; i < FOG_MAX; i++) {
+      if (i < fogData.length) {
+        const { x, z } = fogData[i];
+        const tile = grid[x]?.[z];
+        const qElev = quantizeElevation(tile?.elevation || 0);
+        const tileY = qElev * 0.6;
+        const surfaceH = tile?.type === 'water' ? 0.03 : tile?.type === 'trench' ? 0.04 : tile?.type === 'crater' ? 0.04 : SURFACE_H;
+        _dummy.position.set(x, tileY + surfaceH + 0.02, z);
+        _dummy.scale.set(1, 1, 1);
+        _dummy.updateMatrix();
+        fogRef.current.setMatrixAt(i, _dummy.matrix);
+        // Edge tiles get lighter color
+        _color.set(fogData[i].opacity > 0.3 ? '#000000' : '#111122');
+        fogRef.current.setColorAt(i, _color);
+      } else {
+        _dummy.position.set(0, -100, 0);
+        _dummy.scale.set(0, 0, 0);
+        _dummy.updateMatrix();
+        fogRef.current.setMatrixAt(i, _dummy.matrix);
+      }
     }
     fogRef.current.instanceMatrix.needsUpdate = true;
-  }, [fogTiles, grid]);
-
-  if (fogTiles.length === 0) return null;
+    if (fogRef.current.instanceColor) fogRef.current.instanceColor.needsUpdate = true;
+  }, [fogData, grid]);
 
   return (
-    <instancedMesh ref={fogRef} args={[undefined, undefined, fogTiles.length]}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshBasicMaterial color="#000000" transparent opacity={0.45} depthWrite={false} />
+    <instancedMesh ref={fogRef} args={[undefined, undefined, FOG_MAX]} renderOrder={10}>
+      <planeGeometry args={[TILE_SIZE, TILE_SIZE]} />
+      <meshBasicMaterial
+        ref={matRef}
+        color="#000000"
+        transparent
+        opacity={0.4}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+        polygonOffset
+        polygonOffsetFactor={-1}
+        polygonOffsetUnits={-1}
+      />
     </instancedMesh>
   );
 }

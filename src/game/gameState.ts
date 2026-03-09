@@ -59,7 +59,9 @@ function getTerrainElevation(x: number, z: number, seed: number, flatZones?: Pos
     }
   }
 
-  return Math.max(0, Math.min(1.8, elev));
+  // Quantize to integer block levels 0-3
+  const raw = Math.max(0, Math.min(3, elev * 2.2));
+  return Math.round(raw);
 }
 
 // ── Loot Generation ──
@@ -146,6 +148,11 @@ export function findPath(from: Position, to: Position, state: GameState, maxStep
       if (nextTile.isBlocked || nextTile.prop || nextTile.type === 'water') continue;
       if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz &&
         !(nx === to.x && nz === to.z))) continue;
+
+      // Elevation restriction: can only climb 1 block at a time
+      const currentElev = state.grid[current.x][current.z].elevation;
+      const nextElev = nextTile.elevation;
+      if (nextElev - currentElev > 1) continue;
 
       visited.add(nKey);
       parent.set(nKey, key);
@@ -246,94 +253,94 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
       const onDiagPath2 = Math.abs(x - (GRID_SIZE - 1 - z)) <= 1;
 
       if (biome === 'town') {
-        // Dilapidated town: cobblestone streets, mud, ruins
+        // Dilapidated town: flat, cobblestone streets
         if (onHorizPath || onVertPath) {
-          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.2);
+          type = 'cobblestone'; elevation = 0;
         } else if (r < 0.3) {
-          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.25);
+          type = 'cobblestone'; elevation = 0;
         } else if (r < 0.45) {
-          type = 'mud'; elevation = Math.max(0, elevation * 0.3);
+          type = 'mud'; elevation = 0;
         } else if (r < 0.55) {
-          type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
+          type = 'dirt'; elevation = 0;
         } else {
-          type = 'stone'; elevation = Math.max(0, elevation * 0.35);
+          type = 'stone'; elevation = Math.min(1, elevation);
         }
       } else if (biome === 'beach') {
-        // Beach: sand, shallow water, beach sand
+        // Beach: flat, sand and shallow water
         if (r < 0.35) {
-          type = 'beach_sand'; elevation = Math.max(0, elevation * 0.1);
+          type = 'beach_sand'; elevation = 0;
         } else if (r < 0.55) {
-          type = 'sand'; elevation = Math.max(0, elevation * 0.15);
+          type = 'sand'; elevation = 0;
         } else if (r < 0.7) {
-          type = 'shallow_water'; elevation = -0.05;
+          type = 'shallow_water'; elevation = 0;
         } else {
-          type = 'beach_sand'; elevation = Math.max(0, elevation * 0.1);
+          type = 'beach_sand'; elevation = 0;
         }
       } else if (biome === 'forest') {
-        // Dense forest: mostly grass with heavy tree cover, dirt trails
+        // Dense forest: hilly terrain
         if (onHorizPath || onVertPath) {
-          type = 'dirt'; elevation = Math.max(0, elevation * 0.4);
+          type = 'dirt'; elevation = 0;
         } else if (r < 0.15) {
-          type = 'mud'; elevation = Math.max(0, elevation * 0.3);
+          type = 'mud'; elevation = 0;
         } else if (r < 0.25) {
-          type = 'dirt'; elevation = Math.max(0, elevation * 0.5);
+          type = 'dirt'; elevation = Math.min(1, elevation);
         } else {
-          // Keep as grass but with higher elevation for hills
-          elevation = Math.max(0.2, elevation * 1.3);
+          // Forest hills — keep elevated
+          elevation = Math.max(1, elevation);
         }
       } else if (biome === 'swamp') {
-        // Swamp: shallow water, mud, tall grass
+        // Swamp: flat, shallow water and mud
         if (r < 0.30) {
-          type = 'shallow_water'; elevation = -0.05;
+          type = 'shallow_water'; elevation = 0;
         } else if (r < 0.50) {
-          type = 'mud'; elevation = Math.max(0, elevation * 0.15);
+          type = 'mud'; elevation = 0;
         } else if (r < 0.65) {
-          type = 'dirt'; elevation = Math.max(0, elevation * 0.2);
+          type = 'dirt'; elevation = 0;
         } else {
-          elevation = Math.max(0, elevation * 0.3);
+          elevation = 0;
         }
       } else if (biome === 'ridge') {
-        // Rocky ridge: elevated terrain with stone outcrops
+        // Rocky ridge: elevated terrain 2-3 blocks high
         if (r < 0.35) {
-          type = 'stone'; elevation = elevation + 0.5 + r * 0.8;
+          type = 'stone'; elevation = 2 + (r < 0.15 ? 1 : 0); // 2-3 blocks
         } else if (r < 0.50) {
-          type = 'dirt'; elevation = elevation + 0.3;
+          type = 'dirt'; elevation = 2;
         } else {
-          elevation = elevation + 0.4;
+          elevation = Math.max(1, elevation);
         }
       } else if (biome === 'industrial') {
-        // Ruined industrial zone: cobblestone, craters, concrete
+        // Ruined industrial zone
         if (onHorizPath || onVertPath) {
-          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.15);
+          type = 'cobblestone'; elevation = 0;
         } else if (r < 0.25) {
-          type = 'cobblestone'; elevation = Math.max(0, elevation * 0.2);
+          type = 'cobblestone'; elevation = 0;
         } else if (r < 0.40) {
-          type = 'stone'; elevation = Math.max(0, elevation * 0.25);
+          type = 'stone'; elevation = Math.min(1, elevation);
         } else if (r < 0.50) {
-          type = 'crater'; elevation = Math.max(-0.2, elevation - 0.3);
+          type = 'crater'; elevation = 0;
         } else if (r < 0.60) {
-          type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
+          type = 'dirt'; elevation = 0;
         } else {
-          type = 'mud'; elevation = Math.max(0, elevation * 0.2);
+          type = 'mud'; elevation = 0;
         }
       } else if (onHorizPath || onVertPath) {
-        type = 'dirt'; elevation = Math.max(0, elevation * 0.3);
+        type = 'dirt'; elevation = 0;
       } else if ((onDiagPath1 || onDiagPath2) && r < 0.4) {
-        type = 'sand'; elevation = Math.max(0, elevation * 0.4);
+        type = 'sand'; elevation = 0;
       } else if (distFromCenter < 4 && r < 0.3) {
-        type = 'stone'; elevation = elevation + 0.1;
-      } else if (elevation < 0.15 && r < 0.10) {
-        type = 'water'; elevation = -0.15;
-      } else if (elevation > 1.0) {
+        type = 'stone'; elevation = Math.min(elevation + 1, 2);
+      } else if (elevation === 0 && r < 0.10) {
+        type = 'water'; elevation = 0;
+      } else if (elevation >= 2) {
         type = 'stone';
-      } else if (elevation > 0.7 && r < 0.3) {
-        type = 'dirt'; elevation = elevation + 0.15;
+      } else if (elevation >= 1 && r < 0.3) {
+        type = 'dirt';
       } else if (r < 0.06 && distFromCenter > 5) {
-        type = 'water'; elevation = -0.15;
+        type = 'water'; elevation = 0;
       } else if (r < 0.12 && distFromCenter > 3) {
-        type = 'dirt'; elevation = Math.max(0, elevation * 0.5);
+        type = 'dirt';
       } else if (r < 0.16 && distFromCenter > 4) {
-        type = 'mud'; elevation = Math.max(0, elevation * 0.3);
+        type = 'mud'; elevation = 0;
       }
 
       grid[x][z] = { x, z, elevation, type, prop: null, isBlocked: false, coverValue: 0, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null, damaged: false, scorchMark: false };
@@ -421,7 +428,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
       const tz = horizontal ? startZ + Math.floor(rand() * 2 - 0.5) : startZ + s;
       if (tx >= 0 && tx < GRID_SIZE && tz >= 0 && tz < GRID_SIZE && grid[tx][tz].type !== 'water') {
         grid[tx][tz].type = 'trench';
-        grid[tx][tz].elevation = Math.max(-0.2, grid[tx][tz].elevation - 0.4);
+        grid[tx][tz].elevation = Math.max(0, grid[tx][tz].elevation - 1);
         grid[tx][tz].coverValue = Math.max(grid[tx][tz].coverValue, 1) as 0 | 1 | 2;
       }
     }
@@ -530,7 +537,7 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         } else if (propRoll < 0.050 && distFromCenter > 5) {
           setTileProp(x, z, 'broken_wall', true, 2);
         } else if (propRoll < 0.055 && distFromCenter > 7) {
-          grid[x][z].elevation += 0.3;
+          grid[x][z].elevation = Math.min(3, grid[x][z].elevation + 1);
           setTileProp(x, z, 'ruins', true, 2);
         }
       }
@@ -1029,9 +1036,10 @@ export function calcHitChance(attacker: Unit, defender: Unit, grid: TileData[][]
 
   if (attacker.isSuppressed) chance -= 30;
 
+  // Height advantage: +15% accuracy when shooting from above (any elevation advantage)
   const aElev = grid[attacker.position.x]?.[attacker.position.z]?.elevation || 0;
   const dElev = grid[defender.position.x]?.[defender.position.z]?.elevation || 0;
-  if (aElev > dElev + 0.3) chance += 15;
+  if (aElev > dElev) chance += 15;
 
   if (attacker.weapon.id === 'shotgun' && dist <= 1) chance += 20;
   if (attacker.weapon.id === 'shotgun' && dist === 2) chance += 10;
@@ -1089,6 +1097,12 @@ export function getMovableTiles(unit: Unit, state: GameState): Position[] {
       const tile = state.grid[nx][nz];
       if (tile.isBlocked || tile.prop || tile.type === 'water') continue;
       if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz)) continue;
+
+      // Elevation restriction: can only climb 1 block at a time
+      const currentElev = state.grid[pos.x][pos.z].elevation;
+      const nextElev = tile.elevation;
+      if (nextElev - currentElev > 1) continue; // Can't climb more than 1 block up
+      // Can always drop down (no restriction on descending)
 
       visited.add(nKey);
       tiles.push({ x: nx, z: nz });
@@ -1303,7 +1317,7 @@ export function applyExplosionDamage(grid: TileData[][], center: Position, radiu
       if (dist === 0) {
         // Ground zero — crater
         tile.type = 'crater';
-        tile.elevation = Math.max(-0.2, tile.elevation - 0.3);
+        tile.elevation = Math.max(0, tile.elevation - 1);
         tile.prop = null;
         tile.isBlocked = false;
         tile.coverValue = 0;

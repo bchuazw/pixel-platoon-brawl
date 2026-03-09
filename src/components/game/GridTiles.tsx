@@ -41,11 +41,13 @@ function tileHash(x: number, z: number, seed: number): number {
 }
 
 function quantizeElevation(elev: number): number {
-  return Math.round(elev * 2.5) / 2.5;
+  // Elevation is now integer 0-3, just clamp
+  return Math.round(Math.max(0, Math.min(3, elev)));
 }
 
 export function getTileY(elevation: number): number {
-  return quantizeElevation(elevation) * 0.6;
+  // Each block level = 0.5 units tall
+  return quantizeElevation(elevation) * 0.5;
 }
 
 const TILE_SIZE = 1.0;
@@ -104,7 +106,7 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
         const isOutOfZone = !isInZone(x, z, shrinkLevel) && shrinkLevel > 0;
 
         const qElev = quantizeElevation(tile.elevation);
-        const tileY = qElev * 0.6;
+        const tileY = qElev * 0.5;
         const isWater = tile.type === 'water';
         const isTrench = tile.type === 'trench';
         const isCrater = tile.type === 'crater';
@@ -143,7 +145,7 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
           const tile = grid[x][z];
           const t = TERRAIN[tile.type] || TERRAIN.grass;
           const qElev = quantizeElevation(tile.elevation);
-          const tileY = qElev * 0.6;
+          const tileY = qElev * 0.5;
           const isWater = tile.type === 'water';
           if (tileY > 0.02 && !isWater) {
             _dummy.position.set(x, tileY / 2, z);
@@ -185,7 +187,7 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
           if (hlColor) {
             const tile = grid[x][z];
             const qElev = quantizeElevation(tile.elevation);
-            const tileY = qElev * 0.6;
+            const tileY = qElev * 0.5;
             const surfaceH = tile.type === 'water' ? 0.03 : tile.type === 'trench' ? 0.04 : tile.type === 'crater' ? 0.04 : SURFACE_H;
 
             _dummy.position.set(x, tileY + surfaceH + 0.005, z);
@@ -216,7 +218,7 @@ function InstancedTileGrid({ grid, movableSet, attackableSet, abilitySet, pathSe
       for (let z = 0; z < GRID_SIZE; z++) {
         const tile = grid[x][z];
         const qElev = quantizeElevation(tile.elevation);
-        const tileY = qElev * 0.6;
+        const tileY = qElev * 0.5;
         if (tileY > 0.02 && tile.type !== 'water') c++;
       }
     }
@@ -336,7 +338,7 @@ function SmokeEffect({ x, z, y }: { x: number; z: number; y: number }) {
 function PropObject({ tile, detail }: { tile: TileData; detail: 'low' | 'medium' | 'high' }) {
   if (!tile.prop) return null;
   const qElev = quantizeElevation(tile.elevation);
-  const baseY = qElev * 0.6 + SURFACE_H;
+  const baseY = qElev * 0.5 + SURFACE_H;
   const h = tileHash(tile.x, tile.z, 99);
   const scaleVar = 0.85 + tileHash(tile.x, tile.z, 200) * 0.3;
   const rotVar = tileHash(tile.x, tile.z, 201) * 0.3 - 0.15;
@@ -676,7 +678,7 @@ function PropObject({ tile, detail }: { tile: TileData; detail: 'low' | 'medium'
 function LootObject({ tile }: { tile: TileData }) {
   const ref = useRef<THREE.Group>(null);
   const qElev = quantizeElevation(tile.elevation);
-  const baseY = qElev * 0.6 + SURFACE_H + 0.01;
+  const baseY = qElev * 0.5 + SURFACE_H + 0.01;
 
   useFrame(({ clock }) => {
     if (!ref.current || !tile.loot) return;
@@ -715,7 +717,7 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
       {path.map((pos, i) => {
         const tile = grid[pos.x]?.[pos.z];
         const qElev = quantizeElevation(tile?.elevation || 0);
-        const y = qElev * 0.6 + SURFACE_H + 0.005;
+        const y = qElev * 0.5 + SURFACE_H + 0.005;
         return (
           <mesh key={`path-${i}`} position={[pos.x, y, pos.z]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[0.1, 6]} />
@@ -791,7 +793,7 @@ function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Posi
         const { x, z } = fogData[i];
         const tile = grid[x]?.[z];
         const qElev = quantizeElevation(tile?.elevation || 0);
-        const tileY = qElev * 0.6;
+        const tileY = qElev * 0.5;
         const surfaceH = tile?.type === 'water' ? 0.03 : tile?.type === 'trench' ? 0.04 : tile?.type === 'crater' ? 0.04 : SURFACE_H;
         _fogDummy.position.set(x, tileY + surfaceH + 0.02, z);
         _fogDummy.scale.set(1, 1, 1);
@@ -843,8 +845,8 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
 
   return (
     <group>
-      <mesh position={[GRID_SIZE / 2 - 0.5, -0.25, GRID_SIZE / 2 - 0.5]} receiveShadow>
-        <boxGeometry args={[GRID_SIZE + 10, 0.5, GRID_SIZE + 10]} />
+      <mesh position={[GRID_SIZE / 2 - 0.5, -0.3, GRID_SIZE / 2 - 0.5]} receiveShadow>
+        <boxGeometry args={[GRID_SIZE + 10, 0.6, GRID_SIZE + 10]} />
         <meshStandardMaterial color="#2a3a1e" roughness={1} />
       </mesh>
 

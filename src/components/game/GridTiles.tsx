@@ -678,7 +678,7 @@ function PropObject({ tile, detail }: { tile: TileData; detail: 'low' | 'medium'
 function LootObject({ tile }: { tile: TileData }) {
   const ref = useRef<THREE.Group>(null);
   const qElev = quantizeElevation(tile.elevation);
-  const baseY = qElev * 0.6 + SURFACE_H + 0.01;
+  const baseY = qElev * 0.5 + SURFACE_H + 0.01;
 
   useFrame(({ clock }) => {
     if (!ref.current || !tile.loot) return;

@@ -1093,6 +1093,12 @@ export function getMovableTiles(unit: Unit, state: GameState): Position[] {
       if (tile.isBlocked || tile.prop || tile.type === 'water') continue;
       if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz)) continue;
 
+      // Elevation restriction: can only climb 1 block at a time
+      const currentElev = state.grid[pos.x][pos.z].elevation;
+      const nextElev = tile.elevation;
+      if (nextElev - currentElev > 1) continue; // Can't climb more than 1 block up
+      // Can always drop down (no restriction on descending)
+
       visited.add(nKey);
       tiles.push({ x: nx, z: nz });
       queue.push({ pos: { x: nx, z: nz }, steps: steps + 1 });

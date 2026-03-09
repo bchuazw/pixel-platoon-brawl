@@ -341,7 +341,7 @@ function PropObject({ tile, detail }: { tile: TileData; detail: 'low' | 'medium'
   const scaleVar = 0.85 + tileHash(tile.x, tile.z, 200) * 0.3;
   const rotVar = tileHash(tile.x, tile.z, 201) * 0.3 - 0.15;
 
-  // Low detail: simplified single-mesh props
+  // Low detail: distinct silhouettes so each prop is recognizable
   if (detail === 'low') {
     const propColors: Record<string, string> = {
       tree: '#2e7018', bush: '#3a7a28', rock: '#7a7a82', crate: '#8a6a30',
@@ -354,14 +354,138 @@ function PropObject({ tile, detail }: { tile: TileData; detail: 'low' | 'medium'
       chimney: '#8a4422', boat_wreck: '#5a4a30', fountain: '#9a9a9a', pier_post: '#6a5a30',
     };
     const color = propColors[tile.prop] || '#666666';
-    const isTree = tile.prop === 'tree' || tile.prop === 'palm_tree';
-    const height = isTree ? 1.2 : 0.35;
-    return (
-      <mesh position={[tile.x, baseY + height / 2, tile.z]} castShadow>
-        {isTree ? <cylinderGeometry args={[0.15, 0.08, height, 6]} /> : <boxGeometry args={[0.4, height, 0.4]} />}
-        <meshStandardMaterial color={color} roughness={0.9} />
-      </mesh>
-    );
+
+    switch (tile.prop) {
+      case 'tree':
+        return (
+          <group position={[tile.x, baseY, tile.z]}>
+            <mesh position={[0, 0.35, 0]} castShadow><cylinderGeometry args={[0.05, 0.08, 0.7, 5]} /><meshStandardMaterial color="#5a3818" roughness={0.9} /></mesh>
+            <mesh position={[0, 0.8, 0]} castShadow><coneGeometry args={[0.35, 0.7, 6]} /><meshStandardMaterial color={color} roughness={0.9} /></mesh>
+          </group>
+        );
+      case 'palm_tree':
+        return (
+          <group position={[tile.x, baseY, tile.z]}>
+            <mesh position={[0, 0.45, 0]} castShadow><cylinderGeometry args={[0.04, 0.07, 0.9, 5]} /><meshStandardMaterial color="#7a5a28" roughness={0.9} /></mesh>
+            <mesh position={[0, 0.95, 0]} castShadow><sphereGeometry args={[0.3, 5, 4]} /><meshStandardMaterial color={color} roughness={0.9} /></mesh>
+          </group>
+        );
+      case 'bush':
+        return (
+          <mesh position={[tile.x, baseY + 0.15, tile.z]} castShadow>
+            <sphereGeometry args={[0.25, 5, 4]} /><meshStandardMaterial color={color} roughness={0.9} />
+          </mesh>
+        );
+      case 'rock':
+        return (
+          <mesh position={[tile.x, baseY + 0.13, tile.z]} castShadow>
+            <dodecahedronGeometry args={[0.22, 0]} /><meshStandardMaterial color={color} roughness={0.95} />
+          </mesh>
+        );
+      case 'barrel':
+        return (
+          <mesh position={[tile.x, baseY + 0.2, tile.z]} castShadow>
+            <cylinderGeometry args={[0.16, 0.18, 0.4, 6]} /><meshStandardMaterial color={color} roughness={0.7} />
+          </mesh>
+        );
+      case 'crate':
+        return (
+          <mesh position={[tile.x, baseY + 0.17, tile.z]} castShadow>
+            <boxGeometry args={[0.38, 0.34, 0.38]} /><meshStandardMaterial color={color} roughness={0.9} />
+          </mesh>
+        );
+      case 'sandbag':
+        return (
+          <group position={[tile.x, baseY, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]}>
+            <mesh position={[0, 0.07, 0]} castShadow><boxGeometry args={[0.5, 0.12, 0.2]} /><meshStandardMaterial color={color} roughness={1} /></mesh>
+            <mesh position={[0, 0.18, 0]} castShadow><boxGeometry args={[0.25, 0.1, 0.18]} /><meshStandardMaterial color={color} roughness={1} /></mesh>
+          </group>
+        );
+      case 'jersey_barrier':
+        return (
+          <mesh position={[tile.x, baseY + 0.18, tile.z]} rotation={[0, h * Math.PI, 0]} castShadow>
+            <boxGeometry args={[0.55, 0.36, 0.18]} /><meshStandardMaterial color={color} roughness={0.8} />
+          </mesh>
+        );
+      case 'wall':
+      case 'broken_wall':
+      case 'church_wall':
+        return (
+          <mesh position={[tile.x, baseY + 0.25, tile.z]} rotation={[0, h > 0.5 ? 0 : Math.PI / 2, 0]} castShadow>
+            <boxGeometry args={[0.6, 0.5, 0.1]} /><meshStandardMaterial color={color} roughness={0.9} />
+          </mesh>
+        );
+      case 'ruins':
+      case 'rubble_pile':
+        return (
+          <group position={[tile.x, baseY, tile.z]}>
+            <mesh position={[-0.1, 0.08, 0.05]} castShadow><boxGeometry args={[0.25, 0.16, 0.2]} /><meshStandardMaterial color={color} roughness={0.95} /></mesh>
+            <mesh position={[0.12, 0.06, -0.08]} castShadow><boxGeometry args={[0.18, 0.12, 0.15]} /><meshStandardMaterial color={color} roughness={0.95} /></mesh>
+          </group>
+        );
+      case 'burnt_vehicle':
+      case 'wrecked_car':
+        return (
+          <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+            <mesh position={[0, 0.12, 0]} castShadow><boxGeometry args={[0.55, 0.2, 0.3]} /><meshStandardMaterial color={color} roughness={0.9} /></mesh>
+            <mesh position={[0, 0.26, 0.02]} castShadow><boxGeometry args={[0.3, 0.14, 0.25]} /><meshStandardMaterial color={color} roughness={0.9} /></mesh>
+          </group>
+        );
+      case 'hesco':
+        return (
+          <mesh position={[tile.x, baseY + 0.2, tile.z]} castShadow>
+            <cylinderGeometry args={[0.22, 0.22, 0.4, 6]} /><meshStandardMaterial color={color} roughness={1} />
+          </mesh>
+        );
+      case 'tank_trap':
+        return (
+          <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+            <mesh position={[0, 0.18, 0]} rotation={[0, 0, Math.PI / 4]} castShadow><boxGeometry args={[0.08, 0.5, 0.08]} /><meshStandardMaterial color={color} roughness={0.8} /></mesh>
+            <mesh position={[0, 0.18, 0]} rotation={[0, 0, -Math.PI / 4]} castShadow><boxGeometry args={[0.08, 0.5, 0.08]} /><meshStandardMaterial color={color} roughness={0.8} /></mesh>
+          </group>
+        );
+      case 'wire':
+        return (
+          <mesh position={[tile.x, baseY + 0.1, tile.z]} rotation={[0, h * Math.PI, 0]} castShadow>
+            <torusGeometry args={[0.2, 0.02, 4, 8]} /><meshStandardMaterial color={color} roughness={0.7} />
+          </mesh>
+        );
+      case 'lamp_post':
+        return (
+          <group position={[tile.x, baseY, tile.z]}>
+            <mesh position={[0, 0.5, 0]} castShadow><cylinderGeometry args={[0.03, 0.04, 1.0, 4]} /><meshStandardMaterial color={color} roughness={0.7} /></mesh>
+            <mesh position={[0, 1.0, 0]}><sphereGeometry args={[0.08, 4, 4]} /><meshBasicMaterial color="#ffdd88" /></mesh>
+          </group>
+        );
+      case 'bench':
+        return (
+          <group position={[tile.x, baseY, tile.z]} rotation={[0, h * Math.PI, 0]}>
+            <mesh position={[0, 0.12, 0]} castShadow><boxGeometry args={[0.5, 0.04, 0.18]} /><meshStandardMaterial color={color} roughness={0.9} /></mesh>
+            <mesh position={[-0.2, 0.06, 0]} castShadow><boxGeometry args={[0.04, 0.12, 0.16]} /><meshStandardMaterial color={color} roughness={0.9} /></mesh>
+            <mesh position={[0.2, 0.06, 0]} castShadow><boxGeometry args={[0.04, 0.12, 0.16]} /><meshStandardMaterial color={color} roughness={0.9} /></mesh>
+          </group>
+        );
+      case 'fountain':
+        return (
+          <group position={[tile.x, baseY, tile.z]}>
+            <mesh position={[0, 0.1, 0]} castShadow><cylinderGeometry args={[0.3, 0.32, 0.2, 8]} /><meshStandardMaterial color={color} roughness={0.8} /></mesh>
+            <mesh position={[0, 0.25, 0]}><cylinderGeometry args={[0.05, 0.05, 0.2, 4]} /><meshStandardMaterial color={color} roughness={0.8} /></mesh>
+          </group>
+        );
+      case 'foxhole':
+        return (
+          <mesh position={[tile.x, baseY + 0.02, tile.z]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.15, 0.3, 6]} /><meshStandardMaterial color={color} roughness={1} />
+          </mesh>
+        );
+      default:
+        // Fallback: small distinct shape instead of generic cube
+        return (
+          <mesh position={[tile.x, baseY + 0.15, tile.z]} castShadow>
+            <octahedronGeometry args={[0.18, 0]} /><meshStandardMaterial color={color} roughness={0.9} />
+          </mesh>
+        );
+    }
   }
 
   // Medium detail: 2-3 meshes per prop

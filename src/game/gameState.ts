@@ -310,12 +310,18 @@ function createGrid(spawnPoints: Position[]): TileData[][] {
         type = 'sand'; elevation = Math.max(0, elevation * 0.4);
       } else if (distFromCenter < 4 && r < 0.3) {
         type = 'stone'; elevation = elevation + 0.1;
-      } else if (elevation < 0.15 && r < 0.08) {
+      } else if (elevation < 0.15 && r < 0.10) {
         type = 'water'; elevation = -0.15;
-      } else if (elevation > 1.2) {
+      } else if (elevation > 1.0) {
         type = 'stone';
-      } else if (r < 0.03 && distFromCenter > 5) {
+      } else if (elevation > 0.7 && r < 0.3) {
+        type = 'dirt'; elevation = elevation + 0.15;
+      } else if (r < 0.06 && distFromCenter > 5) {
         type = 'water'; elevation = -0.15;
+      } else if (r < 0.12 && distFromCenter > 3) {
+        type = 'dirt'; elevation = Math.max(0, elevation * 0.5);
+      } else if (r < 0.16 && distFromCenter > 4) {
+        type = 'mud'; elevation = Math.max(0, elevation * 0.3);
       }
 
       grid[x][z] = { x, z, elevation, type, prop: null, isBlocked: false, coverValue: 0, variant: Math.floor(rand() * 4), hasSmoke: false, loot: null, damaged: false, scorchMark: false };

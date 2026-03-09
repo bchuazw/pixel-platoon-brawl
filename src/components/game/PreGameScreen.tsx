@@ -291,11 +291,11 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
               <Play className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
               <span className="relative z-10">START BATTLE</span>
             </button>
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[12px] sm:text-[13px] text-muted-foreground/40">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-[15px] sm:text-[16px] text-muted-foreground/60 font-medium">
               <span>🤖 AI commands each squad</span>
-              <span className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 hidden sm:block" />
               <span>🌫️ Fog of War active</span>
-              <span className="w-1 h-1 rounded-full bg-muted-foreground/20 hidden sm:block" />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 hidden sm:block" />
               <span>💊 Medics heal allies</span>
             </div>
           </div>

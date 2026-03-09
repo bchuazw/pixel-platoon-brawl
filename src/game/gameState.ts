@@ -562,6 +562,15 @@ export function pickupLoot(unit: Unit, tile: TileData): { picked: boolean; messa
       }
       return { picked: false, message: '' };
     }
+    case 'bandage': {
+      const healAmt = Math.min(loot.value, unit.maxHp - unit.hp);
+      if (healAmt > 0) {
+        unit.hp += healAmt;
+        tile.loot = null;
+        return { picked: true, message: `🩹 ${unit.name} uses Bandage (+${healAmt} HP)!` };
+      }
+      return { picked: false, message: '' };
+    }
     case 'armor': {
       unit.armor += loot.value;
       unit.defense += Math.floor(loot.value / 2);
@@ -576,13 +585,53 @@ export function pickupLoot(unit: Unit, tile: TileData): { picked: boolean; messa
       }
       break;
     }
+    case 'grenade_pack': {
+      // Reset grenade cooldown for soldiers, or give temp attack boost for medics
+      const grenadeAbility = unit.abilities.find(a => a.id === 'grenade');
+      if (grenadeAbility && unit.cooldowns['grenade']) {
+        unit.cooldowns['grenade'] = 0;
+        tile.loot = null;
+        return { picked: true, message: `💣 ${unit.name} picks up Grenade Pack! Grenade ready!` };
+      } else if (grenadeAbility) {
+        // Already off cooldown — grant bonus attack
+        unit.attack += 3;
+        tile.loot = null;
+        return { picked: true, message: `💣 ${unit.name} uses Grenade Pack (+3 ATK)!` };
+      } else {
+        // Medics get attack boost
+        unit.attack += 5;
+        tile.loot = null;
+        return { picked: true, message: `💣 ${unit.name} uses Grenade Pack (+5 ATK)!` };
+      }
+    }
+    case 'smoke_canister': {
+      // Reset smoke cooldown for medics, or give defense boost
+      const smokeAbility = unit.abilities.find(a => a.id === 'smoke');
+      if (smokeAbility && unit.cooldowns['smoke']) {
+        unit.cooldowns['smoke'] = 0;
+        tile.loot = null;
+        return { picked: true, message: `💨 ${unit.name} picks up Smoke Canister! Smoke ready!` };
+      } else {
+        // Give defense boost
+        unit.defense += 3;
+        tile.loot = null;
+        return { picked: true, message: `💨 ${unit.name} uses Smoke Canister (+3 DEF)!` };
+      }
+    }
+    case 'stim_pack': {
+      // Temporary move range boost and small heal
+      unit.moveRange += 2;
+      const healAmt = Math.min(15, unit.maxHp - unit.hp);
+      if (healAmt > 0) unit.hp += healAmt;
+      tile.loot = null;
+      return { picked: true, message: `💉 ${unit.name} injects Stim Pack! (+2 MOV${healAmt > 0 ? `, +${healAmt} HP` : ''})` };
+    }
     case 'killstreak': {
       if (loot.killstreakId && !unit.killstreak) {
         unit.killstreak = loot.killstreakId;
         tile.loot = null;
         return { picked: true, message: `🎖️ ${unit.name} picks up ${loot.name}! Ready to activate.` };
       } else if (loot.killstreakId && unit.killstreak) {
-        // Already holding one — swap it
         unit.killstreak = loot.killstreakId;
         tile.loot = null;
         return { picked: true, message: `🎖️ ${unit.name} swaps killstreak for ${loot.name}!` };

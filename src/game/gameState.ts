@@ -149,6 +149,11 @@ export function findPath(from: Position, to: Position, state: GameState, maxStep
       if (state.units.some(u => u.isAlive && u.position.x === nx && u.position.z === nz &&
         !(nx === to.x && nz === to.z))) continue;
 
+      // Elevation restriction: can only climb 1 block at a time
+      const currentElev = state.grid[current.x][current.z].elevation;
+      const nextElev = nextTile.elevation;
+      if (nextElev - currentElev > 1) continue;
+
       visited.add(nKey);
       parent.set(nKey, key);
       depth.set(nKey, currentDepth + 1);

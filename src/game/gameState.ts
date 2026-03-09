@@ -65,23 +65,31 @@ function getTerrainElevation(x: number, z: number, seed: number, flatZones?: Pos
 // ── Loot Generation ──
 function generateLootItem(rand: () => number): LootItem {
   const roll = rand();
-  if (roll < 0.14) {
+  if (roll < 0.10) {
     return { type: 'weapon', weaponId: 'rifle', value: 0, icon: '🔫', name: 'Assault Rifle' };
-  } else if (roll < 0.24) {
+  } else if (roll < 0.17) {
     return { type: 'weapon', weaponId: 'shotgun', value: 0, icon: '💥', name: 'Shotgun' };
-  } else if (roll < 0.32) {
+  } else if (roll < 0.23) {
     return { type: 'weapon', weaponId: 'sniper_rifle', value: 0, icon: '🎯', name: 'Sniper Rifle' };
-  } else if (roll < 0.37) {
+  } else if (roll < 0.27) {
     return { type: 'weapon', weaponId: 'rocket_launcher', value: 0, icon: '🚀', name: 'Rocket Launcher' };
-  } else if (roll < 0.45) {
+  } else if (roll < 0.33) {
     return { type: 'weapon', weaponId: 'smg', value: 0, icon: '⚡', name: 'SMG' };
-  } else if (roll < 0.58) {
+  } else if (roll < 0.42) {
     return { type: 'medkit', value: 40, icon: '❤️', name: 'Medkit' };
-  } else if (roll < 0.70) {
+  } else if (roll < 0.49) {
+    return { type: 'bandage', value: 20, icon: '🩹', name: 'Bandage' };
+  } else if (roll < 0.56) {
     return { type: 'armor', value: 8, icon: '🛡️', name: 'Armor Vest' };
-  } else if (roll < 0.80) {
+  } else if (roll < 0.63) {
     return { type: 'ammo', value: 0, icon: '📦', name: 'Ammo Crate' };
-  } else if (roll < 0.86) {
+  } else if (roll < 0.71) {
+    return { type: 'grenade_pack', value: 0, icon: '💣', name: 'Grenade Pack' };
+  } else if (roll < 0.78) {
+    return { type: 'smoke_canister', value: 0, icon: '💨', name: 'Smoke Canister' };
+  } else if (roll < 0.84) {
+    return { type: 'stim_pack', value: 0, icon: '💉', name: 'Stim Pack' };
+  } else if (roll < 0.88) {
     return { type: 'killstreak', killstreakId: 'uav', value: 0, icon: '📡', name: 'UAV' };
   } else if (roll < 0.92) {
     return { type: 'killstreak', killstreakId: 'supply_drop', value: 0, icon: '📦', name: 'Supply Drop' };

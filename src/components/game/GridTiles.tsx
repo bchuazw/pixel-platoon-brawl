@@ -604,7 +604,64 @@ function PathMarkers({ path, grid }: { path: Position[]; grid: TileData[][] }) {
 }
 
 // ── Main GridTiles ──
-export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTiles, shrinkLevel, movePath, onTileClick, onTileHover, weaponRangeTiles }: GridTilesProps) {
+// ── Fog of War overlay ──
+function FogOfWar({ grid, units }: { grid: TileData[][]; units: { position: Position; visionRange: number; isAlive: boolean }[] }) {
+  const fogRef = useRef<THREE.InstancedMesh>(null);
+
+  const fogTiles = useMemo(() => {
+    // Compute visible set from all alive units
+    const visible = new Set<string>();
+    for (const u of units) {
+      if (!u.isAlive) continue;
+      const range = u.visionRange;
+      for (let dx = -range; dx <= range; dx++) {
+        for (let dz = -range; dz <= range; dz++) {
+          if (Math.abs(dx) + Math.abs(dz) > range) continue;
+          const tx = u.position.x + dx;
+          const tz = u.position.z + dz;
+          if (tx >= 0 && tx < GRID_SIZE && tz >= 0 && tz < GRID_SIZE) {
+            visible.add(`${tx},${tz}`);
+          }
+        }
+      }
+    }
+    // Collect non-visible tiles
+    const fogged: { x: number; z: number }[] = [];
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        if (!visible.has(`${x},${z}`)) fogged.push({ x, z });
+      }
+    }
+    return fogged;
+  }, [units]);
+
+  useEffect(() => {
+    if (!fogRef.current || fogTiles.length === 0) return;
+    for (let i = 0; i < fogTiles.length; i++) {
+      const { x, z } = fogTiles[i];
+      const tile = grid[x]?.[z];
+      const qElev = quantizeElevation(tile?.elevation || 0);
+      const tileY = qElev * 0.6;
+      const surfaceH = tile?.type === 'water' ? 0.03 : tile?.type === 'trench' ? 0.04 : tile?.type === 'crater' ? 0.04 : SURFACE_H;
+      _dummy.position.set(x, tileY + surfaceH + 0.008, z);
+      _dummy.scale.set(TILE_SIZE, 0.01, TILE_SIZE);
+      _dummy.updateMatrix();
+      fogRef.current.setMatrixAt(i, _dummy.matrix);
+    }
+    fogRef.current.instanceMatrix.needsUpdate = true;
+  }, [fogTiles, grid]);
+
+  if (fogTiles.length === 0) return null;
+
+  return (
+    <instancedMesh ref={fogRef} args={[undefined, undefined, fogTiles.length]}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshBasicMaterial color="#000000" transparent opacity={0.45} depthWrite={false} />
+    </instancedMesh>
+  );
+}
+
+export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTiles, shrinkLevel, movePath, onTileClick, onTileHover, weaponRangeTiles, units }: GridTilesProps) {
   const { settings } = useQualityStore();
   const lootTiles = useMemo(() => grid.flat().filter(t => t.loot !== null), [grid]);
   const movableSet = useMemo(() => new Set(movableTiles.map(t => `${t.x},${t.z}`)), [movableTiles]);
@@ -613,20 +670,16 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
   const pathSet = useMemo(() => new Set(movePath ? movePath.map(p => `${p.x},${p.z}`) : []), [movePath]);
   const weaponRangeSet = useMemo(() => new Set(weaponRangeTiles ? weaponRangeTiles.map(t => `${t.x},${t.z}`) : []), [weaponRangeTiles]);
 
-  // Water tiles for overlay
   const waterTiles = useMemo(() => grid.flat().filter(t => t.type === 'water'), [grid]);
-  // Smoke tiles
   const smokeTiles = useMemo(() => grid.flat().filter(t => t.hasSmoke), [grid]);
 
   return (
     <group>
-      {/* Base ground */}
       <mesh position={[GRID_SIZE / 2 - 0.5, -0.25, GRID_SIZE / 2 - 0.5]} receiveShadow>
         <boxGeometry args={[GRID_SIZE + 10, 0.5, GRID_SIZE + 10]} />
         <meshStandardMaterial color="#2a3a1e" roughness={1} />
       </mesh>
 
-      {/* INSTANCED tile grid — 2 draw calls instead of 1152 */}
       <InstancedTileGrid
         grid={grid}
         movableSet={movableSet}
@@ -639,19 +692,19 @@ export function GridTiles({ grid, movableTiles, attackableTiles, abilityTargetTi
         onTileHover={onTileHover}
       />
 
-      {/* Water overlays — only for water tiles */}
+      {/* Fog of War */}
+      {units && units.length > 0 && <FogOfWar grid={grid} units={units} />}
+
       {waterTiles.map(tile => {
         const tileY = getTileY(tile.elevation);
         return <WaterSurface key={`w-${tile.x}-${tile.z}`} x={tile.x} z={tile.z} y={tileY + 0.03 + 0.01} />;
       })}
 
-      {/* Smoke effects */}
       {smokeTiles.map(tile => {
         const tileY = getTileY(tile.elevation);
         return <SmokeEffect key={`s-${tile.x}-${tile.z}`} x={tile.x} z={tile.z} y={tileY + 0.5} />;
       })}
 
-      {/* Props — quality dependent */}
       {grid.flat().filter(t => t.prop).map(tile => (
         <PropObject key={`p-${tile.x}-${tile.z}`} tile={tile} detail={settings.propDetail} />
       ))}

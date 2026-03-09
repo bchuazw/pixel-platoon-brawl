@@ -271,6 +271,7 @@ export function GameBoard({ state, onTileClick, onUnitClick, onTileHover, onMove
             movePath={state.movePath}
             onTileClick={onTileClick}
             onTileHover={onTileHover}
+            units={state.units}
             weaponRangeTiles={(() => {
               if (!inspectedUnitId) return undefined;
               const u = state.units.find(u => u.id === inspectedUnitId && u.isAlive);

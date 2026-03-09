@@ -1317,7 +1317,7 @@ export function applyExplosionDamage(grid: TileData[][], center: Position, radiu
       if (dist === 0) {
         // Ground zero — crater
         tile.type = 'crater';
-        tile.elevation = Math.max(-0.2, tile.elevation - 0.3);
+        tile.elevation = Math.max(0, tile.elevation - 1);
         tile.prop = null;
         tile.isBlocked = false;
         tile.coverValue = 0;

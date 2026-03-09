@@ -103,7 +103,7 @@ export interface Unit {
 }
 
 export type TileType = 'grass' | 'dirt' | 'stone' | 'water' | 'wall' | 'sand' | 'trench' | 'crater' | 'cobblestone' | 'beach_sand' | 'shallow_water' | 'mud';
-export type PropType = 'crate' | 'barrel' | 'sandbag' | 'rock' | 'bush' | 'tree' | 'ruins'
+export type PropType = 'crate' | 'barrel' | 'sandbag' | 'rock' | 'bush' | 'tree' | 'ruins' | 'wall'
   | 'wire' | 'jersey_barrier' | 'burnt_vehicle' | 'foxhole' | 'hesco' | 'tank_trap'
   | 'broken_wall' | 'wrecked_car' | 'rubble_pile'
   | 'lamp_post' | 'bench' | 'market_stall' | 'fountain' | 'palm_tree' | 'pier_post'

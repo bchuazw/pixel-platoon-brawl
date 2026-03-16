@@ -407,7 +407,7 @@ function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, onCla
                 <div className="text-[13px] text-muted-foreground mb-3">
                   You bet <span className="text-foreground font-bold">{betAmount} STT</span> on{' '}
                   <span className="font-bold" style={{ color: TEAM_COLORS[betTeam] }}>{TEAM_NAMES[betTeam]}</span>
-                  {' — Payout: {betAmount}×3 = '}
+                  {` — Payout: ${betAmount}×3 = `}
                   <span className="text-green-400 font-bold">{betAmount * 3} STT</span>
                 </div>
                 {payoutClaimed ? (

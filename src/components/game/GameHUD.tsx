@@ -39,6 +39,9 @@ interface GameHUDProps {
   sponsorPoints?: number;
   onUnitInspect?: (unitId: string) => void;
   inspectedUnitId?: string | null;
+  gameSpeed?: number;
+  onSetGameSpeed?: (speed: number) => void;
+  onSkipToEnd?: () => void;
 }
 
 /* ── Unit Card ── */
@@ -393,7 +396,7 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
 }
 
 /* ── Main HUD ── */
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, inspectedUnitId }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, inspectedUnitId, gameSpeed, onSetGameSpeed, onSkipToEnd }: GameHUDProps) {
   const isPreGame = state.phase === 'pre_game';
   const isGameOver = state.phase === 'game_over';
   const aliveUnits = state.units.filter(u => u.isAlive);
@@ -474,6 +477,30 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
               className="text-sm px-3 sm:px-4 py-1.5 bg-primary/80 text-primary-foreground rounded-md hover:opacity-90 transition-all tracking-wider font-bold font-display flex items-center gap-1.5">
               <Play className="w-3.5 h-3.5" /> PLAY
             </button>
+          )}
+          {/* Speed controls */}
+          {!isGameOver && !isPreGame && onSetGameSpeed && (
+            <>
+              <div className="h-5 w-px bg-border/15 hidden sm:block" />
+              <div className="flex items-center gap-1 hidden sm:flex">
+                {[1, 3, 8].map(s => (
+                  <button key={s} onClick={() => onSetGameSpeed(s)}
+                    className={`text-[11px] px-2 py-1 rounded font-bold font-display transition-all ${gameSpeed === s ? 'bg-accent/80 text-accent-foreground' : 'bg-muted/40 text-muted-foreground hover:bg-muted/70'}`}>
+                    {s}x
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {/* Skip to end */}
+          {!isGameOver && !isPreGame && state.autoPlay && onSkipToEnd && (
+            <>
+              <div className="h-5 w-px bg-border/15 hidden sm:block" />
+              <button onClick={onSkipToEnd}
+                className="text-[11px] px-2 sm:px-3 py-1.5 bg-accent/60 hover:bg-accent/80 text-accent-foreground rounded-md transition-all tracking-wider font-bold font-display hidden sm:flex items-center gap-1">
+                ⏩ SKIP
+              </button>
+            </>
           )}
           {/* Exit button */}
           {onMainMenu && !isGameOver && (

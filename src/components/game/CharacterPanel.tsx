@@ -268,7 +268,7 @@ function SponsorTab({ unit, sponsorPoints, onSponsor }: {
         <div className="text-[14px] text-accent tracking-[0.15em] font-bold glow-accent">🎁 SPONSOR GIFTS</div>
         <div className="flex items-center gap-1.5 bg-accent/10 border border-accent/30 rounded-md px-3 py-1">
           <span className="text-[13px] text-accent font-bold">⭐ {sponsorPoints}</span>
-          <span className="text-[11px] text-muted-foreground">PTS</span>
+          <span className="text-[11px] text-muted-foreground">STT</span>
         </div>
       </div>
       <p className="text-[12px] text-muted-foreground mb-4">
@@ -321,7 +321,7 @@ function SponsorTab({ unit, sponsorPoints, onSponsor }: {
             >
               <div className="flex items-center justify-between">
                 <span className="text-[14px] text-foreground font-bold">{opt.icon} {opt.name}</span>
-                <span className="text-[12px] text-accent font-bold">⭐{opt.cost}</span>
+                <span className="text-[12px] text-accent font-bold">{opt.cost} STT</span>
               </div>
               <div className="text-[12px] text-muted-foreground mt-1 leading-relaxed">{opt.description}</div>
             </button>

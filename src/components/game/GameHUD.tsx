@@ -45,6 +45,7 @@ interface GameHUDProps {
   betTeam?: Team | null;
   betAmount?: number;
   onClaimPayout?: () => void;
+  onDemoBetPlaced?: (team: Team, amount: number) => void;
 }
 
 /* ── Unit Card ── */
@@ -440,7 +441,7 @@ function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, onCla
 }
 
 /* ── Main HUD ── */
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, inspectedUnitId, gameSpeed, onSetGameSpeed, onSkipToEnd, betTeam, betAmount, onClaimPayout }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, inspectedUnitId, gameSpeed, onSetGameSpeed, onSkipToEnd, betTeam, betAmount, onClaimPayout, onDemoBetPlaced }: GameHUDProps) {
   const isPreGame = state.phase === 'pre_game';
   const isGameOver = state.phase === 'game_over';
   const aliveUnits = state.units.filter(u => u.isAlive);
@@ -455,7 +456,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {isPreGame && <PreGameScreen state={state} onStartAutoPlay={onStartAutoPlay} />}
+      {isPreGame && <PreGameScreen state={state} onStartAutoPlay={onStartAutoPlay} onDemoBetPlaced={onDemoBetPlaced} />}
 
       {/* ── Top Bar ── */}
       <div className="pointer-events-auto flex items-center justify-between px-3 sm:px-6 h-12 sm:h-14"

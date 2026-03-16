@@ -540,6 +540,11 @@ export function useGameStore() {
     setSponsorPoints(prev => prev - amount);
   }, [sponsorPoints]);
 
+  const setDemoBet = useCallback((team: Team, amount: number) => {
+    setBetTeam(team);
+    setBetAmount(prev => prev + amount);
+  }, []);
+
   const collectBetPayout = useCallback(() => {
     if (!betTeam || betAmount === 0) return 0;
     const winningTeam = (['blue', 'red', 'green', 'yellow'] as const).find(t =>
@@ -1044,6 +1049,6 @@ export function useGameStore() {
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
     placeBet, betTeam, betAmount, collectBetPayout, handleAirdropLanded,
-    gameSpeed, setGameSpeed, skipToEnd,
+    gameSpeed, setGameSpeed, skipToEnd, setDemoBet,
   };
 }

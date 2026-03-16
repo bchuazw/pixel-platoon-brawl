@@ -30,6 +30,7 @@ const TEAM_NAMES: Record<Team, string> = {
 interface PreGameScreenProps {
   state: GameState;
   onStartAutoPlay: () => void;
+  onDemoBetPlaced?: (team: Team, amount: number) => void;
 }
 
 function Reveal({ delay, children }: { delay: number; children: React.ReactNode }) {
@@ -98,7 +99,7 @@ function UnitCard({ unit, index, onCustomize }: { unit: Unit; index: number; onC
   );
 }
 
-export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
+export function PreGameScreen({ state, onStartAutoPlay, onDemoBetPlaced }: PreGameScreenProps) {
   const teams: Team[] = ['blue', 'red', 'green', 'yellow'];
   const [audioStarted, setAudioStarted] = useState(false);
   const [titleRevealed, setTitleRevealed] = useState(0);
@@ -285,7 +286,7 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
             <div className="lg:w-[340px] shrink-0">
               <div className="glass-panel rounded-xl overflow-hidden">
                 <div className="p-4 sm:p-5">
-                  <CryptoBettingPanel matchId={matchId} demoMode />
+                  <CryptoBettingPanel matchId={matchId} demoMode onDemoBetPlaced={onDemoBetPlaced} />
                 </div>
               </div>
             </div>

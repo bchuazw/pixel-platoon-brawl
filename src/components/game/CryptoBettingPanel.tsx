@@ -17,6 +17,7 @@ interface CryptoBettingPanelProps {
   matchId: string | null;
   disabled?: boolean;
   demoMode?: boolean;
+  onDemoBetPlaced?: (team: Team, amount: number) => void;
 }
 
 const TEAMS: Team[] = ['blue', 'red', 'green', 'yellow'];
@@ -35,7 +36,7 @@ interface TeamBetInfo {
   userBet: string;
 }
 
-export function CryptoBettingPanel({ matchId, disabled = false, demoMode = true }: CryptoBettingPanelProps) {
+export function CryptoBettingPanel({ matchId, disabled = false, demoMode = true, onDemoBetPlaced }: CryptoBettingPanelProps) {
   const realWallet = useWallet();
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [customAmount, setCustomAmount] = useState('');
@@ -116,6 +117,7 @@ export function CryptoBettingPanel({ matchId, disabled = false, demoMode = true 
       }));
       setRecentBets(prev => [{ team, amount, user: '0xDem0...1337' }, ...prev].slice(0, 5));
       setDemoBalance(prev => (parseFloat(prev) - parseFloat(amount)).toFixed(4));
+      onDemoBetPlaced?.(team, parseFloat(amount));
       setSelectedTeam(null);
       setCustomAmount('');
       setBetting(false);

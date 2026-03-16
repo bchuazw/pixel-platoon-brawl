@@ -207,7 +207,14 @@ export function CryptoBettingPanel({ matchId, disabled = false, demoMode = true,
             <button
               key={team}
               disabled={disabled || !wallet.connected}
-              onClick={() => wallet.connected && setSelectedTeam(isSelected ? null : team)}
+              onClick={() => {
+                if (!wallet.connected) return;
+                if (demoMode && !isSelected) {
+                  handlePlaceBet(team, '0.05');
+                } else {
+                  setSelectedTeam(isSelected ? null : team);
+                }
+              }}
               className={`relative overflow-hidden rounded-lg border p-2.5 text-left transition-all ${
                 !wallet.connected || disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02]'
               } ${isSelected ? 'ring-1' : ''}`}

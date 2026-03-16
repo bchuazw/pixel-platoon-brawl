@@ -378,9 +378,12 @@ export function useGameStore() {
         if (isNewRound) {
           turn++;
           zoneTimer--;
-          if (zoneTimer <= 0 && shrinkLevel < 4) {
+          const aliveCount = newState.units.filter(u => u.isAlive).length;
+          // Accelerate zone shrink when few combatants remain
+          const maxShrink = aliveCount <= 3 ? 6 : 4;
+          if (zoneTimer <= 0 && shrinkLevel < maxShrink) {
             shrinkLevel++;
-            zoneTimer = 4;
+            zoneTimer = aliveCount <= 3 ? 2 : 4;
             log.push(`═══════════════════════════`);
             log.push(`⚠ DANGER ZONE LEVEL ${shrinkLevel}! The ring closes in!`);
 
@@ -398,6 +401,41 @@ export function useGameStore() {
               }
               return u;
             });
+          }
+
+          // Per-turn damage for units standing in the danger zone
+          if (shrinkLevel > 0) {
+            newState.units = newState.units.map(u => {
+              if (u.isAlive && !isInZone(u.position.x, u.position.z, shrinkLevel)) {
+                const dmg = 5 + 3 * shrinkLevel;
+                const newHp = Math.max(0, u.hp - dmg);
+                log.push(`🔥 ${u.name} takes ${dmg} storm damage!`);
+                allEvents.push({
+                  id: `evt-${Date.now()}-zone-${u.id}`, type: 'damage',
+                  attackerPos: u.position, targetPos: u.position, value: dmg,
+                  message: `🔥 Storm damage!`, timestamp: Date.now(),
+                });
+                return { ...u, hp: newHp, isAlive: newHp > 0 };
+              }
+              return u;
+            });
+          }
+
+          // Turn limit: force game end at turn 30
+          if (turn >= 30) {
+            const aliveTeams = getAliveTeams(newState.units);
+            if (aliveTeams.length > 1) {
+              // Tiebreaker: team with most total HP wins; eliminate all others
+              const teamHp: Record<string, number> = {};
+              newState.units.filter(u => u.isAlive).forEach(u => {
+                teamHp[u.team] = (teamHp[u.team] || 0) + u.hp;
+              });
+              const winnerTeam = Object.entries(teamHp).sort((a, b) => b[1] - a[1])[0][0];
+              newState.units = newState.units.map(u =>
+                u.team !== winnerTeam && u.isAlive ? { ...u, hp: 0, isAlive: false } : u
+              );
+              log.push(`⏰ TIME'S UP! ${winnerTeam.toUpperCase()} TEAM wins by HP tiebreaker!`);
+            }
           }
 
           let grid = newState.grid;

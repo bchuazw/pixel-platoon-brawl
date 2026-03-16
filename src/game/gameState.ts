@@ -1941,6 +1941,12 @@ export function runAiUnitStep(
       }
     }
 
+    // Fall back to pistol when current weapon runs out of ammo
+    if (unit.weapon.ammo === 0 && unit.weapon.id !== 'pistol') {
+      unit.weapon = { ...WEAPONS.pistol };
+      newState.log = [...newState.log, `🔫 ${unit.name} switches to Pistol (out of ammo)!`];
+    }
+
     // Shoot (ends turn)
     if (unit.ap >= AP_ATTACK_COST && unit.weapon.ammo !== 0) {
       const inRangeVisible = visibleAfterMove.filter(e =>
@@ -1966,12 +1972,13 @@ export function runAiUnitStep(
       }
     }
 
-    // Hunker down (only if didn't shoot — still has AP and enemies visible)
+    // Hunker down (only if didn't shoot, has AP, enemies visible, has cover, and not on cooldown)
     if (unit.ap >= 1 && !unit.isHunkered && visibleAfterMove.length > 0 && unit.coverType !== 'none') {
       const hunkerAbility = unit.abilities.find(a => a.id === 'hunker_down');
-      if (hunkerAbility) {
+      if (hunkerAbility && (!unit.cooldowns['hunker_down'] || unit.cooldowns['hunker_down'] <= 0)) {
         unit.isHunkered = true;
         unit.ap -= 1;
+        unit.cooldowns['hunker_down'] = hunkerAbility.cooldown;
         allEvents.push({ id: makeEventId(), type: 'hunker', attackerPos: { ...unit.position }, targetPos: { ...unit.position }, message: `🛡 ${unit.name} HUNKERS DOWN!`, timestamp: Date.now() });
         newState.log = [...newState.log, allEvents[allEvents.length - 1].message];
       }

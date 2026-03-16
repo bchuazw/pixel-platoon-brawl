@@ -71,8 +71,8 @@ export function CharacterPanel({ unit, sponsorPoints, onClose, onSponsor }: Char
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" onClick={onClose}>
-      <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+      <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" onClick={onClose} />
       <div
         className="relative z-10 flex gap-0 max-w-[780px] w-full mx-4 rounded-xl overflow-hidden border-2"
         style={{ borderColor: teamColor + '60' }}

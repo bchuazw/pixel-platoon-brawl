@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { startAmbientAudio, stopAmbientAudio } from '@/game/ambientAudio';
 import { GameState, Unit, TEAM_COLORS, Team } from '@/game/types';
-import { Play, Swords, Heart, Shield, Crosshair, Coins, Lock, Settings } from 'lucide-react';
+import { Play, Swords, Heart, Shield, Crosshair, Settings } from 'lucide-react';
 import { CryptoBettingPanel } from './CryptoBettingPanel';
+import { SponsorshipPanel } from './SponsorshipPanel';
 import { CustomizationModal, DEFAULT_CUSTOM, UnitCustomization } from './CustomizationModal';
+import { generateMatchId } from '@/somnia/contracts';
 
 import portraitSoldierBlue from '@/assets/portrait-soldier-blue.png';
 import portraitSoldierRed from '@/assets/portrait-soldier-red.png';
@@ -104,6 +106,8 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
   const [showParticles, setShowParticles] = useState(false);
   const [customizingUnit, setCustomizingUnit] = useState<Unit | null>(null);
   const [customizations, setCustomizations] = useState<Record<string, UnitCustomization>>({});
+  const [matchId] = useState(() => generateMatchId());
+  const [activeTab, setActiveTab] = useState<'betting' | 'sponsorship'>('betting');
   const title = 'WARGAMING';
 
   const handleClick = useCallback(() => {
@@ -226,6 +230,17 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
               </span>
             </div>
           </Reveal>
+
+          <Reveal delay={750}>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full border border-green-400/30 bg-green-400/5">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-[10px] text-green-400 font-bold tracking-wider font-display">
+                  POWERED BY SOMNIA REACTIVITY
+                </span>
+              </div>
+            </div>
+          </Reveal>
         </div>
 
         {/* Two-column layout on desktop: Roster + Betting */}
@@ -267,16 +282,40 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
             </Reveal>
           </div>
 
-          {/* Betting Panel (WIP) */}
+          {/* Somnia Reactivity Panel */}
           <Reveal delay={1200}>
-            <div className="lg:w-[300px] shrink-0">
-              <div className="glass-panel rounded-xl p-4 sm:p-5 relative overflow-hidden">
-                <div className="absolute inset-0 z-10 bg-background/40 backdrop-blur-[1px] flex flex-col items-center justify-center rounded-xl">
-                  <Lock className="w-6 h-6 text-accent/40 mb-2" />
-                  <div className="text-sm font-display font-bold text-accent/50 tracking-[0.2em]">COMING SOON</div>
-                  <div className="text-[11px] text-muted-foreground/40 mt-1">Crypto betting in a future update</div>
+            <div className="lg:w-[340px] shrink-0">
+              <div className="glass-panel rounded-xl overflow-hidden">
+                {/* Tab switcher */}
+                <div className="flex border-b border-border/20">
+                  <button
+                    onClick={() => setActiveTab('betting')}
+                    className={`flex-1 py-2.5 text-[11px] font-bold tracking-[0.15em] transition-all ${
+                      activeTab === 'betting'
+                        ? 'text-accent border-b-2 border-accent bg-accent/5'
+                        : 'text-muted-foreground/50 hover:text-muted-foreground'
+                    }`}
+                  >
+                    🎰 BETTING
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('sponsorship')}
+                    className={`flex-1 py-2.5 text-[11px] font-bold tracking-[0.15em] transition-all ${
+                      activeTab === 'sponsorship'
+                        ? 'text-accent border-b-2 border-accent bg-accent/5'
+                        : 'text-muted-foreground/50 hover:text-muted-foreground'
+                    }`}
+                  >
+                    🎁 SPONSOR
+                  </button>
                 </div>
-                <CryptoBettingPanel disabled />
+                <div className="p-4 sm:p-5">
+                  {activeTab === 'betting' ? (
+                    <CryptoBettingPanel matchId={matchId} />
+                  ) : (
+                    <SponsorshipPanel matchId={matchId} />
+                  )}
+                </div>
               </div>
             </div>
           </Reveal>

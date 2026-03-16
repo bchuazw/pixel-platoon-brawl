@@ -1,12 +1,15 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { GameBoard } from '@/components/game/GameBoard';
 import { GameHUD } from '@/components/game/GameHUD';
 import { useGameStore } from '@/game/useGameStore';
 import { CharacterPanel, SponsorAction } from '@/components/game/CharacterPanel';
 import { BroadcastOverlay } from '@/components/game/BroadcastOverlay';
+import { SponsorOverlay } from '@/components/game/SponsorOverlay';
 import { Position, AbilityId } from '@/game/types';
+import { generateMatchId } from '@/somnia/contracts';
 
 const Index = () => {
+  const [matchId] = useState(() => generateMatchId());
   const {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
@@ -109,6 +112,8 @@ const Index = () => {
       />
       {/* Broadcast overlay for cinematic announcements */}
       {state.autoPlay && <BroadcastOverlay state={state} />}
+      {/* Reactive sponsorship overlay */}
+      <SponsorOverlay matchId={matchId} />
       {inspectedUnit && (
         <CharacterPanel
           unit={inspectedUnit}

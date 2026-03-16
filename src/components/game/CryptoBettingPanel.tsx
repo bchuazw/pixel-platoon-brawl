@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Team, TEAM_COLORS } from '@/game/types';
-import { Coins, Lock, TrendingUp, Users, Zap } from 'lucide-react';
-
-interface Bet {
-  team: Team;
-  amount: number;
-}
+import { Coins, TrendingUp, Users, Zap, Loader2, ExternalLink, Wifi } from 'lucide-react';
+import { useWallet } from '@/somnia/useWallet';
+import {
+  placeBet,
+  getTeamOdds,
+  getUserBet,
+  getAgentAddress,
+  onOddsUpdated,
+  onBetPlaced,
+  getTeamFromAgent,
+} from '@/somnia/contracts';
+import { SOMNIA_TESTNET } from '@/somnia/config';
 
 interface CryptoBettingPanelProps {
+  matchId: string | null;
   disabled?: boolean;
 }
 
@@ -20,31 +27,100 @@ const TEAM_NAMES: Record<Team, string> = {
   yellow: 'GOLD LIONS',
 };
 
-const QUICK_AMOUNTS = [0.1, 0.25, 0.5, 1.0];
+const QUICK_AMOUNTS = ['0.001', '0.005', '0.01', '0.05'];
 
-export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps) {
-  const [bets, setBets] = useState<Bet[]>([]);
+interface TeamBetInfo {
+  odds: number;
+  userBet: string;
+}
+
+export function CryptoBettingPanel({ matchId, disabled = false }: CryptoBettingPanelProps) {
+  const wallet = useWallet();
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [customAmount, setCustomAmount] = useState('');
-  const [walletConnected] = useState(false);
+  const [betting, setBetting] = useState(false);
+  const [teamInfo, setTeamInfo] = useState<Record<Team, TeamBetInfo>>({
+    blue: { odds: 100, userBet: '0' },
+    red: { odds: 100, userBet: '0' },
+    green: { odds: 100, userBet: '0' },
+    yellow: { odds: 100, userBet: '0' },
+  });
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [recentBets, setRecentBets] = useState<Array<{ team: Team; amount: string; user: string }>>([]);
 
-  const totalPool = bets.reduce((s, b) => s + b.amount, 0);
-  const uniqueTeams = new Set(bets.map(b => b.team)).size;
-  const canStart = uniqueTeams >= 2;
+  // Load odds from contract
+  const refreshOdds = useCallback(async () => {
+    if (!matchId) return;
+    const updates: Partial<Record<Team, TeamBetInfo>> = {};
+    for (const team of TEAMS) {
+      try {
+        const odds = await getTeamOdds(matchId, team);
+        const userBet = wallet.address ? await getUserBet(matchId, team, wallet.address) : '0';
+        updates[team] = { odds, userBet };
+      } catch {
+        updates[team] = { odds: 100, userBet: '0' };
+      }
+    }
+    setTeamInfo(prev => ({ ...prev, ...updates }));
+  }, [matchId, wallet.address]);
 
-  const handlePlaceBet = (team: Team, amount: number) => {
-    if (disabled) return;
-    setBets(prev => [...prev, { team, amount }]);
-    setSelectedTeam(null);
-    setCustomAmount('');
+  useEffect(() => {
+    refreshOdds();
+  }, [refreshOdds]);
+
+  // Subscribe to reactive events
+  useEffect(() => {
+    if (!matchId) return;
+
+    const unsubOdds = onOddsUpdated(matchId, (agent, newOdds) => {
+      const team = getTeamFromAgent(agent);
+      if (team) {
+        setTeamInfo(prev => ({
+          ...prev,
+          [team]: { ...prev[team], odds: newOdds },
+        }));
+      }
+    });
+
+    const unsubBets = onBetPlaced(matchId, (user, agent, amount) => {
+      const team = getTeamFromAgent(agent);
+      if (team) {
+        setRecentBets(prev => [{ team, amount, user: `${user.slice(0, 6)}...${user.slice(-4)}` }, ...prev].slice(0, 5));
+        refreshOdds();
+      }
+    });
+
+    return () => { unsubOdds(); unsubBets(); };
+  }, [matchId, refreshOdds]);
+
+  const handlePlaceBet = async (team: Team, amount: string) => {
+    if (!matchId || !wallet.connected || betting) return;
+    setError(null);
+    setTxHash(null);
+    setBetting(true);
+
+    try {
+      const tx = await placeBet(matchId, team, amount);
+      setTxHash(tx.hash);
+      await tx.wait();
+      await refreshOdds();
+      setSelectedTeam(null);
+      setCustomAmount('');
+    } catch (err: any) {
+      setError(err.reason || err.message || 'Transaction failed');
+    } finally {
+      setBetting(false);
+    }
   };
 
-  const getTeamPool = (team: Team) => bets.filter(b => b.team === team).reduce((s, b) => s + b.amount, 0);
-  const getTeamOdds = (team: Team) => {
-    const teamPool = getTeamPool(team);
-    if (totalPool === 0 || teamPool === 0) return '—';
-    return `${(totalPool / teamPool).toFixed(1)}x`;
+  const formatOdds = (odds: number) => {
+    if (odds <= 0) return '—';
+    return `${(odds / 100).toFixed(1)}x`;
   };
+
+  const totalUserBet = TEAMS.reduce((sum, team) => sum + parseFloat(teamInfo[team].userBet || '0'), 0);
+  const teamsWithBets = TEAMS.filter(t => parseFloat(teamInfo[t].userBet) > 0).length;
 
   return (
     <div className="w-full max-w-sm space-y-3">
@@ -52,47 +128,64 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
       <div className="text-center space-y-1">
         <div className="flex items-center justify-center gap-2">
           <Coins className="w-4 h-4 text-accent" />
-          <h2 className="text-[13px] font-bold text-accent tracking-[0.2em]">BATTLE WAGER</h2>
+          <h2 className="text-[13px] font-bold text-accent tracking-[0.2em]">REACTIVE BETTING</h2>
           <Coins className="w-4 h-4 text-accent" />
         </div>
-        <p className="text-[9px] text-muted-foreground">Place bets with $WAR tokens on the winning squad</p>
+        <p className="text-[9px] text-muted-foreground">
+          Place bets with STT on Somnia Testnet • Odds update reactively
+        </p>
+        <div className="flex items-center justify-center gap-1.5">
+          <Wifi className="w-3 h-3 text-green-400" />
+          <span className="text-[8px] text-green-400 font-bold tracking-wider">SOMNIA REACTIVITY • LIVE</span>
+        </div>
       </div>
 
       {/* Wallet Connect */}
       <button
-        className="w-full py-2 rounded-lg border border-accent/30 bg-accent/5 hover:bg-accent/10 transition-all flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
-        disabled
+        onClick={wallet.connected ? wallet.disconnect : wallet.connect}
+        disabled={wallet.connecting}
+        className={`w-full py-2 rounded-lg border transition-all flex items-center justify-center gap-2 ${
+          wallet.connected
+            ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10'
+            : 'border-accent/30 bg-accent/5 hover:bg-accent/10'
+        }`}
       >
-        {walletConnected ? (
+        {wallet.connecting ? (
+          <Loader2 className="w-3 h-3 text-accent animate-spin" />
+        ) : wallet.connected ? (
           <>
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span className="text-[10px] text-foreground font-bold">0x7f3a...4d2e</span>
-            <span className="text-[9px] text-muted-foreground">• 12.5 $WAR</span>
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-[10px] text-foreground font-bold">{wallet.shortAddress}</span>
+            <span className="text-[9px] text-muted-foreground">• {parseFloat(wallet.balance || '0').toFixed(4)} STT</span>
           </>
         ) : (
           <>
-            <Lock className="w-3 h-3 text-accent" />
+            <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSI4IiBjeT0iOCIgcj0iOCIgZmlsbD0iIzY4NjZGRiIvPjxwYXRoIGQ9Ik00IDhoOE00IDEwaDgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMS41Ii8+PC9zdmc+" alt="" className="w-3 h-3" />
             <span className="text-[10px] text-accent font-bold tracking-wider">CONNECT WALLET</span>
           </>
         )}
       </button>
 
+      {wallet.error && (
+        <div className="text-[9px] text-red-400 text-center px-2">{wallet.error}</div>
+      )}
+
       {/* Team Cards */}
       <div className="grid grid-cols-2 gap-2">
         {TEAMS.map(team => {
-          const teamPool = getTeamPool(team);
-          const odds = getTeamOdds(team);
+          const info = teamInfo[team];
+          const odds = formatOdds(info.odds);
           const isSelected = selectedTeam === team;
           const teamColor = TEAM_COLORS[team];
-          const hasBet = teamPool > 0;
+          const hasBet = parseFloat(info.userBet) > 0;
 
           return (
             <button
               key={team}
-              disabled={disabled}
-              onClick={() => !disabled && setSelectedTeam(isSelected ? null : team)}
+              disabled={disabled || !wallet.connected}
+              onClick={() => wallet.connected && setSelectedTeam(isSelected ? null : team)}
               className={`relative overflow-hidden rounded-lg border p-2.5 text-left transition-all ${
-                disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02]'
+                !wallet.connected || disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02]'
               } ${isSelected ? 'ring-1' : ''}`}
               style={{
                 borderColor: isSelected ? teamColor : `${teamColor}30`,
@@ -109,21 +202,21 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
 
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-[8px] text-muted-foreground">POOL</div>
-                  <div className="text-[11px] font-bold text-foreground">
-                    {teamPool > 0 ? `${teamPool.toFixed(2)} $WAR` : '—'}
-                  </div>
-                </div>
-                <div className="text-right">
                   <div className="text-[8px] text-muted-foreground">ODDS</div>
                   <div className="text-[11px] font-bold" style={{ color: teamColor }}>{odds}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[8px] text-muted-foreground">YOUR BET</div>
+                  <div className="text-[11px] font-bold text-foreground">
+                    {hasBet ? `${parseFloat(info.userBet).toFixed(4)} STT` : '—'}
+                  </div>
                 </div>
               </div>
 
               {hasBet && (
                 <div className="mt-1.5 bg-card/60 rounded px-1.5 py-0.5 flex items-center gap-1">
-                  <TrendingUp className="w-2.5 h-2.5 text-accent" />
-                  <span className="text-[8px] text-accent font-bold">YOUR BET: {teamPool.toFixed(2)}</span>
+                  <TrendingUp className="w-2.5 h-2.5 text-green-400" />
+                  <span className="text-[8px] text-green-400 font-bold">POSITION ACTIVE</span>
                 </div>
               )}
             </button>
@@ -132,7 +225,7 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
       </div>
 
       {/* Bet Amount Selector */}
-      {selectedTeam && !disabled && (
+      {selectedTeam && wallet.connected && !disabled && (
         <div
           className="rounded-lg border p-3 space-y-2 animate-in slide-in-from-top-2 duration-200"
           style={{ borderColor: `${TEAM_COLORS[selectedTeam]}40`, backgroundColor: `${TEAM_COLORS[selectedTeam]}05` }}
@@ -146,9 +239,10 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
               <button
                 key={amt}
                 onClick={() => handlePlaceBet(selectedTeam, amt)}
-                className="py-1.5 rounded border border-border/30 bg-secondary/40 hover:bg-secondary/70 transition-all text-[10px] font-bold text-foreground"
+                disabled={betting}
+                className="py-1.5 rounded border border-border/30 bg-secondary/40 hover:bg-secondary/70 transition-all text-[10px] font-bold text-foreground disabled:opacity-50"
               >
-                {amt} $WAR
+                {amt} STT
               </button>
             ))}
           </div>
@@ -156,9 +250,9 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
           <div className="flex gap-1.5">
             <input
               type="number"
-              step="0.01"
-              min="0.01"
-              placeholder="Custom amount..."
+              step="0.001"
+              min="0.0001"
+              placeholder="Custom STT..."
               value={customAmount}
               onChange={e => setCustomAmount(e.target.value)}
               className="flex-1 bg-secondary/30 border border-border/30 rounded px-2 py-1.5 text-[10px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent/50"
@@ -166,14 +260,49 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
             <button
               onClick={() => {
                 const amt = parseFloat(customAmount);
-                if (amt > 0) handlePlaceBet(selectedTeam, amt);
+                if (amt > 0) handlePlaceBet(selectedTeam, customAmount);
               }}
-              disabled={!customAmount || parseFloat(customAmount) <= 0}
-              className="px-3 py-1.5 rounded bg-accent/20 border border-accent/30 text-[10px] font-bold text-accent hover:bg-accent/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={!customAmount || parseFloat(customAmount) <= 0 || betting}
+              className="px-3 py-1.5 rounded bg-accent/20 border border-accent/30 text-[10px] font-bold text-accent hover:bg-accent/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
             >
-              BET
+              {betting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'BET'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Transaction Status */}
+      {txHash && (
+        <a
+          href={`${SOMNIA_TESTNET.explorer}/tx/${txHash}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-green-500/30 bg-green-500/5 text-green-400"
+        >
+          <span className="text-[9px] font-bold">✅ TX Confirmed</span>
+          <ExternalLink className="w-3 h-3" />
+        </a>
+      )}
+
+      {error && (
+        <div className="text-center py-1.5 rounded-lg border border-red-500/30 bg-red-500/5">
+          <div className="text-[9px] text-red-400 font-bold px-2">{error}</div>
+        </div>
+      )}
+
+      {/* Recent Bets Feed */}
+      {recentBets.length > 0 && (
+        <div className="rounded-lg border border-border/20 bg-card/40 p-2 space-y-1">
+          <div className="text-[8px] text-muted-foreground tracking-wider mb-1">LIVE BET FEED</div>
+          {recentBets.map((bet, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-[8px]">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: TEAM_COLORS[bet.team] }} />
+              <span className="text-muted-foreground">{bet.user}</span>
+              <span className="text-foreground font-bold">{parseFloat(bet.amount).toFixed(4)} STT</span>
+              <span className="text-muted-foreground">on</span>
+              <span style={{ color: TEAM_COLORS[bet.team] }} className="font-bold">{TEAM_NAMES[bet.team]}</span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -182,45 +311,20 @@ export function CryptoBettingPanel({ disabled = true }: CryptoBettingPanelProps)
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Users className="w-3 h-3 text-muted-foreground" />
-            <span className="text-[9px] text-muted-foreground">TOTAL POOL</span>
+            <span className="text-[9px] text-muted-foreground">YOUR TOTAL BETS</span>
           </div>
           <span className="text-[12px] font-bold text-foreground">
-            {totalPool > 0 ? `${totalPool.toFixed(2)} $WAR` : '0.00 $WAR'}
+            {totalUserBet > 0 ? `${totalUserBet.toFixed(4)} STT` : '0 STT'}
           </span>
-        </div>
-
-        <div className="h-2 bg-muted/30 rounded-full overflow-hidden flex">
-          {TEAMS.map(team => {
-            const pct = totalPool > 0 ? (getTeamPool(team) / totalPool) * 100 : 0;
-            if (pct === 0) return null;
-            return (
-              <div
-                key={team}
-                className="h-full transition-all duration-500"
-                style={{ width: `${pct}%`, backgroundColor: TEAM_COLORS[team] }}
-              />
-            );
-          })}
         </div>
 
         <div className="flex items-center gap-1.5 pt-1">
-          <Zap className="w-3 h-3" style={{ color: canStart ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }} />
-          <span className="text-[8px]" style={{ color: canStart ? 'hsl(142, 70%, 45%)' : 'hsl(0, 75%, 55%)' }}>
-            {canStart
-              ? '✓ MIN 2 TEAMS COVERED — READY TO FIGHT'
-              : `NEED BETS ON ${2 - uniqueTeams} MORE TEAM${2 - uniqueTeams > 1 ? 'S' : ''} TO START`
-            }
+          <Zap className="w-3 h-3 text-accent" />
+          <span className="text-[8px] text-accent">
+            ⚡ Powered by Somnia Reactivity — odds update instantly on every bet
           </span>
         </div>
       </div>
-
-      {/* Disabled overlay message */}
-      {disabled && (
-        <div className="text-center py-1.5 rounded-lg border border-accent/20 bg-accent/5">
-          <div className="text-[9px] text-accent font-bold tracking-wider">🔒 COMING SOON</div>
-          <div className="text-[7px] text-muted-foreground mt-0.5">Crypto betting will be enabled in a future update</div>
-        </div>
-      )}
     </div>
   );
 }

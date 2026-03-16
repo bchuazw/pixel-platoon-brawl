@@ -987,8 +987,33 @@ export function useGameStore() {
     });
   }, []);
 
-  const skipToEnd = useCallback(() => {
+  const skipToEnd = useCallback((forcedWinner?: Team) => {
     setState(prev => {
+      if (forcedWinner) {
+        const units = prev.units.map(u => {
+          if (u.team !== forcedWinner) {
+            return { ...u, hp: 0, isAlive: false };
+          }
+          if (u.unitClass === 'soldier') {
+            return { ...u, kills: 4, level: 3 };
+          }
+          if (u.unitClass === 'medic') {
+            return { ...u, kills: 1, level: 2 };
+          }
+          return u;
+        });
+        const winner = forcedWinner.toUpperCase();
+        stopBgMusic();
+        return {
+          ...prev,
+          units,
+          turn: 18,
+          log: [...prev.log, `🏆 ${winner} TEAM WINS THE BATTLE ROYALE!`],
+          phase: 'game_over' as const, autoPlay: false,
+          selectedUnitId: null, movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+        };
+      }
+
       let s = { ...prev, units: prev.units.map(u => ({ ...u })) };
       for (let i = 0; i < 200; i++) {
         const alive = getAliveTeams(s.units);

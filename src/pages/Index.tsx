@@ -14,7 +14,7 @@ const Index = () => {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
-    handleAirdropLanded,
+    handleAirdropLanded, gameSpeed, setGameSpeed, skipToEnd, betTeam, betAmount, setDemoBet,
   } = useGameStore();
 
   const handleTileClick = useCallback((pos: Position) => {
@@ -109,6 +109,13 @@ const Index = () => {
         sponsorPoints={sponsorPoints}
         onUnitInspect={inspectUnit}
         inspectedUnitId={inspectedUnitId}
+        gameSpeed={gameSpeed}
+        onSetGameSpeed={setGameSpeed}
+        onSkipToEnd={() => skipToEnd(betTeam || 'blue')}
+        betTeam={betTeam}
+        betAmount={betAmount}
+        onDemoBetPlaced={setDemoBet}
+        onClaimPayout={() => {}}
       />
       {/* Broadcast overlay for cinematic announcements */}
       {state.autoPlay && <BroadcastOverlay state={state} />}

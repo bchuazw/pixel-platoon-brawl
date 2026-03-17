@@ -204,7 +204,7 @@ export const SOLDIER_ABILITIES: Ability[] = [{
   apCost: 1, cooldown: 3, range: 4, aoeRadius: 2, icon: '💣',
 }, {
   id: 'hunker_down', name: 'HUNKER DOWN', description: 'Brace for impact: +50% defense, much harder to hit until next turn',
-  apCost: 1, cooldown: 0, range: 0, icon: '🛡',
+  apCost: 1, cooldown: 2, range: 0, icon: '🛡',
 }];
 
 export const MEDIC_ABILITIES: Ability[] = [{

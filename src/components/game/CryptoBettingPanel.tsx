@@ -16,6 +16,8 @@ import { SOMNIA_TESTNET } from '@/somnia/config';
 interface CryptoBettingPanelProps {
   matchId: string | null;
   disabled?: boolean;
+  demoMode?: boolean;
+  onDemoBetPlaced?: (team: Team, amount: number) => void;
 }
 
 const TEAMS: Team[] = ['blue', 'red', 'green', 'yellow'];
@@ -34,8 +36,8 @@ interface TeamBetInfo {
   userBet: string;
 }
 
-export function CryptoBettingPanel({ matchId, disabled = false }: CryptoBettingPanelProps) {
-  const wallet = useWallet();
+export function CryptoBettingPanel({ matchId, disabled = false, demoMode = true, onDemoBetPlaced }: CryptoBettingPanelProps) {
+  const realWallet = useWallet();
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [betting, setBetting] = useState(false);
@@ -48,10 +50,15 @@ export function CryptoBettingPanel({ matchId, disabled = false }: CryptoBettingP
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recentBets, setRecentBets] = useState<Array<{ team: Team; amount: string; user: string }>>([]);
+  const [demoBalance, setDemoBalance] = useState('25.0000');
 
-  // Load odds from contract
+  const wallet = demoMode
+    ? { connected: true, connecting: false, address: '0xDem0...1337', shortAddress: '0xDem0...1337', balance: demoBalance, error: null, connect: () => {}, disconnect: () => {} }
+    : realWallet;
+
+  // Load odds from contract (skip in demo mode)
   const refreshOdds = useCallback(async () => {
-    if (!matchId) return;
+    if (!matchId || demoMode) return;
     const updates: Partial<Record<Team, TeamBetInfo>> = {};
     for (const team of TEAMS) {
       try {
@@ -63,15 +70,15 @@ export function CryptoBettingPanel({ matchId, disabled = false }: CryptoBettingP
       }
     }
     setTeamInfo(prev => ({ ...prev, ...updates }));
-  }, [matchId, wallet.address]);
+  }, [matchId, wallet.address, demoMode]);
 
   useEffect(() => {
     refreshOdds();
   }, [refreshOdds]);
 
-  // Subscribe to reactive events
+  // Subscribe to reactive events (skip in demo mode)
   useEffect(() => {
-    if (!matchId) return;
+    if (!matchId || demoMode) return;
 
     const unsubOdds = onOddsUpdated(matchId, (agent, newOdds) => {
       const team = getTeamFromAgent(agent);
@@ -92,13 +99,30 @@ export function CryptoBettingPanel({ matchId, disabled = false }: CryptoBettingP
     });
 
     return () => { unsubOdds(); unsubBets(); };
-  }, [matchId, refreshOdds]);
+  }, [matchId, refreshOdds, demoMode]);
 
   const handlePlaceBet = async (team: Team, amount: string) => {
     if (!matchId || !wallet.connected || betting) return;
     setError(null);
     setTxHash(null);
     setBetting(true);
+
+    if (demoMode) {
+      await new Promise(r => setTimeout(r, 600));
+      const fakeHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      setTxHash(fakeHash);
+      setTeamInfo(prev => ({
+        ...prev,
+        [team]: { ...prev[team], userBet: (parseFloat(prev[team].userBet) + parseFloat(amount)).toString() },
+      }));
+      setRecentBets(prev => [{ team, amount, user: '0xDem0...1337' }, ...prev].slice(0, 5));
+      setDemoBalance(prev => (parseFloat(prev) - parseFloat(amount)).toFixed(4));
+      onDemoBetPlaced?.(team, parseFloat(amount));
+      setSelectedTeam(null);
+      setCustomAmount('');
+      setBetting(false);
+      return;
+    }
 
     try {
       const tx = await placeBet(matchId, team, amount);
@@ -183,7 +207,14 @@ export function CryptoBettingPanel({ matchId, disabled = false }: CryptoBettingP
             <button
               key={team}
               disabled={disabled || !wallet.connected}
-              onClick={() => wallet.connected && setSelectedTeam(isSelected ? null : team)}
+              onClick={() => {
+                if (!wallet.connected) return;
+                if (demoMode && !isSelected) {
+                  handlePlaceBet(team, '0.05');
+                } else {
+                  setSelectedTeam(isSelected ? null : team);
+                }
+              }}
               className={`relative overflow-hidden rounded-lg border p-2.5 text-left transition-all ${
                 !wallet.connected || disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02]'
               } ${isSelected ? 'ring-1' : ''}`}

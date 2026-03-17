@@ -39,6 +39,13 @@ interface GameHUDProps {
   sponsorPoints?: number;
   onUnitInspect?: (unitId: string) => void;
   inspectedUnitId?: string | null;
+  gameSpeed?: number;
+  onSetGameSpeed?: (speed: number) => void;
+  onSkipToEnd?: () => void;
+  betTeam?: Team | null;
+  betAmount?: number;
+  onClaimPayout?: () => void;
+  onDemoBetPlaced?: (team: Team, amount: number) => void;
 }
 
 /* ── Unit Card ── */
@@ -189,10 +196,14 @@ function CombatFeed({ log, visible }: { log: string[]; visible: boolean }) {
 }
 
 /* ── Victory Screen ── */
-function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onRestart: () => void; onMainMenu?: () => void }) {
+function VictoryScreen({ state, onRestart, onMainMenu, betTeam, betAmount, onClaimPayout }: {
+  state: GameState; onRestart: () => void; onMainMenu?: () => void;
+  betTeam?: Team | null; betAmount?: number; onClaimPayout?: () => void;
+}) {
   const [show, setShow] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [payoutClaimed, setPayoutClaimed] = useState(false);
 
   const winnerLine = state.log.find(l => l.includes('WINS'))?.replace('🏆 ', '') || '';
   const winningTeam = (['blue', 'red', 'green', 'yellow'] as const).find(t =>
@@ -387,13 +398,50 @@ function VictoryScreen({ state, onRestart, onMainMenu }: { state: GameState; onR
             </button>
           )}
         </div>
+
+        {/* Bet Result */}
+        {betTeam && betAmount != null && betAmount > 0 && (
+          <div className="transition-all duration-700 mt-3" style={{ opacity: showDetails ? 1 : 0, transitionDelay: '0.5s' }}>
+            {betTeam === winningTeam ? (
+              <div className="glass-panel rounded-xl p-4 text-center border border-green-500/30 bg-green-500/5">
+                <div className="text-lg font-bold text-green-400 font-display mb-1">💰 BET WON!</div>
+                <div className="text-[13px] text-muted-foreground mb-3">
+                  You bet <span className="text-foreground font-bold">{betAmount} STT</span> on{' '}
+                  <span className="font-bold" style={{ color: TEAM_COLORS[betTeam] }}>{TEAM_NAMES[betTeam]}</span>
+                  {` — Payout: ${betAmount}×3 = `}
+                  <span className="text-green-400 font-bold">{betAmount * 3} STT</span>
+                </div>
+                {payoutClaimed ? (
+                  <div className="px-6 py-2.5 rounded-lg bg-green-500/20 border border-green-500/30 text-green-400 font-bold text-sm tracking-wider font-display">
+                    ✅ PAYOUT CLAIMED — {betAmount * 3} STT
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setPayoutClaimed(true); onClaimPayout?.(); }}
+                    className="px-6 py-2.5 rounded-lg bg-green-500/80 hover:bg-green-500/90 text-white font-bold text-sm tracking-wider font-display transition-all"
+                  >
+                    CLAIM PAYOUT
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="glass-panel rounded-xl p-4 text-center border border-red-500/30 bg-red-500/5">
+                <div className="text-lg font-bold text-red-400 font-display mb-1">❌ BET LOST</div>
+                <div className="text-[13px] text-muted-foreground">
+                  You bet <span className="text-foreground font-bold">{betAmount} STT</span> on{' '}
+                  <span className="font-bold" style={{ color: TEAM_COLORS[betTeam] }}>{TEAM_NAMES[betTeam]}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 /* ── Main HUD ── */
-export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, inspectedUnitId }: GameHUDProps) {
+export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility, onStartAutoPlay, onStopAutoPlay, onMainMenu, sponsorPoints, onUnitInspect, inspectedUnitId, gameSpeed, onSetGameSpeed, onSkipToEnd, betTeam, betAmount, onClaimPayout, onDemoBetPlaced }: GameHUDProps) {
   const isPreGame = state.phase === 'pre_game';
   const isGameOver = state.phase === 'game_over';
   const aliveUnits = state.units.filter(u => u.isAlive);
@@ -408,7 +456,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {isPreGame && <PreGameScreen state={state} onStartAutoPlay={onStartAutoPlay} />}
+      {isPreGame && <PreGameScreen state={state} onStartAutoPlay={onStartAutoPlay} onDemoBetPlaced={onDemoBetPlaced} />}
 
       {/* ── Top Bar ── */}
       <div className="pointer-events-auto flex items-center justify-between px-3 sm:px-6 h-12 sm:h-14"
@@ -474,6 +522,30 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
               className="text-sm px-3 sm:px-4 py-1.5 bg-primary/80 text-primary-foreground rounded-md hover:opacity-90 transition-all tracking-wider font-bold font-display flex items-center gap-1.5">
               <Play className="w-3.5 h-3.5" /> PLAY
             </button>
+          )}
+          {/* Speed controls */}
+          {!isGameOver && !isPreGame && onSetGameSpeed && (
+            <>
+              <div className="h-5 w-px bg-border/15 hidden sm:block" />
+              <div className="flex items-center gap-1 hidden sm:flex">
+                {[1, 3, 8].map(s => (
+                  <button key={s} onClick={() => onSetGameSpeed(s)}
+                    className={`text-[11px] px-2 py-1 rounded font-bold font-display transition-all ${gameSpeed === s ? 'bg-accent/80 text-accent-foreground' : 'bg-muted/40 text-muted-foreground hover:bg-muted/70'}`}>
+                    {s}x
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {/* Skip to end */}
+          {!isGameOver && !isPreGame && state.autoPlay && onSkipToEnd && (
+            <>
+              <div className="h-5 w-px bg-border/15 hidden sm:block" />
+              <button onClick={onSkipToEnd}
+                className="text-[11px] px-2 sm:px-3 py-1.5 bg-accent/60 hover:bg-accent/80 text-accent-foreground rounded-md transition-all tracking-wider font-bold font-display hidden sm:flex items-center gap-1">
+                ⏩ SKIP
+              </button>
+            </>
           )}
           {/* Exit button */}
           {onMainMenu && !isGameOver && (
@@ -546,7 +618,7 @@ export function GameHUD({ state, onEndTurn, onDeselect, onRestart, onUseAbility,
       {/* Scanlines */}
       <div className="absolute inset-0 crt-scanlines opacity-[0.015] pointer-events-none" />
 
-      {isGameOver && <VictoryScreen state={state} onRestart={onRestart} onMainMenu={onMainMenu} />}
+      {isGameOver && <VictoryScreen state={state} onRestart={onRestart} onMainMenu={onMainMenu} betTeam={betTeam} betAmount={betAmount} onClaimPayout={onClaimPayout} />}
     </div>
   );
 }

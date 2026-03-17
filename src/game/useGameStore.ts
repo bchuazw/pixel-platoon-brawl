@@ -19,6 +19,7 @@ export function useGameStore() {
   const [betAmount, setBetAmount] = useState(0);
   const autoPlayRef = useRef(false);
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [gameSpeed, setGameSpeed] = useState(1);
 
   // Track which unit is currently acting in the auto-play sequence
   const unitQueueRef = useRef<string[]>([]);
@@ -378,9 +379,12 @@ export function useGameStore() {
         if (isNewRound) {
           turn++;
           zoneTimer--;
-          if (zoneTimer <= 0 && shrinkLevel < 4) {
+          const aliveCount = newState.units.filter(u => u.isAlive).length;
+          // Accelerate zone shrink when few combatants remain
+          const maxShrink = aliveCount <= 3 ? 6 : 4;
+          if (zoneTimer <= 0 && shrinkLevel < maxShrink) {
             shrinkLevel++;
-            zoneTimer = 4;
+            zoneTimer = aliveCount <= 3 ? 2 : 4;
             log.push(`═══════════════════════════`);
             log.push(`⚠ DANGER ZONE LEVEL ${shrinkLevel}! The ring closes in!`);
 
@@ -398,6 +402,41 @@ export function useGameStore() {
               }
               return u;
             });
+          }
+
+          // Per-turn damage for units standing in the danger zone
+          if (shrinkLevel > 0) {
+            newState.units = newState.units.map(u => {
+              if (u.isAlive && !isInZone(u.position.x, u.position.z, shrinkLevel)) {
+                const dmg = 5 + 3 * shrinkLevel;
+                const newHp = Math.max(0, u.hp - dmg);
+                log.push(`🔥 ${u.name} takes ${dmg} storm damage!`);
+                allEvents.push({
+                  id: `evt-${Date.now()}-zone-${u.id}`, type: 'damage',
+                  attackerPos: u.position, targetPos: u.position, value: dmg,
+                  message: `🔥 Storm damage!`, timestamp: Date.now(),
+                });
+                return { ...u, hp: newHp, isAlive: newHp > 0 };
+              }
+              return u;
+            });
+          }
+
+          // Turn limit: force game end at turn 30
+          if (turn >= 30) {
+            const aliveTeams = getAliveTeams(newState.units);
+            if (aliveTeams.length > 1) {
+              // Tiebreaker: team with most total HP wins; eliminate all others
+              const teamHp: Record<string, number> = {};
+              newState.units.filter(u => u.isAlive).forEach(u => {
+                teamHp[u.team] = (teamHp[u.team] || 0) + u.hp;
+              });
+              const winnerTeam = Object.entries(teamHp).sort((a, b) => b[1] - a[1])[0][0];
+              newState.units = newState.units.map(u =>
+                u.team !== winnerTeam && u.isAlive ? { ...u, hp: 0, isAlive: false } : u
+              );
+              log.push(`⏰ TIME'S UP! ${winnerTeam.toUpperCase()} TEAM wins by HP tiebreaker!`);
+            }
           }
 
           let grid = newState.grid;
@@ -478,8 +517,8 @@ export function useGameStore() {
         return () => clearTimeout(safetyTimer);
       }
 
-      // Delays: killcam 3s, normal unit 1.2s, team switch 0.6s
-      const delay = isKillCam ? 3000 : hasQueue ? 1200 : 600;
+      const baseDelay = isKillCam ? 3000 : hasQueue ? 1200 : 600;
+      const delay = Math.max(50, Math.round(baseDelay / gameSpeed));
       autoPlayTimerRef.current = setTimeout(() => {
         if (autoPlayRef.current) {
           if (isKillCam) {
@@ -492,7 +531,7 @@ export function useGameStore() {
     return () => {
       if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
     };
-  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, state.units, state.selectedUnitId, state.killCam, runSingleUnitStep]);
+  }, [state.autoPlay, state.phase, state.currentTeam, state.turn, state.units, state.selectedUnitId, state.killCam, runSingleUnitStep, gameSpeed]);
 
   const placeBet = useCallback((team: Team, amount: number) => {
     if (amount > sponsorPoints) return;
@@ -500,6 +539,11 @@ export function useGameStore() {
     setBetAmount(amount);
     setSponsorPoints(prev => prev - amount);
   }, [sponsorPoints]);
+
+  const setDemoBet = useCallback((team: Team, amount: number) => {
+    setBetTeam(team);
+    setBetAmount(prev => prev + amount);
+  }, []);
 
   const collectBetPayout = useCallback(() => {
     if (!betTeam || betAmount === 0) return 0;
@@ -948,10 +992,63 @@ export function useGameStore() {
     });
   }, []);
 
+  const skipToEnd = useCallback((forcedWinner?: Team) => {
+    setState(prev => {
+      if (forcedWinner) {
+        const units = prev.units.map(u => {
+          if (u.team !== forcedWinner) {
+            return { ...u, hp: 0, isAlive: false };
+          }
+          if (u.unitClass === 'soldier') {
+            return { ...u, kills: 4, level: 3 };
+          }
+          if (u.unitClass === 'medic') {
+            return { ...u, kills: 1, level: 2 };
+          }
+          return u;
+        });
+        const winner = forcedWinner.toUpperCase();
+        stopBgMusic();
+        return {
+          ...prev,
+          units,
+          turn: 18,
+          log: [...prev.log, `🏆 ${winner} TEAM WINS THE BATTLE ROYALE!`],
+          phase: 'game_over' as const, autoPlay: false,
+          selectedUnitId: null, movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+        };
+      }
+
+      let s = { ...prev, units: prev.units.map(u => ({ ...u })) };
+      for (let i = 0; i < 200; i++) {
+        const alive = getAliveTeams(s.units);
+        if (alive.length <= 1) break;
+        const result = runAiTurn(s);
+        s = { ...result.state, units: result.state.units.map(u => ({ ...u })) };
+      }
+      const alive = getAliveTeams(s.units);
+      if (alive.length > 1) {
+        const teamHp: Record<string, number> = {};
+        s.units.filter(u => u.isAlive).forEach(u => { teamHp[u.team] = (teamHp[u.team] || 0) + u.hp; });
+        const winner = Object.entries(teamHp).sort((a, b) => b[1] - a[1])[0][0];
+        s.units = s.units.map(u => u.team !== winner && u.isAlive ? { ...u, hp: 0, isAlive: false } : u);
+      }
+      const winner = getAliveTeams(s.units)[0]?.toUpperCase() || 'NO';
+      stopBgMusic();
+      return {
+        ...s,
+        log: [...s.log, `🏆 ${winner} TEAM WINS THE BATTLE ROYALE!`],
+        phase: 'game_over' as const, autoPlay: false,
+        selectedUnitId: null, movableTiles: [], attackableTiles: [], abilityTargetTiles: [],
+      };
+    });
+  }, []);
+
   return {
     state, selectUnit, moveUnit, attackTarget, endTurn, deselect, restart,
     useAbility, executeAbility, setHoveredTile, startAutoPlay, stopAutoPlay,
     sponsorPoints, inspectedUnitId, inspectUnit, sponsorUnit, clearMovePath,
     placeBet, betTeam, betAmount, collectBetPayout, handleAirdropLanded,
+    gameSpeed, setGameSpeed, skipToEnd, setDemoBet,
   };
 }

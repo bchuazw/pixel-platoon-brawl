@@ -3,7 +3,6 @@ import { startAmbientAudio, stopAmbientAudio } from '@/game/ambientAudio';
 import { GameState, Unit, TEAM_COLORS, Team } from '@/game/types';
 import { Play, Swords, Heart, Shield, Crosshair, Settings } from 'lucide-react';
 import { CryptoBettingPanel } from './CryptoBettingPanel';
-import { SponsorshipPanel } from './SponsorshipPanel';
 import { CustomizationModal, DEFAULT_CUSTOM, UnitCustomization } from './CustomizationModal';
 import { generateMatchId } from '@/somnia/contracts';
 
@@ -31,6 +30,7 @@ const TEAM_NAMES: Record<Team, string> = {
 interface PreGameScreenProps {
   state: GameState;
   onStartAutoPlay: () => void;
+  onDemoBetPlaced?: (team: Team, amount: number) => void;
 }
 
 function Reveal({ delay, children }: { delay: number; children: React.ReactNode }) {
@@ -99,7 +99,7 @@ function UnitCard({ unit, index, onCustomize }: { unit: Unit; index: number; onC
   );
 }
 
-export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
+export function PreGameScreen({ state, onStartAutoPlay, onDemoBetPlaced }: PreGameScreenProps) {
   const teams: Team[] = ['blue', 'red', 'green', 'yellow'];
   const [audioStarted, setAudioStarted] = useState(false);
   const [titleRevealed, setTitleRevealed] = useState(0);
@@ -107,7 +107,6 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
   const [customizingUnit, setCustomizingUnit] = useState<Unit | null>(null);
   const [customizations, setCustomizations] = useState<Record<string, UnitCustomization>>({});
   const [matchId] = useState(() => generateMatchId());
-  const [activeTab, setActiveTab] = useState<'betting' | 'sponsorship'>('betting');
   const title = 'WARGAMING';
 
   const handleClick = useCallback(() => {
@@ -286,35 +285,8 @@ export function PreGameScreen({ state, onStartAutoPlay }: PreGameScreenProps) {
           <Reveal delay={1200}>
             <div className="lg:w-[340px] shrink-0">
               <div className="glass-panel rounded-xl overflow-hidden">
-                {/* Tab switcher */}
-                <div className="flex border-b border-border/20">
-                  <button
-                    onClick={() => setActiveTab('betting')}
-                    className={`flex-1 py-2.5 text-[11px] font-bold tracking-[0.15em] transition-all ${
-                      activeTab === 'betting'
-                        ? 'text-accent border-b-2 border-accent bg-accent/5'
-                        : 'text-muted-foreground/50 hover:text-muted-foreground'
-                    }`}
-                  >
-                    🎰 BETTING
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('sponsorship')}
-                    className={`flex-1 py-2.5 text-[11px] font-bold tracking-[0.15em] transition-all ${
-                      activeTab === 'sponsorship'
-                        ? 'text-accent border-b-2 border-accent bg-accent/5'
-                        : 'text-muted-foreground/50 hover:text-muted-foreground'
-                    }`}
-                  >
-                    🎁 SPONSOR
-                  </button>
-                </div>
                 <div className="p-4 sm:p-5">
-                  {activeTab === 'betting' ? (
-                    <CryptoBettingPanel matchId={matchId} />
-                  ) : (
-                    <SponsorshipPanel matchId={matchId} />
-                  )}
+                  <CryptoBettingPanel matchId={matchId} demoMode onDemoBetPlaced={onDemoBetPlaced} />
                 </div>
               </div>
             </div>
